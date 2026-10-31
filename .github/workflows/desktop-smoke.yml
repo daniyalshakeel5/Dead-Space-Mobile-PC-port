@@ -61,3 +61,20 @@ jobs:
         run: cmake --build build --config Release --parallel 2
       - name: Run input unit tests
         run: ctest --test-dir build --build-config Release --output-on-failure
+      - name: Stage Linux input diagnostic
+        if: runner.os == 'Linux'
+        shell: bash
+        run: mkdir -p dist && cp build/ds_input_probe dist/
+      - name: Stage Windows input diagnostic
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item build/Release/ds_input_probe.exe dist/
+      - name: Upload diagnostic only - NO GAME CONTENT
+        uses: actions/upload-artifact@v4
+        with:
+          name: deadspace-input-probe-${{ runner.os }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
