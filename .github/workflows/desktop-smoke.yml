@@ -57,7 +57,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libsdl2-dev
       - name: Configure (Windows fetches pinned SDL2 source)
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=ON -DDS_FETCH_SDL2=ON
-      - name: Build the native diagnostics program, not a game
-        run: cmake --build build --config Release --target ds_input_probe --parallel 2
+      - name: Build native diagnostics AND the input tests
+        run: cmake --build build --config Release --parallel 2
       - name: Run input unit tests
         run: ctest --test-dir build --build-config Release --output-on-failure
