@@ -51,7 +51,7 @@ def analyze_library(path: Path, archive_path: str) -> dict:
     data = path.read_bytes()[:32]
     result = {"apk_path": archive_path, "size_bytes": path.stat().st_size,
               "sha256": sha256_file(path)}
-    if len(data) < 20 or data[:4] != b"\\x7fELF":
+    if len(data) < 20 or data[:4] != b"\x7fELF":
         result["error"] = "Not an ELF library"
         return result
     little_endian = data[5] == 1
@@ -59,9 +59,9 @@ def analyze_library(path: Path, archive_path: str) -> dict:
     machine = int.from_bytes(data[18:20], "little" if little_endian else "big")
     result["machine"] = MACHINES.get(machine, f"unknown_{machine}")
     dyn = command_output("readelf", "-d", str(path))
-    result["needed_libraries"] = sorted(set(re.findall(r"\\(NEEDED\\).*?\\[([^]]+)\\]", dyn)))
+    result["needed_libraries"] = sorted(set(re.findall(r"\(NEEDED\).*?\[([^]]+)\]", dyn)))
     symbols = command_output("readelf", "-Ws", str(path))
-    undefined = sorted(set(re.findall(r"\\bUND\\s+([^\\s@]+)", symbols)))
+    undefined = sorted(set(re.findall(r"\bUND\s+([^\s@]+)", symbols)))
     result["undefined_symbol_count"] = len(undefined)
     result["import_hints"] = {
         key: sorted({name for name in undefined
