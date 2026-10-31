@@ -55,8 +55,19 @@ jobs:
       - name: Install system SDL2 (Linux only)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libsdl2-dev
-      - name: Configure (Windows fetches pinned SDL2 source)
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=ON -DDS_FETCH_SDL2=ON
+      - name: Prepare SDL2 on Windows using GitHub-hosted setup-sdl
+        if: runner.os == 'Windows'
+        id: sdl
+        uses: libsdl-org/setup-sdl@afd98199e97f9c2aa739474be7e0886d149a5e47
+        with:
+          version: 2.30.12
+          build-type: Release
+      - name: Configure on Linux with system SDL2
+        if: runner.os == 'Linux'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=ON -DDS_FETCH_SDL2=OFF
+      - name: Configure on Windows with setup-sdl's package
+        if: runner.os == 'Windows'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=ON -DDS_FETCH_SDL2=OFF "-DCMAKE_PREFIX_PATH=${{ steps.sdl.outputs.prefix }}"
       - name: Build native diagnostics AND the input tests
         run: cmake --build build --config Release --parallel 2
       - name: Run input unit tests
@@ -71,6 +82,9 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item build/Release/ds_input_probe.exe dist/
+          # Package SDL2.dll only if the setup-sdl package linked dynamically.
+          $dll = Get-ChildItem -Path "${{ steps.sdl.outputs.prefix }}" -Filter SDL2.dll -File -Recurse | Select-Object -First 1
+          if ($dll) { Copy-Item $dll.FullName dist/ }
       - name: Upload diagnostic only - NO GAME CONTENT
         uses: actions/upload-artifact@v4
         with:
