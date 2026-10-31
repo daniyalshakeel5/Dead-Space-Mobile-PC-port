@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(DS_BUILD_INPUT_PROBE "Build SDL2 keyboard/mouse diagnostic program" ON)
+option(DS_FETCH_SDL2 "Download and build pinned SDL2 if not installed (on CI, not the assistant VM)" OFF)
 option(DS_ENABLE_TESTS "Build and register deterministic input tests" ON)
 
 add_library(ds_port_input STATIC src/input.cpp)
@@ -19,6 +20,17 @@ endif()
 
 if(DS_BUILD_INPUT_PROBE)
     find_package(SDL2 CONFIG QUIET)
+    if(NOT TARGET SDL2::SDL2 AND DS_FETCH_SDL2)
+        include(FetchContent)
+        set(SDL_TEST OFF CACHE BOOL "SDL tests" FORCE)
+        set(SDL_SHARED OFF CACHE BOOL "SDL shared library" FORCE)
+        set(SDL_STATIC ON CACHE BOOL "SDL static library" FORCE)
+        FetchContent_Declare(ds_sdl2
+            URL "https://www.libsdl.org/release/SDL2-2.30.12.tar.gz"
+            URL_HASH "SHA256=ac356ea55e8b9dd0b2d1fa27da40ef7e238267ccf9324704850d5d47375b48ea"
+            DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+        FetchContent_MakeAvailable(ds_sdl2)
+    endif()
     if(TARGET SDL2::SDL2)
         add_executable(ds_input_probe apps/input_probe.cpp)
         target_link_libraries(ds_input_probe PRIVATE ds_port_input SDL2::SDL2)
