@@ -63,6 +63,17 @@ def analyze_library(path: Path, archive_path: str) -> dict:
     symbols = command_output("readelf", "-Ws", str(path))
     undefined = sorted(set(re.findall(r"\bUND\s+([^\s@]+)", symbols)))
     result["undefined_symbol_count"] = len(undefined)
+    # JNI exports, if present, identify Java/native boundary candidates.
+    # This does not establish whether the code has been successfully decompiled.
+    exports = []
+    for line in symbols.splitlines():
+        fields = line.split()
+        if (len(fields) >= 8 and fields[0].endswith(":")
+                and fields[6] != "UND"):
+            name = fields[7].split("@", 1)[0]
+            if name == "JNI_OnLoad" or name.startswith("Java_"):
+                exports.append(name)
+    result["jni_export_hints"] = sorted(set(exports))[:150]
     result["import_hints"] = {
         key: sorted({name for name in undefined
                      if any(marker in name.lower() for marker in markers)})[:100]
