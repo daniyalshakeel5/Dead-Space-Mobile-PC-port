@@ -1,0 +1,23 @@
+# Proprietary input packages and native game binaries must remain outside public Git history.
+*.apk
+*.xapk
+*.obb
+*.dex
+*.so
+*.aab
+
+# Local extraction / analysis scratch data
+game-input/
+extracted-game/
+decompiled-game/
+research-private/
+report/
+*.log
+
+# Local build and Python cache
+build/
+out/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
