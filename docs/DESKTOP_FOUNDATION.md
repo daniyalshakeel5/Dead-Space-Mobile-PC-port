@@ -51,3 +51,21 @@ See `docs/APK_INPUT_SETUP.md` to make the original APK available
 privately to the GitHub-hosted research job. First verify the ABI,
 native entrypoints, mobile update loop and asset readers. Only then
 bind input actions and game state to reconstructed functions.
+
+## Testing a successful GitHub Actions diagnostic
+
+When all four jobs in **Dead Space Mobile - Windows Linux desktop
+foundation** finish successfully, open that Actions run's **Artifacts**.
+Download `deadspace-input-probe-Windows` or
+`deadspace-input-probe-Linux` for your operating system. These packages
+contain the input tester only, with no game executable, assets, or APK.
+
+- **Windows:** extract ZIP and run `ds_input_probe.exe`. If Windows
+  requires the Visual C++ runtime, install it from Microsoft.
+- **Linux:** extract ZIP, mark `ds_input_probe` executable and ensure
+  SDL2 runtime libraries are installed (e.g., `libsdl2-2.0-0` on Debian).
+  The Linux diagnostic is not yet an AppImage/fully portable package.
+
+F1 toggles mouse capture; use WASD, mouse buttons, Space and number keys,
+and observe the window title. F10 exits. Do not treat a compile-only CI
+result as gameplay verification.
