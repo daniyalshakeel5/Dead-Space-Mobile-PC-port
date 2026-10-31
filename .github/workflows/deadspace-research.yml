@@ -1,0 +1,61 @@
+name: Dead Space Mobile - remote port research
+
+on:
+  push:
+    branches:
+      - work/deadspace-remote-preflight-2026-11-01
+    paths:
+      - "tools/deadspace_audit.py"
+      - "tests/test_deadspace_audit.py"
+      - ".github/workflows/deadspace-research.yml"
+  pull_request:
+    paths:
+      - "tools/deadspace_audit.py"
+      - "tests/test_deadspace_audit.py"
+      - ".github/workflows/deadspace-research.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-audit:
+    name: Research on GitHub runner (not local VM)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run fixture tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Inventory repository (push and PR)
+        if: github.event_name != 'workflow_dispatch'
+        run: python tools/deadspace_audit.py --root . --output report/deadspace-audit.json
+
+      - name: Analyze private APK if configured (manual run only)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          DS_APK_URL: ${{ secrets.DS_APK_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${DS_APK_URL:-}" ]]; then
+            curl -fsSL --retry 2 --max-time 240 -o "$RUNNER_TEMP/deadspace.apk" "$DS_APK_URL"
+            python tools/deadspace_audit.py --root . --apk "$RUNNER_TEMP/deadspace.apk" --output report/deadspace-audit.json
+            rm -f "$RUNNER_TEMP/deadspace.apk"
+          else
+            echo "DS_APK_URL not configured; performing safe repository-only audit."
+            python tools/deadspace_audit.py --root . --output report/deadspace-audit.json
+          fi
+
+      - name: Upload metadata report only
+        uses: actions/upload-artifact@v4
+        with:
+          name: deadspace-port-audit
+          path: report/deadspace-audit.json
+          if-no-files-found: error
+          retention-days: 14
