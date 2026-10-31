@@ -28,8 +28,15 @@ class TestPortAudit(unittest.TestCase):
             with ZipFile(apk, "w") as archive:
                 archive.writestr("lib/armeabi-v7a/libTest.so", header)
                 archive.writestr("AndroidManifest.xml", b"fixture")
+                archive.writestr("classes.dex", b"test dex")
+                archive.writestr("assets/data/sector.dat", b"game fixture")
             report = scan_apk(apk)
             self.assertTrue(report["has_android_manifest"])
+            self.assertEqual(report["dex_count"], 1)
+            self.assertEqual(report["entry_groups"]["assets"]["files"], 1)
+            self.assertEqual(report["entry_groups"]["lib"]["files"], 1)
+            self.assertEqual(report["archive_entries"], 4)
+            self.assertGreater(report["archive_uncompressed_bytes"], 32)
             self.assertEqual(report["native_libraries"][0]["machine"], "ARM32")
             self.assertEqual(report["native_libraries"][0]["elf_class"], "ELF32")
 
