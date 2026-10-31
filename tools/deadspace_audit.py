@@ -88,15 +88,40 @@ def scan_apk(apk: Path) -> dict:
                                if item.filename.startswith("lib/") and item.filename.endswith(".so")
                                and not item.is_dir()]
             report["archive_entries"] = len(entries)
+            report["archive_uncompressed_bytes"] = sum(item.file_size for item in entries)
+            # Summaries contain counts/byte sizes only: never export asset filenames or bytes.
+            by_group = {}
+            for entry in entries:
+                if entry.is_dir():
+                    continue
+                group = entry.filename.split("/", 1)[0] if "/" in entry.filename else "[root]"
+                bucket = by_group.setdefault(group, {"files": 0, "uncompressed_bytes": 0})
+                bucket["files"] += 1
+                bucket["uncompressed_bytes"] += entry.file_size
+            report["entry_groups"] = dict(sorted(by_group.items()))
+            report["dex_count"] = sum(item.filename.endswith(".dex") for item in entries)
             report["native_libraries"] = []
+            # Even a corrupt or malicious APK cannot trigger unbounded extraction.
+            max_single_library_bytes = 256 * 1024 * 1024
+            max_total_libraries_bytes = 1024 * 1024 * 1024
+            used_bytes = 0
             with tempfile.TemporaryDirectory() as temp:
                 for i, entry in enumerate(library_entries):
+                    if (entry.file_size > max_single_library_bytes
+                            or used_bytes + entry.file_size > max_total_libraries_bytes):
+                        report["native_libraries"].append({
+                            "apk_path": entry.filename,
+                            "error": "Extraction skipped: native library exceeds audit size limit",
+                            "declared_size_bytes": entry.file_size,
+                        })
+                        continue
+                    used_bytes += entry.file_size
                     target = Path(temp) / f"library_{i}.so"
                     with archive.open(entry) as src, target.open("wb") as dst:
                         shutil.copyfileobj(src, dst)
                     report["native_libraries"].append(analyze_library(target, entry.filename))
             report["has_android_manifest"] = "AndroidManifest.xml" in archive.namelist()
-            report["has_dex"] = any(item.filename.endswith(".dex") for item in entries)
+            report["has_dex"] = report["dex_count"] > 0
     except BadZipFile:
         report["error"] = "APK is not a valid ZIP archive"
     return report
