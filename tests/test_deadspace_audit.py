@@ -85,7 +85,7 @@ class TestPortAudit(unittest.TestCase):
     def test_truncated_or_invalid_elf_header_fails_closed(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "bad.so"
-            path.write_bytes(bytes.fromhex("7f454c460101") + b"0" * 16)
+            path.write_bytes(bytes.fromhex("7f454c460101") + b"0" * 25)
             self.assertEqual(analyze_library(path, "lib/test.so")["error"],
                              "Truncated ELF header")
             path.write_bytes(bytes.fromhex("7f454c460901") + b"0" * 52)
