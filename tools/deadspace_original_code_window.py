@@ -672,6 +672,22 @@ def observe(apk: Path) -> dict:
         data,sections,0x002807a4,0x34,0x002807b0)
     input_initial_table=(event_constructor_base+8)&0xffffffff
     input_final_table=(event_constructor_base+0x20)&0xffffffff
+    # Original 0x36FD38 = MOV r0,#1 ; B 0x37000C.
+    # Entire 0x37000C function through +0x68 was recovered from
+    # user's APK; resolve its three PC-relative inputs and scratch
+    # vtable pointer (final stores at original SP+0x0c).
+    service_global_va=resolve_arm_literal_based_global(
+        data,sections,0x00370010,0x60,0x00370024)
+    service_stack_param_va=resolve_arm_literal_based_global(
+        data,sections,0x00370014,0x60,0x00370030)
+    service_descriptor_va=resolve_arm_literal_based_global(
+        data,sections,0x00370018,0x60,0x0037003c)
+    service_temp_vtable_va=(
+        resolve_arm_literal_based_global(
+            data,sections,0x00370058,0x24,0x00370060)+8)&0xffffffff
+    if not all((service_global_va,service_stack_param_va,
+                service_descriptor_va,service_temp_vtable_va)):
+        raise ValueError("Original 0x37000C service literals unresolved")
     # Original 0x27E560 C++ static singleton guard and returned object
     # are PC-relative original BSS addresses, not address-space guesses.
     singleton_guard_va=resolve_arm_literal_based_global(
@@ -901,6 +917,17 @@ def observe(apk: Path) -> dict:
             "allocator_owner_pointer_slot_va":f"0x{input_allocator_slot:08x}",
             "queue_owner_pointer_slot_va":f"0x{input_queue_slot:08x}",
             "verified_by_three_jni_wrappers":True,
+        },
+        "original_startup_global_service_0x37000c":{
+            "entry_va":"0x0036fd38",
+            "tail_target_va":"0x0037000c",
+            "original_global_word_va":f"0x{service_global_va:08x}",
+            "stack_parameter_va":f"0x{service_stack_param_va:08x}",
+            "literal_descriptor_va":f"0x{service_descriptor_va:08x}",
+            "temp_object_vtable_va":f"0x{service_temp_vtable_va:08x}",
+            "time_seed_or_duration_us":1000000,
+            "original_callee_chain":["0x00282000","0x00282614","0x00288408"],
+            "verified":True,
         },
         "original_input_ready_guard":{
             "guard_function_va":"0x0027e97c",
