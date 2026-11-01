@@ -25,4 +25,22 @@ FramePrefixResult execute_original_frame_prefix(
     void* original_state_object, std::size_t accessible_bytes,
     OriginalFrameInit original_initializer) noexcept;
 
+// Original ARM 0x0027f870: call routine 0x0027f790(context), then
+// tail-branch to 0x00280520(context). These callees are not reconstructed
+// yet; refusing a missing callee prevents a fabricated success path.
+enum class StageZeroChainResult : std::uint8_t {
+    MissingNativeCallee,
+    OriginalTwoCallsCompleted
+};
+StageZeroChainResult execute_original_stage_zero_chain(
+    void* original_stage_context, OriginalFrameInit first_original_callee,
+    OriginalFrameInit second_original_callee) noexcept;
+
+// Original ARM 0x0027fc68 after its virtual call: SUBS r0,r0,#1;
+// MOVNE r0,#1. Thus return 0 iff the virtual method returned 1, else 1.
+// Its virtual method itself and subsequent graphics/state side effects are
+// NOT implemented by this pure value-normalization function.
+std::uint32_t original_stage_one_normalized_result(
+    std::uint32_t virtual_method_return) noexcept;
+
 } // namespace ds_port::original_runtime
