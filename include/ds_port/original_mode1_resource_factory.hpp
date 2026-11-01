@@ -1,5 +1,6 @@
 #pragma once
 #include "ds_port/original_resource_handle.hpp"
+#include "ds_port/original_resource_resolver.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
@@ -21,6 +22,9 @@ struct OriginalMode1FactoryInputs {
     std::size_t handle_bytes=0;
     OriginalMode1ResourceResolve original_0x28a718=nullptr;
     void* context=nullptr;
+    // Prefer native original 0x28A718 wrapper if provided. Its lower
+    // allocation/lookup/virtual services still require native recovery.
+    const OriginalResolverInputs0x28a718* native_resolver_0x28a718=nullptr;
 };
 enum class OriginalMode1FactoryStatus:std::uint8_t {
     InvalidMemory,MissingOriginalResolver,
