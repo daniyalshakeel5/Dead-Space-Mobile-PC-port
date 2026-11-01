@@ -67,13 +67,22 @@ original_construct_resource_owner_0x27a768(
     }
     std::uint32_t provider_r0=0;
     if(in.original_provider_arm_va) {
-        if(!in.provider_flags_0x14)
-            return blocked(S::MissingOriginalProviderMethod,pool,
-                           in.original_provider_arm_va);
-        if(!in.provider_flags_0x14(
-            in.original_provider_arm_va,0x14u,in.context,&provider_r0))
-            return blocked(S::OriginalProviderRefused,pool,
-                           in.original_provider_arm_va);
+        // If the provider IS the owner's embedded +0x804 object,
+        // original 0x27A4F0 constructs its +0x90 mode word as zero.
+        // Its verified +0x14 target 0x26C3C4 simply loads that
+        // word. No external callback is needed for this exact
+        // native owner/provider combination.
+        const bool embedded=
+            in.original_provider_arm_va==in.owner_arm_va+0x804u;
+        if(!embedded) {
+            if(!in.provider_flags_0x14)
+                return blocked(S::MissingOriginalProviderMethod,pool,
+                               in.original_provider_arm_va);
+            if(!in.provider_flags_0x14(
+                in.original_provider_arm_va,0x14u,in.context,&provider_r0))
+                return blocked(S::OriginalProviderRefused,pool,
+                               in.original_provider_arm_va);
+        }
     }
     // All potentially failing external calls have succeeded. The
     // following writes translate literal stores in original ARM
