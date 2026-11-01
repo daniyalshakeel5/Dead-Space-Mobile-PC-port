@@ -29,8 +29,9 @@ bool valid_object_type(std::uint8_t t) {
 
 M3gContainerReport scan_m3g_container(const std::uint8_t* data,
                                      std::size_t size,
-                                     std::size_t max_section_bytes) {
+                                     std::size_t max_section_bytes, M3gScanMode mode) {
     M3gContainerReport report;
+    report.diagnostic_mode = (mode == M3gScanMode::DiagnosticOpaqueVariant);
     const auto fail = [&](const char* message) {
         report.error = message;
         report.valid = false;
@@ -100,8 +101,11 @@ M3gContainerReport scan_m3g_container(const std::uint8_t* data,
             offset += 5;
             if (length > objects_size - offset)
                 return fail("M3G object payload exceeds section");
-            if (!valid_object_type(type))
-                return fail("reserved M3G object type");
+            if (!valid_object_type(type)) {
+                if (!report.diagnostic_mode)
+                    return fail("reserved M3G object type");
+                ++report.reserved_type_objects;
+            }
             if (report.section_count == 0) {
                 if (objects_in_section != 0 || type != 0)
                     return fail("header section must contain one Header object");
@@ -118,13 +122,16 @@ M3gContainerReport scan_m3g_container(const std::uint8_t* data,
                 if (header[length - 1] != 0)
                     return fail("unterminated authoring field");
             } else {
-                if (type == 0)
-                    return fail("unexpected second M3G header object");
+                if (type == 0) {
+                    if (!report.diagnostic_mode)
+                        return fail("unexpected second M3G header object");
+                    ++report.nonstandard_header_objects;
+                }
                 const bool external_section =
                     report.has_external_references && report.section_count == 1;
-                if (external_section && type != 0xff)
+                if (external_section && type != 0xff && !report.diagnostic_mode)
                     return fail("external reference section contains scene object");
-                if (!external_section && type == 0xff)
+                if (!external_section && type == 0xff && !report.diagnostic_mode)
                     return fail("unexpected external reference object");
             }
             ++objects_in_section;
