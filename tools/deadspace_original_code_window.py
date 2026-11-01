@@ -224,6 +224,18 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
         32:("orrs","r1, r1, r3"),
         36:("bne","#0x28056c"),
     })
+    gettimeofday_call=matched("frame_stage_zero_second_callee",{
+        40:("add","r0, sp, #8"),
+        44:("bl","#0x357c4"),
+    })
+    transition_state_two=matched("frame_state_one_zero_result_tail",{
+        0:("push","{r4, r5, lr}"),
+        4:("ldr","r4, [pc, #0x84]"),
+        8:("mov","r3, #2"),
+        12:("sub","sp, sp, #0x14"),
+        16:("add","r4, pc, r4"),
+        20:("str","r3, [r4], #8"),
+    })
     signed_clock=matched("frame_stage_zero_second_callee",{
         48:("ldr","r2, [sp, #0xc]"),
         52:("ldr","r0, [sp, #8]"),
@@ -239,6 +251,8 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
         "stage_one_normalizes_virtual_return_to_zero_or_one":stage_one,
         "original_signed_time_math_and_store_at_0x40":signed_clock,
         "original_clock_slot_zero_check_before_store":conditional_clock,
+        "original_gettimeofday_stack_arg_and_bl":conditional_clock and gettimeofday_call,
+        "original_state_one_transition_stores_two_first":transition_state_two,
     }
 
 
