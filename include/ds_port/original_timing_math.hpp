@@ -16,4 +16,19 @@ bool original_store_time_pair_at_offset_0x40(
     void* state, std::size_t accessible_bytes,
     std::int32_t large_units, std::int32_t small_units) noexcept;
 
+// Native 0x00280520 (AFTER its unresolved setup callback): load both
+// words at +0x40/+0x44, ORRS, BNE on nonzero. Only for an all-zero pair does
+// it obtain original time units and store the scaled 64-bit value at +0x40.
+// Caller must pass those real clock values; this function does not generate
+// or simulate time, and does not call the missing original setup routine.
+enum class OriginalClockSeedResult : std::uint8_t {
+    InvalidContext,
+    ExistingValueKept,
+    OriginalEmptySlotSeeded
+};
+OriginalClockSeedResult original_seed_time_pair_if_zero(
+    void* state, std::size_t accessible_bytes,
+    std::int32_t original_large_units,
+    std::int32_t original_small_units) noexcept;
+
 } // namespace ds_port::original_runtime
