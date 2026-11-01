@@ -218,6 +218,12 @@ jobs:
                        "startup_registration_string_copy_0x281df4"):
               print("ORIGINAL_RESOURCE_DEPENDENCY",name,
                     json.dumps(report["windows"][name]["instructions"][:192],separators=(",",":")))
+          for name in ("resource_lookup_0x28b3a4","resource_lookup_0x28a5f4",
+                       "resource_lookup_0x28a4f8","resource_lookup_0x283cb4",
+                       "resource_lookup_0x286918","resource_lookup_0x284d38",
+                       "resource_lookup_0x284df8","resource_lookup_0x28a644"):
+              print("ORIGINAL_RESOURCE_LOOKUP_FUNCTION",name,
+                    json.dumps(report["windows"][name]["instructions"][:70],separators=(",",":")))
           print("ORIGINAL_ENGINE_REGISTER_HELPER",
                 json.dumps(report["windows"]["repeated_initializer_callee_0x284178"]["instructions"][:192],separators=(",",":")))
           for name in ("post_setup_direct_callee_0x27fd7c",

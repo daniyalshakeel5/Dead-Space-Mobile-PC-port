@@ -45,6 +45,15 @@ WINDOWS = {
     # Observation only: no implementation or gameplay semantics inferred.
     "post_setup_direct_callee_0x27fd7c": (0x0027fd7c, 704),
     "post_setup_direct_callee_0x2803e4": (0x002803e4, 460),
+    "resource_lookup_0x28b3a4": (0x0028b3a4, 384),
+    "resource_lookup_0x28a5f4": (0x0028a5f4, 384),
+    "resource_lookup_0x28a4f8": (0x0028a4f8, 256),
+    "resource_lookup_0x283cb4": (0x00283cb4, 384),
+    "resource_lookup_0x286918": (0x00286918, 384),
+    "resource_lookup_0x284d38": (0x00284d38, 256),
+    "resource_lookup_0x284df8": (0x00284df8, 256),
+    "resource_lookup_0x28a644": (0x0028a644, 256),
+
     "verified_vtable_object34_slot0c_0x2876d0": (0x002876d0, 256),
     "verified_vtable_object58_slot24_0x281b40": (0x00281b40, 256),
     "verified_vtable_secondary_slot0c_0x2828e4": (0x002828e4, 256),
@@ -585,7 +594,7 @@ def observe(apk: Path) -> dict:
                 {"offset": i.address-address,
                  "op": i.mnemonic.lower(),
                  "args": i.op_str.lower()}
-                for i in decoded[:192 if key=="repeated_initializer_callee_0x284178" or key.startswith("startup_registration_") else 180 if key=="post_setup_direct_callee_0x27fd7c" else 120 if key=="post_setup_direct_callee_0x2803e4" else 64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" or key.startswith("stage_zero_second_tail_") or key=="startup_allocator_object_init_0x27e560" or key.startswith("verified_vtable_") else 40]],
+                for i in decoded[:96 if key.startswith("resource_lookup_") else 192 if key=="repeated_initializer_callee_0x284178" or key.startswith("startup_registration_") else 180 if key=="post_setup_direct_callee_0x27fd7c" else 120 if key=="post_setup_direct_callee_0x2803e4" else 64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" or key.startswith("stage_zero_second_tail_") or key=="startup_allocator_object_init_0x27e560" or key.startswith("verified_vtable_") else 40]],
         }
     # Two independently instruction-proven PC-relative literal loads.
     # Frame 0x27ef6c LDR r4,[pc,#0x90], 0x27ef74 ADD r4,pc,r4.
