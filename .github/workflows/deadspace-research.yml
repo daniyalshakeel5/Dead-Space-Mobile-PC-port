@@ -179,7 +179,7 @@ jobs:
                 json.dumps(original,sort_keys=True))
           import re
           code=Path("src/original_jni_exports.cpp").read_text()
-          pattern=r'extern "C" DS_ORIGINAL_JNI_EXPORT std::int32_t (Java_com_ea_[A-Za-z0-9_]+)\\(void\\*, void\\*\\) noexcept \\{\\s*return (\\d+);\\s*\\}'
+          pattern=r'extern "C" DS_ORIGINAL_JNI_EXPORT std::int32_t (Java_com_ea_[A-Za-z0-9_]+)\(void\*, void\*\) noexcept \{\s*return (\d+);\s*\}'
           matches=re.findall(pattern,code)
           constructed={name:int(value) for name,value in matches}
           if len(matches)!=29 or constructed!=original:
