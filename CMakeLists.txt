@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(DS_BUILD_INPUT_PROBE "Build SDL2 keyboard/mouse diagnostic program" ON)
+option(DS_BUILD_BOOT_SPLASH "Enable original APK EA/Dead Space splash rendering in the native executable" ON)
 option(DS_FETCH_SDL2 "Download and build pinned SDL2 if not installed (on CI, not the assistant VM)" OFF)
 option(DS_ENABLE_TESTS "Build and register deterministic input tests" ON)
 option(DS_BUILD_ASSET_INSTALLER "Build user-owned APK assets/ installer with zlib" OFF)
@@ -79,6 +80,18 @@ if(DS_BUILD_INPUT_PROBE)
     endif()
 endif()
 
+
+# Boot phase A: decode the user's real original EA/Dead Space splash
+# IM-M3G Image2D assets and display them in the actual game executable.
+# The original interactive menu remains gated until its code is native.
+if(DS_BUILD_BOOT_SPLASH AND TARGET SDL2::SDL2)
+    target_sources(deadspace_native PRIVATE src/original_splash_host.cpp)
+    target_link_libraries(deadspace_native PRIVATE ds_port_im_ui SDL2::SDL2)
+    target_compile_definitions(deadspace_native PRIVATE DS_NATIVE_SPLASH_PRESENTATION=1)
+    message(STATUS "Original EA and Dead Space native splash stage enabled")
+elseif(DS_BUILD_BOOT_SPLASH)
+    message(STATUS "SDL2 missing: original splash stage disabled in this build")
+endif()
 
 # The installer is opt-in so the existing lightweight diagnostic build does
 # not gain extra dependencies. ZIP inflate/CRC always runs on the user's PC.
