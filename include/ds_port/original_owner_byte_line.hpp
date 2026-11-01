@@ -42,7 +42,8 @@ OriginalNativeByteLineResult original_read_byte_line_0x276fe4(
 // branch in 0x276D18. Other modes require original UTF-16 +0x6C
 // or alternate reader paths and return an explicit blocked status.
 enum class OriginalNativeOwnerStreamStatus : std::uint8_t {
-    LineReady, EndOfStream, InvalidSource, UnsupportedOriginalMode,
+    LineReadyAwaitingOwnerPostprocess, EndOfStream, InvalidSource,
+    EngineUninitialized, MissingOriginalProvider, UnsupportedOriginalMode,
     LineTooLong, OutOfMemory
 };
 struct OriginalNativeOwnerStreamResult {
