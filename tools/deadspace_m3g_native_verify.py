@@ -100,6 +100,7 @@ def analyze(apk: Path, native_probe: Path,
     diagnostic_outcomes: Counter = Counter()
     diagnostic_types: Counter = Counter()
     image2d_format_counts: Counter = Counter()
+    image2d_failure_stages: Counter = Counter()
     image_decoding_counts: Counter = Counter()
     png_smoke_counts: Counter = Counter()
     decoded_rgba_bytes = 0
@@ -193,6 +194,9 @@ def analyze(apk: Path, native_probe: Path,
                                 for key, val in (extra.get("image2d_formats") or {}).items():
                                     if key in {"96", "97", "98", "99", "100"}:
                                         image2d_format_counts[key] += int(val)
+                                for key, val in (extra.get("image2d_failure_stages") or {}).items():
+                                    if key in {"0", "1", "2", "3", "4", "5", "6", "7"}:
+                                        image2d_failure_stages[key] += int(val)
                                 if int(extra.get("image2d_standard_payloads", 0)) > 0:
                                     decoded = subprocess.run(
                                         [str(native_probe), str(stage), "--decode-image"],
@@ -260,6 +264,7 @@ def analyze(apk: Path, native_probe: Path,
         "image2d_max_height": image2d_max_height,
         "image2d_validated_pixel_bytes": image2d_validated_pixel_bytes,
         "image2d_jsr184_format_counts": dict(sorted(image2d_format_counts.items())),
+        "image2d_failure_stage_counts": dict(sorted(image2d_failure_stages.items())),
         "image_rgba_decode_outcomes": dict(sorted(image_decoding_counts.items())),
         "image_rgba_decoded_bytes": decoded_rgba_bytes,
         "temporary_png_smoke_test": dict(sorted(png_smoke_counts.items())),
