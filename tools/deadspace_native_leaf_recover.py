@@ -34,6 +34,29 @@ def noop_return(code: bytes, thumb: bool) -> bool:
         code[4:] in (b"", b"\x00\x00\x00\x00"))
 
 
+def unconditional_tail_target(code: bytes, thumb: bool, address: int) -> int | None:
+    """Prove direct non-linking B target; no indirect branches or guesses."""
+    if thumb:
+        if len(code) != 2:
+            return None
+        half = struct.unpack_from("<H",code)[0]
+        if (half & 0xf800) != 0xe000:
+            return None
+        displacement = (half & 0x7ff) << 1
+        if displacement & 0x800:
+            displacement -= 0x1000
+        return (address + 4 + displacement) & 0xffffffff
+    if len(code) != 4:
+        return None
+    word=struct.unpack_from("<I",code)[0]
+    if (word & 0xff000000) != 0xea000000:
+        return None  # ARM unconditional B, not BL or conditional B
+    offset=(word & 0x00ffffff) << 2
+    if offset & (1 << 25):
+        offset -= (1 << 26)
+    return (address + 8 + offset) & 0xffffffff
+
+
 def inspect(binary: bytes) -> dict:
     if len(binary) < 52 or binary[:6] != b"\x7fELF\x01\x01":
         raise ValueError("expected ELF32 little-endian original lib")
@@ -49,6 +72,7 @@ def inspect(binary: bytes) -> dict:
             raise ValueError("invalid section span")
         sec.append((typ,addr,off,length,link,step))
     results={}
+    tail_targets={}
     for typ,_,off,length,link,step in sec:
         if typ!=11 or link>=len(sec) or step<16 or step>128:
             continue
@@ -68,13 +92,24 @@ def inspect(binary: bytes) -> dict:
             if position<0 or size>128 or position+size>span:continue
             body=binary[begin+position:begin+position+size]
             proven=noop_return(body,bool(value&1))
-            if name in results:results[name]=results[name] and proven
-            else:results[name]=proven
+            tail=unconditional_tail_target(body,bool(value&1),value&~1)
+            if name in results:
+                results[name]=results[name] and proven
+                if tail_targets.get(name)!=tail:
+                    tail_targets[name]=None
+            else:
+                results[name]=proven
+                tail_targets[name]=tail
     return {"schema":1,
             "kind":"original-arm-jni-noop-instruction-proof",
             "checked_targets":{name: results.get(name) for name in TARGETS},
             "proven_noop_count":sum(v is True for v in results.values()),
-            "limitations":"Only single return-instruction no-ops; longer callbacks are unverified."}
+            "direct_nonlinking_branch_targets":{
+                name:(f"0x{tail_targets[name]:08x}"
+                      if tail_targets.get(name) is not None else None)
+                for name in TARGETS
+            },
+            "limitations":"Exact no-op or two/four-byte direct B branch detection only; branch target semantics remain unverified."}
 
 
 def main() -> int:
