@@ -45,7 +45,9 @@ bool load_original_menu_stage(const std::string& root) {
     const auto ui=ds_port::decode_im_ui_rgba_images(
         ui_bytes.data(),ui_bytes.size());
     if(!scene.decoded || !ui.decoded || ui.images.size()!=2 ||
-       scene.mesh_count==0 || scene.surfaces.empty())return false;
+       scene.mesh_count==0 || scene.surfaces.empty() ||
+       scene.camera_object_indices.empty() ||
+       scene.group_object_indices.empty())return false;
     for(const auto& img:ui.images)
         if(!img.decoded || img.width!=1024 || img.height!=1024 ||
            img.pixels_rgba.size()!=1024u*1024u*4u)return false;
