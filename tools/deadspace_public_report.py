@@ -17,7 +17,7 @@ MAGIC_CATEGORIES = {
     "ogg", "flac", "id3", "wav", "webp", "riff-other", "gif", "bmp",
     "zip", "gzip", "sqlite", "elf", "dex", "unityfs", "glb", "bink",
     "xml-text", "possible-json-text", "unrecognized",
-    "m3g_jsr184", "m3g_im2", "m3g_im3", "m3g_gzip_wrapper",
+    "m3g_jsr184", "m3g_im2", "m3g_im3", "m3g_im_dash", "m3g_gzip_wrapper",
     "inner_read_error", "possible-zlib",
 }
 GROUPS = {"assets", "res", "lib", "META-INF", "other"}
@@ -77,6 +77,13 @@ def publish(audit: dict, recon: dict | None = None) -> dict:
                 key: counts_only(value)
                 for key, value in (recon.get("magic_stats") or {}).items()
                 if key in MAGIC_CATEGORIES
+            },
+            "unknown_m3g_prefix_family_stats": {
+                kind: counts_only(v)
+                for kind, v in
+                (recon.get("unknown_m3g_prefix_family_stats") or {}).items()
+                if kind in {"extended_m3g_like", "possible_ironmonkey_wrapper",
+                            "standard_gzip", "other_unknown_prefix"}
             },
             "m3g_inner_magic_stats": {
                 kind: counts_only(v)
