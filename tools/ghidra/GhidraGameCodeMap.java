@@ -348,7 +348,22 @@ public class GhidraGameCodeMap extends GhidraScript {
             result.append("]}");
             frameInstruction=frameInstruction.getNext();
         }
-        result.append("],\"frame_callback_exact_return_only\":");
+        result.append("],\"original_clock_source_thunk\":{");
+        Function clockProvider=currentProgram.getFunctionManager().getFunctionAt(
+            toAddr(0x000357c4L+ghidraBias));
+        result.append("\"entry\":").append(escape("0x"+
+            toAddr(0x000357c4L+ghidraBias).toString()));
+        result.append(",\"called_targets\":[");
+        if(clockProvider!=null) {
+            int clockCalls=0;
+            for(Function dep:clockProvider.getCalledFunctions(monitor)) {
+                if(clockCalls++>0)result.append(',');
+                result.append(escape(dep.isExternal() ? "API:"+dep.getName():addr(dep)));
+                if(clockCalls>=8)break;
+            }
+        }
+        result.append("]}");
+        result.append(",\"frame_callback_exact_return_only\":");
         Function frame=null;
         for(Function f:internals)
             if(f.getName().equals("Java_com_ea_blast_AndroidRenderer_NativeOnDrawFrame")) {
