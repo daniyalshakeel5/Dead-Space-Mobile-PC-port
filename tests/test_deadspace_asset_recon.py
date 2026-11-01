@@ -27,6 +27,8 @@ class AssetReconTests(unittest.TestCase):
             b"UnityFS\x00resource": "unityfs",
             b"\x00\x01\x02\x03": "unrecognized",
             bytes.fromhex("ab4a5352313834bb0d0a1a0a") + b"xx": "m3g_jsr184",
+            bytes.fromhex("ab494d324d3347bb0d0a1a0a"): "m3g_im2",
+            bytes.fromhex("ab494d334d3347bb0d0a1a0a"): "m3g_im3",
             b"\x78\x9c\x03\x00": "possible-zlib",
         }
         for data, expected in cases.items():
