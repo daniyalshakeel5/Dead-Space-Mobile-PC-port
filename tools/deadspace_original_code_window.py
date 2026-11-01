@@ -61,6 +61,7 @@ WINDOWS = {
     "resource_string_tree_0x285238": (0x00285238, 384),
     "resource_string_destroy_0x284e84": (0x00284e84, 224),
     "resource_token_match_0x285630": (0x00285630, 368),
+    "resource_token_tree_find_0x2854b8": (0x002854b8, 216),
     "resource_token_compare_0x35674": (0x00035674, 128),
     "resource_token_object_0x285590": (0x00285590, 224),
     "resource_record_build_0x28611c": (0x0028611c, 512),
