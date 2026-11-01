@@ -52,5 +52,25 @@ int main() {
     assert(raw.contents==before&&raw.original_capacity_bytes==cap);
     assert(append(raw,nullptr,1)==S::InvalidRange);
     assert(raw.contents==before);
+    // 0x2863EC reads (source_end-source_begin), compares the
+    // already-copied temporary length, and appends only the suffix.
+    const std::uint8_t source[]={'A','B','C','D','E','F'};
+    OriginalResourceByteString parsed{};
+    assert(original_complete_parser_range_0x2863ec(
+        parsed,source,2)==S::Completed);
+    assert(parsed.contents=="AB");
+    assert(original_complete_parser_range_0x2863ec(
+        parsed,source,6)==S::Completed);
+    assert(parsed.contents=="ABCDEF");
+    assert(parsed.original_capacity_bytes==9u);
+    // Range already shorter than the buffer: no duplicate append.
+    assert(original_complete_parser_range_0x2863ec(
+        parsed,source,4)==S::Completed);
+    assert(parsed.contents=="ABCDEF");
+    assert(original_complete_parser_range_0x2863ec(
+        parsed,nullptr,6)==S::InvalidRange);
+    assert(original_complete_parser_range_0x2863ec(
+        parsed,source,6,5)==S::ExceedsLimit);
+    assert(parsed.contents=="ABCDEF");
     return 0;
 }
