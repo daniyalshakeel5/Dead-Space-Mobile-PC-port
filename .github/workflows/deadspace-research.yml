@@ -186,6 +186,12 @@ jobs:
                   "address":sample["address"],
                   "instructions":sample["instructions"][:24]
               },sort_keys=True))
+          print("ORIGINAL_FRAME_NONZERO_BRANCH",json.dumps(
+              report["windows"]["native_frame_state_dispatch"]["instructions"][24:40],
+              sort_keys=True))
+          print("ORIGINAL_TRANSITION_CONTINUATION",json.dumps(
+              report["windows"]["frame_state_one_zero_result_tail"]["instructions"][24:36],
+              sort_keys=True))
           PY
           python - <<'PY'
           import json
