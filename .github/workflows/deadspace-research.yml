@@ -177,6 +177,9 @@ jobs:
           import json
           from pathlib import Path
           report=json.loads(Path("report/deadspace-original-instruction-window.json").read_text())
+          print("ORIGINAL_ARM_TYPE2_FLOAT_EVIDENCE",
+                json.dumps(report["stage_zero_type2_runtime_float_evidence"],
+                           sort_keys=True))
           for name in ("stage_zero_setup_type2_branch_0x28cad8",):
               item=report["windows"][name]
               print("Original type-2 ARM branch",name,
