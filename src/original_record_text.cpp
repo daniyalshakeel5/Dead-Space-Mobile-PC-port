@@ -15,12 +15,15 @@ OriginalRecordReplaceStatus original_replace_record_text_0x28611c(
        target.contents.size()>=target.original_capacity_code_units)
         return S::InvalidDestination;
     if(source_bytes && !source)return S::InvalidInput;
-    if(source_bytes>maximum_code_units*4u)
+    const auto max_source_bytes=maximum_code_units>
+        std::numeric_limits<std::size_t>::max()/4u?
+        std::numeric_limits<std::size_t>::max():maximum_code_units*4u;
+    if(source_bytes>max_source_bytes)
         return S::ExceedsLimit;
     // Original 0x286130 BL 0x28CC88 with output capacity 0 counts
     // code units, reporting -1 when an invalid sequence is encountered.
     const auto measured=original_utf8_to_utf16_0x28cc88(
-        nullptr,0,source,source_bytes,maximum_code_units*4u);
+        nullptr,0,source,source_bytes,max_source_bytes);
     if(measured.status==OriginalUtf8DecodeStatus::MalformedOriginalEncoding)
         return S::MalformedEncoding;
     if(measured.status!=OriginalUtf8DecodeStatus::Completed)
