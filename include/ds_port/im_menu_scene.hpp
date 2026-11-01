@@ -38,6 +38,10 @@ struct ImMenuSceneNodeRecord {
     std::uint8_t object_type=0;
     std::uint32_t payload_bytes=0;
 };
+struct ImMenuGroupChildren {
+    std::uint32_t group_object_index=0;
+    std::vector<std::uint32_t> children;
+};
 struct ImMenuGeometry {
     bool decoded=false;
     std::string error;
@@ -52,6 +56,7 @@ struct ImMenuGeometry {
     std::vector<std::uint32_t> camera_object_indices;
     std::vector<std::uint32_t> group_object_indices;
     std::vector<ImMenuSceneNodeRecord> scene_node_records;
+    std::vector<ImMenuGroupChildren> validated_group_children;
     std::vector<ImMenuReferenceCandidate> scene_reference_candidates;
 };
 ImMenuGeometry decode_im_menu_geometry(
