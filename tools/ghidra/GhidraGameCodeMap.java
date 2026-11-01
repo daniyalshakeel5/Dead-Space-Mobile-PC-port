@@ -8,6 +8,9 @@ import ghidra.app.decompiler.DecompInterface;
 import ghidra.app.decompiler.DecompileResults;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.FunctionIterator;
+import ghidra.program.model.listing.Instruction;
+import ghidra.program.model.listing.InstructionIterator;
+import ghidra.program.model.symbol.Reference;
 import ghidra.program.model.pcode.HighFunction;
 import ghidra.program.model.pcode.PcodeOp;
 import ghidra.program.model.pcode.PcodeOpAST;
@@ -234,6 +237,27 @@ public class GhidraGameCodeMap extends GhidraScript {
             for(int i=0;i<child.size();i++) {
                 if(i>0)result.append(',');
                 result.append(escape(child.get(i)));
+            }
+            result.append("],\"ordered_direct_call_sites\":[");
+            int siteCount=0;
+            InstructionIterator calls=currentProgram.getListing().getInstructions(
+                target.getBody(),true);
+            while(calls.hasNext() && siteCount<100) {
+                Instruction instruction=calls.next();
+                for(Reference reference:instruction.getReferencesFrom()) {
+                    if(!reference.getReferenceType().isCall()) continue;
+                    Function called=currentProgram.getFunctionManager().getFunctionAt(
+                        reference.getToAddress());
+                    if(called==null) called=currentProgram.getFunctionManager()
+                        .getFunctionContaining(reference.getToAddress());
+                    if(called==null) continue;
+                    if(siteCount++>0) result.append(',');
+                    result.append("{\"at\":").append(escape("0x"+instruction.getAddress()));
+                    result.append(",\"target\":").append(escape(
+                        called.isExternal() ? "API:"+called.getName() : addr(called)));
+                    result.append('}');
+                    if(siteCount>=100) break;
+                }
             }
             result.append("]}");
         }
