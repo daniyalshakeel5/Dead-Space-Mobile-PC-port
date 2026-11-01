@@ -177,6 +177,11 @@ jobs:
           import json
           from pathlib import Path
           report=json.loads(Path("report/deadspace-original-instruction-window.json").read_text())
+          for name in ("stage_zero_owner_provider_0x27e930",
+                       "record_allocator_virtual_call_0x281d54"):
+              print("ARM_ALLOCATOR_CHAIN",name,
+                    json.dumps(report["windows"][name]["instructions"][:32],
+                               separators=(",",":")))
           print("ORIGINAL_ARM_ALLOCATED_RECORD_GLOBAL_SLOT",
                 report["stage_zero_0x281d54_record_global_slot"])
           print("ORIGINAL_ARM_TYPE2_FLOAT_EVIDENCE",
