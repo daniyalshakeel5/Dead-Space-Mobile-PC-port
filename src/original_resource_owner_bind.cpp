@@ -33,7 +33,7 @@ OriginalOwnerBindResult0x278778 original_bind_resource_owner_0x278778(
     const auto activated=original_execute_receiver_activation_0x278e58({
         in.owner_arm_va,owner,in.owner_bytes,
         in.release_original_tree,in.context,
-        in.query_provider_mode_0x14,1u
+        in.query_provider_mode_0x14,1u,in.native_scratch
     });
     if(activated.status==A::CompletedEmptyProviderReset) {
         // Original 0x2790E0: activation returns r0=0.
