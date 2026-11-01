@@ -43,4 +43,35 @@ StageZeroChainResult execute_original_stage_zero_chain(
 std::uint32_t original_stage_one_normalized_result(
     std::uint32_t virtual_method_return) noexcept;
 
+// Original ARM 0x0027fc68 reads a pointer from [context+0xc], reads
+// its first virtual-method pointer, calls that method with its owning object
+// as r0, then applies SUBS/MOVNE to normalize the result.
+// The original 32-bit pointer layout cannot safely be assumed on x86-64:
+// the verified virtual target and object address must be supplied explicitly.
+// There is NO stand-in virtual method and no engine state mutation.
+using OriginalVirtualFirstMethod = std::uint32_t (*)(void*) noexcept;
+enum class OriginalVirtualDispatchResult : std::uint8_t {
+    MissingOriginalObjectOrMethod,
+    OriginalReturnWasOne,
+    OriginalReturnWasOther
+};
+OriginalVirtualDispatchResult original_invoke_stage_one_first_virtual(
+    void* original_virtual_object,
+    OriginalVirtualFirstMethod original_first_method) noexcept;
+
+// Original state-one frame ARM branch: after native 0x0027fc68 returns,
+// zero leads to the original transition routine 0x0027eecc. Nonzero
+// proceeds to other indirect dispatches that are not yet reconstructed.
+// We never report those unknown side effects as executed.
+using OriginalFrameTransition = void (*)(void*) noexcept;
+enum class OriginalStageOneBranchResult : std::uint8_t {
+    MissingOriginalTransition,
+    OriginalZeroResultTransitionCalled,
+    OriginalNonzeroBranchNotYetReconstructed
+};
+OriginalStageOneBranchResult original_dispatch_stage_one_result(
+    void* original_frame_object,
+    std::uint32_t result_from_0x0027fc68,
+    OriginalFrameTransition original_transition_0x0027eecc) noexcept;
+
 } // namespace ds_port::original_runtime
