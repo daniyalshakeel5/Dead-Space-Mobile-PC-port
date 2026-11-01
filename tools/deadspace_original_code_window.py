@@ -13,16 +13,16 @@ from pathlib import Path
 from zipfile import ZipFile
 
 # Actual addresses independently grounded by previous native Ghidra/ELF runs.
+# Original *ELF virtual addresses*. Do not pass Ghidra's re-based values
+# (+0x10000 for this import) to an ELF section/segment mapper.
 WINDOWS = {
-    "jni_draw_frame_tail": (0x0028f008, 4),
-    "jni_draw_frame_target": (0x0027ef68, 52),
-    "native_function_start_containing_frame_target": (0x0027ead0, 52),
-    "original_game_entry_jni": (0x00045de8, 48),
-    "game_entry_direct_callee": (0x0028e974, 8),
-    "activity_native_create": (0x0028ee54, 60),
-    "renderer_native_surface_changed": (0x0028ecf8, 60),
-    "frame_direct_helper_a": (0x000450bc, 12),
-    "frame_direct_helper_b": (0x000458b4, 12),
+    "jni_draw_frame_branch": (0x0027f008, 4),
+    "native_frame_state_dispatch": (0x0027ef68, 144),
+    "original_game_entry_jni": (0x00035de8, 48),
+    "game_entry_direct_callee": (0x0027e974, 12),
+    "activity_native_create": (0x0027ee54, 64),
+    "renderer_native_surface_changed": (0x0027ecf8, 64),
+    "renderer_native_surface_created": (0x0027ec24, 84),
 }
 
 
@@ -190,7 +190,7 @@ def observe(apk: Path) -> dict:
                 {"offset": i.address-address,
                  "op": i.mnemonic.lower(),
                  "args": i.op_str.lower()}
-                for i in decoded[:20]],
+                for i in decoded[:40]],
         }
     return {
         "schema": 1,
