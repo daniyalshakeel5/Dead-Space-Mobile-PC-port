@@ -81,7 +81,7 @@ OriginalNativeOwnerStreamResult original_dispatch_owner_line_0x276d18(
     const auto read=original_read_byte_line_0x276fe4(source,output);
     switch(read.status){
         case OriginalNativeByteLineStatus::LineReady:
-            return {S::LineReady,read.consumed_bytes};
+            return {S::LineReadyAwaitingOwnerPostprocess,read.consumed_bytes};
         case OriginalNativeByteLineStatus::EndOfStream:
             return {S::EndOfStream,0};
         case OriginalNativeByteLineStatus::LineTooLong:
