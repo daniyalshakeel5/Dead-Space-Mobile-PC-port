@@ -65,6 +65,8 @@ jobs:
                  "resource_parser_owner_mode_0x26c410",
                  "resource_parser_owner_bind_0x278778",
                  "resource_parser_owner_bind_tail_0x278a78",
+                 "resource_owner_bind_finalize_0x278978",
+                 "resource_activation_return_0x2790d8",
                  "resource_parser_tail_0x2866ec",
                  "resource_copy_0x285918",
                  "resource_string_pair_0x2857a0",
