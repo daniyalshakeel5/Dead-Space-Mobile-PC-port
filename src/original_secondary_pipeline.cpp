@@ -33,8 +33,12 @@ OriginalSecondaryPipelineResult original_run_secondary_pipeline(
         OriginalSecondaryStatus::InvalidMemory,
         OriginalPostprocessStatus::MissingOriginalCallees,0u
     };
-    if(!in.allocator || !in.embedded_service) {
+    if(!in.allocator) {
         result.allocation_status=OriginalSecondaryStatus::MissingAllocator;
+        return result;
+    }
+    if(!in.embedded_service) {
+        result.allocation_status=OriginalSecondaryStatus::MissingPostprocess;
         return result;
     }
     if(!in.allocated_object_arm_address || !in.allocated_object_bytes ||

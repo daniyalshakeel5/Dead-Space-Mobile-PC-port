@@ -126,6 +126,10 @@ int main() {
 
     state={};args.embedded_service=nullptr;
     result=original_run_secondary_pipeline(args);
+    assert(result.allocation_status==OriginalSecondaryStatus::MissingPostprocess);
+    args.embedded_service=&service;
+    args.allocator=nullptr;
+    result=original_run_secondary_pipeline(args);
     assert(result.allocation_status==OriginalSecondaryStatus::MissingAllocator);
     return 0;
 }
