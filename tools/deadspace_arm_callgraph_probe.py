@@ -10,7 +10,7 @@ import argparse
 import json
 from pathlib import Path
 from elftools.elf.elffile import ELFFile
-from capstone import Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB
+from capstone import Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB, CS_GRP_CALL, CS_GRP_JUMP
 from capstone.arm import ARM_OP_IMM
 
 
@@ -44,14 +44,13 @@ def inspect(path, va, size, thumb=False):
         name = ins.mnemonic.lower()
         entry = {"at": f"0x{ins.address:08x}", "instruction": name,
                  "operands": ins.op_str}
-        if name in {"bl", "blx", "bleq", "blne", "blgt", "bllt", "blge", "blls", "blhi", "blcs", "blcc"}:
+        if ins.group(CS_GRP_CALL):
             for operand in ins.operands:
                 if operand.type == ARM_OP_IMM:
                     entry["target"] = f"0x{operand.imm & 0xffffffff:08x}"
                     break
             calls.append(entry)
-        elif name in {"b", "bx", "beq", "bne", "bhi", "bls", "bge", "blt",
-                      "bgt", "ble", "bcc", "bcs", "bpl", "bmi", "cbz", "cbnz"}:
+        elif ins.group(CS_GRP_JUMP):
             branches.append(entry)
         if name in {"ldr", "add"} and ("#0x50" in ins.op_str or "#80" in ins.op_str):
             virtual_sites.append(entry)
