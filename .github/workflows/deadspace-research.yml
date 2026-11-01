@@ -89,6 +89,9 @@ jobs:
             --recon "$RUNNER_TEMP/private-resource-recon.json" \
             --output report/deadspace-public-evidence.json
           python -c 'import json; d=json.load(open("report/deadspace-public-evidence.json",encoding="utf-8")); assert d.get("real_apk_analyzed") and d.get("resources",{}).get("valid_zip"); print("Real upstream release analyzed; redacted aggregate report ready.")'
+          echo "::group::Sanitized original-APK evidence (public metadata only)"
+          python -m json.tool report/deadspace-public-evidence.json
+          echo "::endgroup::"
 
       - name: Upload metadata report only
         uses: actions/upload-artifact@v4
