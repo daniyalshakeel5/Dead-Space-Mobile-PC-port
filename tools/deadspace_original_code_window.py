@@ -56,6 +56,8 @@ WINDOWS = {
     "resource_lookup_0x286918": (0x00286918, 384),
     "resource_parser_0x2863ec": (0x002863ec, 768),
     "resource_parser_owner_init_0x27a768": (0x0027a768, 512),
+    "resource_owner_embedded_init_0x27a4f0": (0x0027a4f0, 512),
+    "resource_owner_default_pool_0x271914": (0x00271914, 320),
     "resource_parser_receiver_0x278018": (0x00278018, 768),
     "resource_receiver_activation_0x278e58": (0x00278e58, 480),
     "resource_receiver_activation_tree_clear_0x273570": (0x00273570, 384),
