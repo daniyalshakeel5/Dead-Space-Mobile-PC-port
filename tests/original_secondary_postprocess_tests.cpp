@@ -1,5 +1,8 @@
 #include "ds_port/original_secondary_postprocess.hpp"
 #include <array>
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <cassert>
 using namespace ds_port::original_runtime;
 namespace {
