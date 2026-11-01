@@ -2,7 +2,8 @@
 import struct
 import unittest
 from tools.deadspace_original_code_window import (
-    elf32_load_ranges, bounded_virtual_read, proven_frame_dispatch_prefix)
+    elf32_load_ranges, bounded_virtual_read, proven_frame_dispatch_prefix,
+    proven_original_code_helpers)
 
 
 class ArmWindowTests(unittest.TestCase):
@@ -15,6 +16,42 @@ class ArmWindowTests(unittest.TestCase):
                          1,128,0x1000,0,16,16,5,4096)
         data[128:144]=bytes(range(16))
         return bytes(data)
+
+    def test_exact_original_native_helper_proofs(self):
+        def decoded(spec):
+            return {"instructions":[{"offset":offset,"op":op,"args":args}
+                                    for offset,(op,args) in spec.items()]}
+        windows={
+            "game_entry_direct_callee":decoded({
+                0:("mov","r0, #0"),4:("bx","lr")}),
+            "original_game_entry_jni":decoded({
+                0:("push","{fp, lr}"),4:("add","fp, sp, #4"),
+                8:("sub","sp, sp, #8"),12:("str","r0, [fp, #-8]"),
+                16:("str","r1, [fp, #-0xc]"),
+                20:("mov","r0, #0"),24:("mov","r1, #0"),
+                28:("bl","#0x27e974"),32:("mov","r3, r0"),
+                36:("mov","r0, r3"),40:("sub","sp, fp, #4"),
+                44:("pop","{fp, pc}")}),
+            "frame_stage_zero_routine":decoded({
+                0:("push","{r4, lr}"),4:("mov","r4, r0"),
+                8:("bl","#0x27f790"),12:("mov","r0, r4"),
+                16:("pop","{r4, lr}"),20:("b","#0x280520")}),
+            "frame_stage_one_routine":decoded({
+                0:("push","{r4, lr}"),4:("ldr","r3, [r0, #0xc]"),
+                8:("mov","r0, r3"),12:("ldr","r3, [r3]"),
+                16:("mov","lr, pc"),20:("ldr","pc, [r3]"),
+                24:("subs","r0, r0, #1"),28:("movne","r0, #1"),
+                32:("pop","{r4, pc}")})
+        }
+        self.assertTrue(all(proven_original_code_helpers(windows).values()))
+        windows["game_entry_direct_callee"]["instructions"][0]["args"]="r0, #1"
+        results=proven_original_code_helpers(windows)
+        self.assertFalse(results["jni_run_entrypoint_always_returns_zero"])
+        self.assertTrue(results["stage_zero_calls_both_native_routines_in_order"])
+        windows["game_entry_direct_callee"]["instructions"][0]["args"]="r0, #0"
+        windows["frame_stage_one_routine"]["instructions"][7]["op"]="mov"
+        self.assertFalse(proven_original_code_helpers(windows)[
+            "stage_one_normalizes_virtual_return_to_zero_or_one"])
 
     def test_exact_original_arm_frame_dispatch_proof(self):
         specs={
