@@ -176,6 +176,13 @@ jobs:
               elf,elf32_executable_sections(elf),0x27193c,4))[0]
           pool_slot=(0x27191c+8+pool_relative)&0xffffffff
           print("ORIGINAL_DEFAULT_POOL_SLOT_0x271914",hex(pool_slot))
+          # Original 0x27541C wide-string constructor obtains its
+          # allocator via LDR r5, [PC,#0x4C] at 0x275420 and
+          # ADD r5, PC, r5 at 0x27542C. Resolve original GOT VA.
+          string_relative=struct.unpack("<i",bounded_virtual_read(
+              elf,elf32_executable_sections(elf),0x275474,4))[0]
+          string_slot=(0x27542c+8+string_relative)&0xffffffff
+          print("ORIGINAL_RECEIVER_STRING_SLOT_0x27541C",hex(string_slot))
           outfile=Path(os.environ["RUNNER_TEMP"])/"resource-instructions.json"
           outfile.write_text(json.dumps({"schema":2,
                "factory_mode1_vtable_arm_va":hex(vtable),
