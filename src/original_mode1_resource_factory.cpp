@@ -15,7 +15,7 @@ OriginalMode1FactoryResult original_construct_mode1_handle_0x28b3a4(
     if(!in.mapped_handle || in.handle_bytes<kOriginalMode1HandleBytes ||
        !owner)
         return fail(OriginalMode1FactoryStatus::InvalidMemory);
-    if(!in.original_0x28a718)
+    if(!in.original_0x28a718 && !in.native_resolver_0x28a718)
         return fail(OriginalMode1FactoryStatus::MissingOriginalResolver);
     // ARM 0x28B3BC..0x28B3D0: original handle layout.
     // The original r2 is exactly 1 at its callsite in 0x280444.
@@ -28,8 +28,15 @@ OriginalMode1FactoryResult original_construct_mode1_handle_0x28b3a4(
     // stored at +8. The internal parsing and allocation remain
     // engine dependencies: refusing them cannot mark engine ready.
     std::uint32_t resource=0;
-    if(!in.original_0x28a718(owner,name,in.context,&resource))
+    if(in.native_resolver_0x28a718) {
+        const auto resolved=original_execute_resolver_0x28a718(
+            *in.native_resolver_0x28a718,owner,name);
+        if(resolved.status!=OriginalResolverStatus0x28a718::Completed)
+            return fail(OriginalMode1FactoryStatus::OriginalResolverRefused);
+        resource=resolved.original_resource_object_va;
+    } else if(!in.original_0x28a718(owner,name,in.context,&resource)) {
         return fail(OriginalMode1FactoryStatus::OriginalResolverRefused);
+    }
     store32(dest+0x8,resource);
     return {OriginalMode1FactoryStatus::CompletedOriginalMode1Constructor,
             {in.mapped_handle,in.handle_bytes,0,nullptr,0,0,nullptr,0}};
