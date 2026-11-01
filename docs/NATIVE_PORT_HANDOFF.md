@@ -1,3 +1,7 @@
+> **This is an older engineering handoff and contains historical milestone
+> descriptions. For the latest verified state, read
+> [HANDOFF_2026-11-01.md](HANDOFF_2026-11-01.md) first.**
+
 # Dead Space Mobile — native Windows/Linux port handoff
 
 ## Project target
