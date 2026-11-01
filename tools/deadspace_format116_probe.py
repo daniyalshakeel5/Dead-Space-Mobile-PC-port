@@ -125,11 +125,22 @@ def read_116(data: bytes) -> tuple[str, dict]:
         })
         expected_etc1 = ((width + 3)//4) * ((height + 3)//4) * 8
         expected_etc2_rgba = expected_etc1 * 2
+        mip_etc1 = 0
+        mw, mh = width, height
+        while True:
+            mip_etc1 += ((mw + 3)//4) * ((mh + 3)//4) * 8
+            if mw == 1 and mh == 1:
+                break
+            mw, mh = max(1, mw//2), max(1, mh//2)
         result["size_class"] = ("etc1_exact" if pixel_len == expected_etc1
+                                else "etc1_full_mip_chain" if pixel_len == mip_etc1
                                 else "etc_rgba8_exact" if pixel_len == expected_etc2_rgba
+                                else "etc_rgba8_full_mip_chain" if pixel_len == 2*mip_etc1
                                 else "raw_rgb_exact" if pixel_len == width*height*3
                                 else "raw_rgba_exact" if pixel_len == width*height*4
                                 else "other")
+        result["etc1_ratio_pct"] = round(100 * pixel_len / expected_etc1)
+        result["mip_ratio_pct"] = round(100 * pixel_len / mip_etc1)
         result["matches_noesis_offset_0x74"] = (absolute + off == 0x74)
         return ("structural_payload_exact" if result["trailing"] == 0
                 else "payload_trailing_bytes"), result
@@ -140,6 +151,8 @@ def read_116(data: bytes) -> tuple[str, dict]:
 def analyze(apk: Path) -> dict:
     status = Counter()
     flags, sizes, palettes, offsets, dims = (Counter() for _ in range(5))
+    ratios: Counter = Counter()
+    mip_ratios: Counter = Counter()
     candidate_count = 0
     with ZipFile(apk) as archive:
         for info in archive.infolist():
@@ -167,6 +180,9 @@ def analyze(apk: Path) -> dict:
                      else "other"] += 1
                 if "size_class" in fields:
                     sizes[fields["size_class"]] += 1
+                # Ratios only; never output individual original pixel lengths.
+                ratios[str(fields["etc1_ratio_pct"])] += 1
+                mip_ratios[str(fields["mip_ratio_pct"])] += 1
                     palettes["empty" if fields["palette_len"] == 0 else "nonempty"] += 1
                     offsets["exact_noesis_fixed_0x74" if fields[
                         "matches_noesis_offset_0x74"] else "variable"] += 1
@@ -177,6 +193,8 @@ def analyze(apk: Path) -> dict:
         "mutability_field_counts": dict(sorted(flags.items())),
         "power_of_two_dimensions": dict(sorted(dims.items())),
         "compressed_block_size_hypotheses": dict(sorted(sizes.items())),
+        "etc1_base_length_ratio_pct": dict(sorted(ratios.items())),
+        "etc1_full_mip_length_ratio_pct": dict(sorted(mip_ratios.items())),
         "palette_presence": dict(sorted(palettes.items())),
         "pixel_start_offset_class": dict(sorted(offsets.items())),
         "limitations": "Size matches are structural evidence only, NOT confirmation of an ETC1 decoder or the original ARM loader.",
