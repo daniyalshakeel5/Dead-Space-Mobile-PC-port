@@ -53,6 +53,7 @@ WINDOWS = {
     "resource_lookup_0x284d38": (0x00284d38, 256),
     "resource_lookup_0x284df8": (0x00284df8, 256),
     "resource_lookup_0x28a644": (0x0028a644, 256),
+    "resource_cleanup_0x284f00": (0x00284f00, 256),
 
     "verified_vtable_object34_slot0c_0x2876d0": (0x002876d0, 256),
     "verified_vtable_object58_slot24_0x281b40": (0x00281b40, 256),
