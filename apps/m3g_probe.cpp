@@ -88,9 +88,13 @@ int main(int argc, char** argv) {
     std::cout << "}";
     if (image_check) {
         const auto image = ds_port::decode_m3g_rgba_image(data.data(), data.size());
+        const auto etc = ds_port::decode_m3g_etc1_image(data.data(), data.size());
         std::cout << ",\"rgba_decoded\":" << (image.decoded ? "true" : "false")
                   << ",\"rgba_width\":" << image.width
-                  << ",\"rgba_height\":" << image.height;
+                  << ",\"rgba_height\":" << image.height
+                  << ",\"etc1_decoded\":" << (etc.decoded ? "true" : "false")
+                  << ",\"etc1_width\":" << etc.width
+                  << ",\"etc1_height\":" << etc.height;
     }
     std::cout << "}\n";
     return 0; // Invalid source content is data for the research tally.
