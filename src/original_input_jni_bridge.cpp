@@ -1,4 +1,5 @@
 #include "ds_port/original_input_jni_bridge.hpp"
+#include "ds_port/original_runtime_globals.hpp"
 #include <mutex>
 namespace ds_port::original_runtime {
 namespace {
@@ -6,6 +7,17 @@ std::mutex runtime_mutex;
 OriginalInputBinding bound{};
 bool is_bound=false;
 thread_local OriginalInputStatus last_status=OriginalInputStatus::MissingOriginalService;
+}
+bool original_input_ready_0x27e97c(
+    const void* original_frame_state,std::size_t bytes) noexcept {
+    // Real ARM at 0x27E97C: LDR r0,[PC,r3] of original 0x0049CAA8;
+    // CMP r0,#1; MOVNE r0,#0; MOVEQ r0,#1; BX lr.
+    if(!original_frame_state || bytes<4)return false;
+    const auto* p=static_cast<const std::uint8_t*>(original_frame_state);
+    const std::uint32_t original_stage=
+        std::uint32_t(p[0])|(std::uint32_t(p[1])<<8)|
+        (std::uint32_t(p[2])<<16)|(std::uint32_t(p[3])<<24);
+    return original_stage==1u;
 }
 void original_bind_input_services(const OriginalInputBinding& input) noexcept {
     std::lock_guard<std::mutex> lock(runtime_mutex);
@@ -26,12 +38,15 @@ void original_emit_input(const OriginalInputPacket& packet) noexcept {
         }
         local=bound;
     }
-    if(!local.readiness){
+    if(!local.mapped_original_frame_state ||
+       local.mapped_frame_state_bytes<4) {
         last_status=OriginalInputStatus::MissingOriginalService;
         return;
     }
     last_status=original_dispatch_input_event(
-        local.readiness(local.readiness_context),packet,local.services);
+        original_input_ready_0x27e97c(
+            local.mapped_original_frame_state,
+            local.mapped_frame_state_bytes),packet,local.services);
 }
 } // namespace ds_port::original_runtime
 

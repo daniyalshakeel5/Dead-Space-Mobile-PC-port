@@ -1,15 +1,20 @@
 #pragma once
 #include "ds_port/original_input_events.hpp"
 #include <cstdint>
+#include <cstddef>
 namespace ds_port::original_runtime {
 // The user-confirmed APK exports the exact JNI names below. The native
 // PC port binds them to reconstructed C++ record creation/queue dispatch.
 // A missing original runtime is an explicit failure, not synthetic input.
-using OriginalInputReady=bool (*)(void* context) noexcept;
+// ARM 0x0027E97C reads runtime global word 0x0049CAA8 and compares
+// it with 1. APK ELF and frame dispatcher independently prove this address.
+// Host supplies a pointer to that *mapped original word*, not a fake stage.
+bool original_input_ready_0x27e97c(
+    const void* mapped_original_frame_state,std::size_t mapped_bytes) noexcept;
 struct OriginalInputBinding {
     OriginalInputServices services;
-    OriginalInputReady readiness;
-    void* readiness_context;
+    const void* mapped_original_frame_state;
+    std::size_t mapped_frame_state_bytes;
 };
 // The integration owner must keep callback contexts valid while bound.
 void original_bind_input_services(const OriginalInputBinding&) noexcept;
