@@ -102,7 +102,7 @@ jobs:
           targets = json.loads(Path("report/allocator-targets.json").read_text())
           assert targets["kind"] == "original-allocator-target-metadata"
           assert targets["address_bias"] == 65536
-          assert len(targets["roots"]) == 4
+          assert len(targets["roots"]) == 5
           print(json.dumps(targets, indent=2))
           PY
 

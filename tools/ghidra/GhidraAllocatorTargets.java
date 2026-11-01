@@ -24,6 +24,7 @@ public class GhidraAllocatorTargets extends GhidraScript {
         Function fn = currentProgram.getFunctionManager().getFunctionAt(start);
         if (fn == null) return "{\"elf_entry\":\"0x"+Long.toHexString(elfVA)+"\",\"found\":false}";
         List<String> calls = new ArrayList<>();
+        String functionName = fn.getName().replace("\\", "\\\\").replace("\"", "\\\"");
         List<String> indirects = new ArrayList<>();
         List<String> virtualCallSites = new ArrayList<>();
         InstructionIterator it = currentProgram.getListing().getInstructions(fn.getBody(), true);
@@ -53,6 +54,7 @@ public class GhidraAllocatorTargets extends GhidraScript {
         Collections.sort(virtualCallSites);
         return "{\"elf_entry\":\"0x"+Long.toHexString(elfVA)+
             "\",\"found\":true,\"ghidra_function_start\":"+jsonAddress(fn.getEntryPoint())+
+            ",\"ghidra_function_name\":\""+functionName+"\""+
             ",\"instruction_count_bounded\":"+instructions+
             ",\"direct_call_sites\":["+String.join(",",calls)+
             "],\"pc_destination_load_sites\":["+String.join(",",indirects)+
@@ -61,7 +63,7 @@ public class GhidraAllocatorTargets extends GhidraScript {
     @Override public void run() throws Exception {
         String[] args=getScriptArgs();
         if(args.length!=1) throw new IllegalArgumentException("output JSON required");
-        long[] roots={0x0027e930L,0x0027f790L,0x00281d54L,0x00280520L};
+        long[] roots={0x0027e930L,0x0027f790L,0x00281d54L,0x00280520L,0x00035194L};
         List<String> nodes=new ArrayList<>();
         for(long va:roots) nodes.add(inspect(va));
         String payload="{\"kind\":\"original-allocator-target-metadata\",\"schema\":1,"+
