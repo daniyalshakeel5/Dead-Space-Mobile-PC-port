@@ -32,7 +32,8 @@ OriginalOwnerBindResult0x278778 original_bind_resource_owner_0x278778(
     // independently reconstructed 0x278E58 native code.
     const auto activated=original_execute_receiver_activation_0x278e58({
         in.owner_arm_va,owner,in.owner_bytes,
-        in.release_original_tree,in.context
+        in.release_original_tree,in.context,
+        in.query_provider_mode_0x14,1u
     });
     if(activated.status==A::CompletedEmptyProviderReset) {
         // Original 0x2790E0: activation returns r0=0.
@@ -42,6 +43,11 @@ OriginalOwnerBindResult0x278778 original_bind_resource_owner_0x278778(
         return result(S::ReachedOriginalNullProviderExit,
                       activated.status,0);
     }
+    if(activated.status==A::CompletedProviderRejected)
+        // ARM 0x278EDC returns r0=0 after owner+0x24 rejects
+        // the provider, so 0x278AC4 skips binding and exits.
+        return result(S::ReachedOriginalProviderRejectedExit,
+                      activated.status,provider);
     if(activated.status==A::UnreconstructedProviderActivation)
         return result(S::UnreconstructedProviderBinding,
                       activated.status,provider);
