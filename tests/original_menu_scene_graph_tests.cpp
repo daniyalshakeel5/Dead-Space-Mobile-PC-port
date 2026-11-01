@@ -20,5 +20,19 @@ int main(){
     assert(!resolve_original_menu_scene(g,s,{},nodes,camera,{{8,0,false}}).valid);
     nodes[1].parent_id=4;camera.node_id=42;
     assert(!resolve_original_menu_scene(g,s,{},nodes,camera,{{8,0,false}}).valid);
+    ImMenuGeometry topology{};
+    topology.decoded=true;
+    topology.group_object_indices={1,2,3};
+    topology.validated_group_children={
+        {1,{2,10}},{2,{3}}
+    };
+    auto graph=recover_original_menu_topology(topology);
+    assert(graph.valid&&graph.unresolved_groups==1);
+    assert(graph.child_parent.size()==3);
+    topology.validated_group_children.push_back({3,{1}});
+    assert(!recover_original_menu_topology(topology).valid);
+    topology.validated_group_children.pop_back();
+    topology.validated_group_children.push_back({3,{10}});
+    assert(!recover_original_menu_topology(topology).valid);
     return 0;
 }
