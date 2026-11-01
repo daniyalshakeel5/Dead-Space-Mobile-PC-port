@@ -48,7 +48,13 @@ OriginalOwnerBindResult0x278778 original_bind_resource_owner_0x278778(
         // the provider, so 0x278AC4 skips binding and exits.
         return result(S::ReachedOriginalProviderRejectedExit,
                       activated.status,provider);
-    if(activated.status==A::UnreconstructedProviderActivation)
+    if(activated.status==A::UnreconstructedProviderActivation ||
+       activated.status==A::UnreconstructedOwnerApproval ||
+       activated.status==A::ReachedUnreconstructedStreamInitialization ||
+       activated.status==A::ConstructedThreeStringsAwaitingProviderStreams)
+        // A real provider can be active and the three original
+        // string objects constructed, but original stream methods
+        // +0x2C/+0x28 and owner +0x70 are still missing.
         return result(S::UnreconstructedProviderBinding,
                       activated.status,provider);
     return result(S::OriginalTreeActivationBlocked,
