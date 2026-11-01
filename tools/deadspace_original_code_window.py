@@ -56,7 +56,7 @@ WINDOWS = {
     "resource_lookup_0x286918": (0x00286918, 384),
     "resource_parser_0x2863ec": (0x002863ec, 768),
     "resource_parser_owner_init_0x27a768": (0x0027a768, 512),
-    "resource_parser_receiver_0x278018": (0x00278018, 768),
+    "resource_parser_receiver_0x278018": (0x00278018, 1952),
     "resource_parser_owner_mode_0x26c410": (0x0026c410, 512),
     "resource_parser_owner_bind_0x278778": (0x00278778, 512),
     "resource_parser_tail_0x2866ec": (0x002866ec, 520),
@@ -618,7 +618,7 @@ def observe(apk: Path) -> dict:
                 {"offset": i.address-address,
                  "op": i.mnemonic.lower(),
                  "args": i.op_str.lower()}
-                for i in decoded[:192 if key.startswith("resource_parser_") or key.startswith("resource_copy_") or key.startswith("resource_string_") or key.startswith("resource_token_") or key.startswith("resource_record_") or key.startswith("resource_utf16_transform_") else 64 if key.startswith("resource_loader_tree_") else 180 if key.startswith("resource_factory_") else 96 if key.startswith("resource_lookup_") else 192 if key=="repeated_initializer_callee_0x284178" or key.startswith("startup_registration_") else 180 if key=="post_setup_direct_callee_0x27fd7c" else 120 if key=="post_setup_direct_callee_0x2803e4" else 64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" or key.startswith("stage_zero_second_tail_") or key=="startup_allocator_object_init_0x27e560" or key.startswith("verified_vtable_") else 40]],
+                for i in decoded[:460 if key.startswith("resource_parser_receiver_") else 192 if key.startswith("resource_parser_") or key.startswith("resource_copy_") or key.startswith("resource_string_") or key.startswith("resource_token_") or key.startswith("resource_record_") or key.startswith("resource_utf16_transform_") else 64 if key.startswith("resource_loader_tree_") else 180 if key.startswith("resource_factory_") else 96 if key.startswith("resource_lookup_") else 192 if key=="repeated_initializer_callee_0x284178" or key.startswith("startup_registration_") else 180 if key=="post_setup_direct_callee_0x27fd7c" else 120 if key=="post_setup_direct_callee_0x2803e4" else 64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" or key.startswith("stage_zero_second_tail_") or key=="startup_allocator_object_init_0x27e560" or key.startswith("verified_vtable_") else 40]],
         }
     # Two independently instruction-proven PC-relative literal loads.
     # Frame 0x27ef6c LDR r4,[pc,#0x90], 0x27ef74 ADD r4,pc,r4.
