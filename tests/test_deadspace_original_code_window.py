@@ -37,6 +37,35 @@ class ArmWindowTests(unittest.TestCase):
                 0:("push","{r4, lr}"),4:("mov","r4, r0"),
                 8:("bl","#0x27f790"),12:("mov","r0, r4"),
                 16:("pop","{r4, lr}"),20:("b","#0x280520")}),
+            "stage_zero_followup_target_0x281d54":decoded({
+                0:("push","{r4, r5, lr}"),
+                4:("ldr","r2, [pc, #0x64]"),
+                8:("sub","sp, sp, #0xc"),
+                12:("mov","r3, #4"),
+                16:("mov","r4, #0"),
+                20:("stm","sp, {r3, r4}"),
+                24:("add","r2, pc, r2"),
+                28:("ldr","ip, [r0]"),
+                32:("mov","r1, #0x20"),
+                36:("mov","r3, #1"),
+                40:("mov","r5, r0"),
+                44:("mov","lr, pc"),
+                48:("ldr","pc, [ip, #0xc]"),
+                52:("cmp","r0, #0"),
+                56:("beq","#0x281db0"),
+                60:("add","r3, r0, #4"),
+                64:("str","r5, [r0, #0x18]"),
+                68:("str","r4, [r0, #0x1c]"),
+                72:("str","r3, [r0, #8]"),
+                76:("str","r4, [r0, #0xc]"),
+                80:("strb","r4, [r0, #0x10]"),
+                84:("str","r4, [r0, #0x14]"),
+                88:("str","r3, [r0, #4]"),
+                92:("ldr","r3, [pc, #0x10]"),
+                96:("add","r3, pc, r3"),
+                100:("str","r0, [r3]"),
+                104:("add","sp, sp, #0xc"),
+                108:("pop","{r4, r5, pc}")}),
             "stage_zero_setup_target_0x28ca24":decoded({
                 0:("vldr","s15, [pc, #0xf4]"),
                 4:("push","{r4, r5, r6, lr}"),
@@ -131,6 +160,19 @@ class ArmWindowTests(unittest.TestCase):
             self.assertFalse(proven_original_code_helpers(windows)[result_key])
             stores[index]["args"]=old
         self.assertTrue(proven_original_code_helpers(windows)[result_key])
+        post_key="stage_zero_0x281d54_allocator_post_return_and_global_store"
+        self.assertTrue(proven_original_code_helpers(windows)[post_key])
+        allocator=windows["stage_zero_followup_target_0x281d54"]["instructions"]
+        for off,bad in ((48,"pc, [ip, #0x10]"),
+                        (56,"#0x281db4"),
+                        (64,"r5, [r0, #0x14]"),
+                        (88,"r3, [r0, #8]"),
+                        (100,"r0, [r3, #4]")):
+            obj=next(v for v in allocator if v["offset"]==off)
+            old=obj["args"]
+            obj["args"]=bad
+            self.assertFalse(proven_original_code_helpers(windows)[post_key])
+            obj["args"]=old
         name="stage_zero_type2_0x28ca24_complete_case"
         self.assertTrue(proven_original_code_helpers(windows)[name])
         type2=windows["stage_zero_setup_type2_branch_0x28cad8"]["instructions"]
