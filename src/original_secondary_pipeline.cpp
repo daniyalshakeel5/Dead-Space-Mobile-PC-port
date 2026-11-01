@@ -23,7 +23,7 @@ bool post_bridge(std::uint32_t result,void* ctx) noexcept {
         in.second_setup_arg_arm_address,in.third_setup_arg_arm_address,
         in.call_original,in.callback_context
     };
-    b.post_status=original_postprocess_0x288688_prefix(post);
+    b.post_status=original_postprocess_0x288688_native_constructor(post);
     return b.post_status==OriginalPostprocessStatus::Completed;
 }
 }

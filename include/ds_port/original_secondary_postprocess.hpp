@@ -30,6 +30,13 @@ enum class OriginalPostprocessStatus:std::uint8_t {
 // 0x27fb28(object+0x14), 0x27fa74(object+0x14),
 // store 0x27fa74 return at object+0x20.
 // The subroutines themselves must be proven and supplied by caller.
+// Both vtables verified against original ARM ELF on hosted runner.
+inline constexpr std::uint32_t kOriginal2828acConstructorVtableVA=0x004898e8u;
+inline constexpr std::uint32_t kOriginal288688OverrideVtableVA=0x00489a98u;
+
+// Runs original 0x2828AC directly before remaining two external methods.
+OriginalPostprocessStatus original_postprocess_0x288688_native_constructor(
+    const OriginalPostprocessInputs&) noexcept;
 OriginalPostprocessStatus original_postprocess_0x288688_prefix(
     const OriginalPostprocessInputs&) noexcept;
 }

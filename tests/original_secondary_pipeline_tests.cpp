@@ -20,11 +20,11 @@ bool alloc(const OriginalSecondaryAllocation& a,void* ctx,std::uint32_t* out) no
 bool step(std::uint32_t target,std::uint32_t address,std::uint32_t a1,
           std::uint32_t a2,void* ctx,std::uint32_t* out) noexcept {
     auto& s=*static_cast<State*>(ctx);
-    const std::uint32_t targets[]={0x2828acu,0x27fb28u,0x27fa74u};
-    assert(s.steps<3&&target==targets[s.steps]);
-    assert(address==(s.steps==0?0x5000u:0x5014u));
-    assert(a1==(s.steps==0?0u:s.steps==1?1u:2u));
-    assert(a2==(s.steps==2?3u:0u));
+    const std::uint32_t targets[]={0x27fb28u,0x27fa74u};
+    assert(s.steps<2&&target==targets[s.steps]);
+    assert(address==0x5014u);
+    assert(a1==(s.steps==0?1u:2u));
+    assert(a2==(s.steps==1?3u:0u));
     ++s.steps;*out=0x6000u;return true;
 }
 }
@@ -36,12 +36,14 @@ int main() {
     State s;
     OriginalSecondaryPipeline inputs{0x3000,owner.data(),owner.size(),
         table.data(),table.size(),0x5000,object.data(),object.size(),
-        0x7000,1,2,3,alloc,step,&s};
+        kOriginal288688OverrideVtableVA,1,2,3,alloc,step,&s};
     auto r=original_run_secondary_pipeline(inputs);
     assert(r.allocation_status==OriginalSecondaryStatus::Completed);
     assert(r.postprocess_status==OriginalPostprocessStatus::Completed);
-    assert(r.original_result_arm_address==0x5000&&s.allocations==1&&s.steps==3);
-    assert(object[0]==0&&object[1]==0x70&&object[0x20]==0&&object[0x21]==0x60);
+    assert(r.original_result_arm_address==0x5000&&s.allocations==1&&s.steps==2);
+    assert(object[0]==0x98&&object[1]==0x9a&&object[2]==0x48);
+    for(unsigned i=4;i<=0x12;++i)assert(object[i]==0);
+    assert(object[0x20]==0&&object[0x21]==0x60);
     s={};s.token=0x9999;object.fill(0);
     r=original_run_secondary_pipeline(inputs);
     assert(r.allocation_status==OriginalSecondaryStatus::PostprocessRefused);
