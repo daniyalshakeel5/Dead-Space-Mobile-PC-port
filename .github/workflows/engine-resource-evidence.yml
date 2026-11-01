@@ -233,7 +233,7 @@ jobs:
           shstrings=sections[shstridx]
           shstr=elf[shstrings[4]:shstrings[4]+shstrings[5]]
           def sectname(s):
-              j=s[0];k=shstr.find(b"\\x00",j)
+              j=s[0];k=shstr.find(b"\x00",j)
               return shstr[j:k].decode("ascii","replace")
           named={sectname(s):s for s in sections}
           print("ORIGINAL_ELF_IO_IMPORT_SECTION_NAMES",sorted(
@@ -249,7 +249,7 @@ jobs:
                   info=struct.unpack_from("<I",elf,offset+4)[0]
                   sym=info>>8
                   nameoffset=struct.unpack_from("<I",elf,dynsym[4]+sym*16)[0]
-                  end=symbols.find(b"\\x00",nameoffset)
+                  end=symbols.find(b"\x00",nameoffset)
                   relocation_names.append(symbols[nameoffset:end].decode(
                       "utf-8","replace"))
               # ARM PLT0 is 20 bytes, each subsequent entry 12.
