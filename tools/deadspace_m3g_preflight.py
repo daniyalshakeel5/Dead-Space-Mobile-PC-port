@@ -102,8 +102,13 @@ def analyze_archive(apk: Path) -> dict:
                             im_sections["compression_" + str(scheme)
                                         if scheme in (0, 1)
                                         else "unknown_compression"] += 1
-                            if total < 13 or total > MAX_HEADER_SECTION:
+                            if total < 13:
                                 im_sections["invalid_section_length"] += 1
+                                continue
+                            if total > MAX_HEADER_SECTION:
+                                # Not intrinsically invalid: conservative 1 MiB
+                                # bounded-read limit on unknown IM sections.
+                                im_sections["section_exceeds_preflight_limit"] += 1
                                 continue
                             section = section_hdr + stream.read(total - 9)
                             if len(section) != total:
