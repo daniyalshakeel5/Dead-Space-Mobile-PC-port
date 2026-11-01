@@ -62,11 +62,19 @@ OriginalResourceQueryResult original_execute_resource_query_0x2803e4(
     if(ready.status!=OriginalResourceHandleStatus::Completed)
         return fail(OriginalResourceQueryStatus::HandleReadinessBlocked);
     if(!ready.original_r0) {
-        // Original 0x28045C branch calls 0x28A4F8 and can dispatch
-        // an additional error virtual at +0x10. No fake success.
-        if(!in.original_0x28a4f8_failure_path ||
-           !in.original_0x28a4f8_failure_path(owner,name,handle,in.context))
-            return fail(OriginalResourceQueryStatus::OriginalFailurePathBlocked);
+        // Original 0x28045C calls 0x28A4F8. For the reconstructed
+        // mode=1 null-resource handle, the virtual provider release is
+        // skipped. Native string_view has no original ARM heap to free.
+        if(in.native_factory_0x28b3a4) {
+            if(original_cleanup_unready_mode1_0x28a4f8(handle)!=
+               OriginalUnreadyHandleStatus::CompletedNullResourceCleanup)
+                return fail(OriginalResourceQueryStatus::OriginalFailurePathBlocked);
+        } else {
+            // Legacy factory path may require original cleanup virtuals.
+            if(!in.original_0x28a4f8_failure_path ||
+               !in.original_0x28a4f8_failure_path(owner,name,handle,in.context))
+                return fail(OriginalResourceQueryStatus::OriginalFailurePathBlocked);
+        }
         return {OriginalResourceQueryStatus::Completed,0};
     }
     // Original 0x2804A8: 0x284DF8(owner) -> 0x283CB4 twice
