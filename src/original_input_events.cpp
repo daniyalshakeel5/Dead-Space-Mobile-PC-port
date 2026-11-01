@@ -1,10 +1,20 @@
 #include "ds_port/original_input_events.hpp"
 #include <cstdint>
 #include <cstring>
+#include <mutex>
 namespace ds_port::original_runtime {
 namespace {
 void store32(std::uint8_t* p,std::uint32_t value) noexcept {
     for(unsigned i=0;i<4;i++)p[i]=static_cast<std::uint8_t>(value>>(8*i));
+}
+// The original Bionic __atomic_swap(new_value, volatile int32_t*)
+// takes r0=0,r1=record+4; the ignored return is the prior word.
+// Serialize all of this port's mapped ARM32 atomic swaps with one lock.
+// memcpy avoids undefined type punning on a byte-addressed ARM image.
+void original_atomic_swap_zero(std::uint8_t* mapped_word) noexcept {
+    static std::mutex swap_mutex;
+    std::lock_guard<std::mutex> guard(swap_mutex);
+    store32(mapped_word,0);
 }
 void store_float(std::uint8_t* p,float value) noexcept {
     static_assert(sizeof(float)==4,"original ABI uses float32");
@@ -21,7 +31,7 @@ OriginalInputStatus original_dispatch_input_event(
     if(!ready)return OriginalInputStatus::NotReady;
     if(!svc.pool_owner_arm_va || !svc.allocator_method_arm_va ||
        !svc.queue_owner_arm_va || !svc.queue_method_arm_va ||
-       !svc.allocate || !svc.constructor_import || !svc.queue)
+       !svc.allocate || !svc.queue)
         return OriginalInputStatus::MissingOriginalService;
 
     const OriginalInputAllocation request{
@@ -37,14 +47,14 @@ OriginalInputStatus original_dispatch_input_event(
         return OriginalInputStatus::InvalidRecord;
 
     // Complete native stores for original function 0x2807A0:
-    // STR initial table; imported helper; STR original pool at +8;
+    // STR initial table; atomic swap zero at +4; STR pool at +8;
     // STR final table at +0. The imported helper stays explicit.
     auto* record=static_cast<std::uint8_t*>(allocated.mapped_bytes);
     store32(record,kOriginalInputRecordInitialVtable);
-    if(!svc.constructor_import(0,allocated.arm_va+4,
-          kOriginalInputRecordInitialVtable,record,
-          allocated.accessible_bytes,svc.context))
-        return OriginalInputStatus::ConstructorRefused;
+    // ELF PLT 0x35194 was independently identified by R_ARM_JUMP_SLOT
+    // relocation as Bionic __atomic_swap. Original r0=0, r1=record+4;
+    // r2 still contains a type pointer but is ignored by this import.
+    original_atomic_swap_zero(record+4);
     store32(record+8,svc.pool_owner_arm_va);
     store32(record,kOriginalInputRecordFinalVtable);
 

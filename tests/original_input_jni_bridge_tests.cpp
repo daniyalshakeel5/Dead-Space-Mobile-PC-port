@@ -9,7 +9,7 @@ using namespace ds_port::original_runtime;
 namespace {
 struct Harness {
     std::array<std::uint8_t,48> record{};
-    int allocations=0,constructions=0,queues=0;
+    int allocations=0,queues=0;
     bool ready=false;
     std::uint32_t last_event=0;
     std::uint32_t last_key=0;
@@ -26,15 +26,10 @@ bool allocate(const OriginalInputAllocation& a,void* ctx,
     *record={0x5000,h.record.data(),h.record.size()};
     return true;
 }
-bool constructor(std::uint32_t a,std::uint32_t b,std::uint32_t c,
-    void*,std::size_t,void* ctx) noexcept {
-    auto& h=*static_cast<Harness*>(ctx);++h.constructions;
-    assert(a==0&&b==0x5004&&c==kOriginalInputRecordInitialVtable);
-    return true;
-}
 bool queue(const OriginalInputQueuedEvent& a,void* ctx) noexcept {
     auto& h=*static_cast<Harness*>(ctx);++h.queues;
     assert(a.original_record_arm_va==0x5000);
+    assert(get32(h.record.data()+4)==0);
     h.last_event=a.event_id;h.last_key=get32(h.record.data()+0x18);
     return true;
 }
@@ -46,7 +41,7 @@ int main(){
         nullptr,nullptr,kOriginalRawPointerDown,1000,1,123.f,70.f);
     assert(original_last_input_status()==OriginalInputStatus::MissingOriginalService);
     OriginalInputBinding b{
-        {0x1000,0x2000,0x3000,0x4000,allocate,constructor,queue,&h},ready,&h
+        {0x1000,0x2000,0x3000,0x4000,allocate,queue,&h},ready,&h
     };
     original_bind_input_services(b);
     Java_com_ea_blast_KeyboardAndroid_NativeOnKeyDown(nullptr,nullptr,600,99,1);

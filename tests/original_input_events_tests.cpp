@@ -14,8 +14,8 @@ std::uint32_t load32(const std::uint8_t* b) {
 }
 struct Trace {
     std::array<std::uint8_t,48> data{};
-    int allocations=0,imports=0,queues=0;
-    bool fail_alloc=false,fail_import=false,fail_queue=false;
+    int allocations=0,queues=0;
+    bool fail_alloc=false,fail_queue=false;
     bool null_result=false;
     OriginalInputPacket expected{};
 };
@@ -29,20 +29,13 @@ bool allocate(const OriginalInputAllocation& a,void* ctx,
     *out={t.null_result?0u:0x5000u,t.data.data(),t.data.size()};
     return true;
 }
-bool import(std::uint32_t r0,std::uint32_t r1,std::uint32_t r2,
-            void* bytes,std::size_t n,void* ctx) noexcept {
-    auto& t=*static_cast<Trace*>(ctx);++t.imports;
-    assert(r0==0&&r1==0x5004&&r2==kOriginalInputRecordInitialVtable);
-    assert(bytes==t.data.data()&&n>=0x30);
-    assert(load32(t.data.data())==kOriginalInputRecordInitialVtable);
-    return !t.fail_import;
-}
 bool queue(const OriginalInputQueuedEvent& q,void* ctx) noexcept {
     auto& t=*static_cast<Trace*>(ctx);++t.queues;
     assert(q.original_queue_owner_arm_va==0x3000);
     assert(q.original_queue_method_arm_va==0x4000);
     assert(q.original_record_arm_va==0x5000&&q.r3==0&&q.stack0==0);
     assert(load32(t.data.data())==kOriginalInputRecordFinalVtable);
+    assert(load32(t.data.data()+4)==0);
     assert(load32(t.data.data()+8)==0x1000);
     assert(load32(t.data.data()+0x10)==t.expected.module_id);
     if(t.expected.kind==OriginalInputPacket::Kind::Pointer) {
@@ -67,7 +60,7 @@ int main() {
     static_assert(kOriginalRawPointerUp==0x8000c);
     Trace t{};
     OriginalInputServices svc{0x1000,0x2000,0x3000,0x4000,
-        allocate,import,queue,&t};
+        allocate,queue,&t};
     OriginalInputPacket p{OriginalInputPacket::Kind::Pointer,
         kOriginalRawPointerDown,1000,7,123.25f,-48.5f,0,0};
     t.expected=p;
@@ -76,8 +69,9 @@ int main() {
     };
     assert(run(false)==OriginalInputStatus::NotReady);
     assert(t.allocations==0&&t.queues==0);
+    t.data.fill(0xA5);
     assert(run()==OriginalInputStatus::Completed);
-    assert(t.allocations==1&&t.imports==1&&t.queues==1);
+    assert(t.allocations==1&&t.queues==1);
     for(auto raw:{kOriginalRawPointerMove,kOriginalRawPointerUp}){
         t.expected.event_id=raw;
         assert(run()==OriginalInputStatus::Completed);
@@ -88,13 +82,10 @@ int main() {
     assert(run()==OriginalInputStatus::Completed);
     t.null_result=true;
     assert(run()==OriginalInputStatus::AllocationReturnedNull);
-    assert(t.queues==5&&t.imports==5);
+    assert(t.queues==5);
     t.null_result=false;t.fail_alloc=true;
     assert(run()==OriginalInputStatus::AllocationRefused);
-    t.fail_alloc=false;t.fail_import=true;
-    assert(run()==OriginalInputStatus::ConstructorRefused);
-    assert(t.queues==5);
-    t.fail_import=false;t.fail_queue=true;
+    t.fail_alloc=false;t.fail_queue=true;
     assert(run()==OriginalInputStatus::QueueRefused);
     t.fail_queue=false;svc.queue=nullptr;
     assert(run()==OriginalInputStatus::MissingOriginalService);

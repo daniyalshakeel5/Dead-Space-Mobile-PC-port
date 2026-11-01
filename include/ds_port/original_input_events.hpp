@@ -30,13 +30,9 @@ struct OriginalInputAllocation {
 using OriginalInputAllocate=bool (*)(const OriginalInputAllocation&,
     void* context,OriginalInputRecord*) noexcept;
 
-// Original 0x2807A0 calls an imported function through PLT 0x35194.
-// Its actual imported implementation is still unresolved. This callback
-// MUST execute original semantics; the native code does not pretend to.
-using OriginalInputImport35194=bool (*)(
-    std::uint32_t r0_zero,std::uint32_t record_plus_four_arm_va,
-    std::uint32_t initial_table_arm_va,void* mapped_record,
-    std::size_t mapped_bytes,void* context) noexcept;
+// Original 0x2807A0 invokes Bionic __atomic_swap(0, record+4) via
+// PLT 0x00035194 -> GOT 0x0049031C (real APK relocation verified).
+// Native C++17 performs that exchange directly before queuing input.
 struct OriginalInputQueuedEvent {
     std::uint32_t original_queue_owner_arm_va;
     std::uint32_t original_queue_method_arm_va;
@@ -53,13 +49,12 @@ struct OriginalInputServices {
     std::uint32_t queue_owner_arm_va;
     std::uint32_t queue_method_arm_va;
     OriginalInputAllocate allocate;
-    OriginalInputImport35194 constructor_import;
     OriginalInputQueue queue;
     void* context;
 };
 enum class OriginalInputStatus:std::uint8_t {
     NotReady,MissingOriginalService,AllocationRefused,AllocationReturnedNull,
-    InvalidRecord,ConstructorRefused,QueueRefused,Completed
+    InvalidRecord,QueueRefused,Completed
 };
 struct OriginalInputPacket {
     enum class Kind:std::uint8_t {Pointer,KeyDown,KeyUp};
