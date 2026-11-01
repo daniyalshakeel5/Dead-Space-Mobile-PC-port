@@ -50,6 +50,12 @@ VALID_REASONS = {
 
 def analyze(apk: Path, native_probe: Path) -> dict:
     outcomes: Counter = Counter()
+    diagnostic_outcomes: Counter = Counter()
+    diagnostic_types: Counter = Counter()
+    diagnostic_nonstandard_headers = 0
+    diagnostic_reserved_objects = 0
+    diagnostic_sections = 0
+    diagnostic_objects = 0
     successful_sections = 0
     successful_objects = 0
     compressed_sections = 0
@@ -83,12 +89,9 @@ def analyze(apk: Path, native_probe: Path) -> dict:
                 if stage.stat().st_size != info.file_size:
                     outcomes["zip_size_mismatch"] += 1
                     continue
-                try:
-                    process = subprocess.run([str(native_probe), str(stage)],
-                                             capture_output=True, text=True,
-                                             check=False, timeout=30)
-                finally:
-                    stage.unlink(missing_ok=True)
+                process = subprocess.run([str(native_probe), str(stage)],
+                                         capture_output=True, text=True,
+                                         check=False, timeout=30)
                 if process.returncode != 0:
                     outcomes["native_process_error"] += 1
                     continue
@@ -101,6 +104,32 @@ def analyze(apk: Path, native_probe: Path) -> dict:
                 else:
                     reason = result.get("reason", "")
                     outcomes[reason if reason in VALID_REASONS else "unknown_native_error"] += 1
+                    if reason == "unexpected second M3G header object":
+                        exploratory = subprocess.run(
+                            [str(native_probe), str(stage), "--diagnostic"],
+                            capture_output=True, text=True, check=False, timeout=30)
+                        if exploratory.returncode != 0:
+                            diagnostic_outcomes["process_error"] += 1
+                        else:
+                            extra = json.loads(exploratory.stdout)
+                            if not extra.get("diagnostic"):
+                                diagnostic_outcomes["unexpected_mode"] += 1
+                            elif extra.get("valid") is True:
+                                diagnostic_outcomes["structural_diagnostic_pass"] += 1
+                                diagnostic_nonstandard_headers += int(
+                                    extra.get("nonstandard_header_objects", 0))
+                                diagnostic_reserved_objects += int(
+                                    extra.get("reserved_type_objects", 0))
+                                diagnostic_sections += int(extra.get("sections", 0))
+                                diagnostic_objects += int(extra.get("objects", 0))
+                                for key, value in (extra.get("type_counts") or {}).items():
+                                    if key.isdecimal() and 0 <= int(key) <= 255:
+                                        diagnostic_types[key] += int(value)
+                            else:
+                                reason2 = extra.get("reason", "")
+                                diagnostic_outcomes[
+                                    reason2 if reason2 in VALID_REASONS
+                                    else "unknown_diagnostic_error"] += 1
             except (OSError, RuntimeError, ValueError, EOFError,
                     subprocess.TimeoutExpired, json.JSONDecodeError):
                 outcomes["read_or_probe_error"] += 1
@@ -113,7 +142,14 @@ def analyze(apk: Path, native_probe: Path) -> dict:
         "valid_containers_total_sections": successful_sections,
         "valid_containers_total_objects": successful_objects,
         "valid_containers_compressed_sections": compressed_sections,
-        "limitations": "Container checks only; no original geometry/texture/animation rendering verified.",
+        "diagnostic_outcomes": dict(sorted(diagnostic_outcomes.items())),
+        "diagnostic_nonstandard_header_objects": diagnostic_nonstandard_headers,
+        "diagnostic_reserved_type_objects": diagnostic_reserved_objects,
+        "diagnostic_total_sections": diagnostic_sections,
+        "diagnostic_total_objects": diagnostic_objects,
+        "diagnostic_object_type_counts": dict(
+            sorted(diagnostic_types.items(), key=lambda p: int(p[0]))),
+        "limitations": "Strict JSR-184 results separate from diagnostic opaque object framing. Diagnostic passes are NOT validated model decoders or gameplay.",
     }
 
 
