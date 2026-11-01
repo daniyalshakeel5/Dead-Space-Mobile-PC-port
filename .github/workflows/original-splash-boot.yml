@@ -1,0 +1,89 @@
+name: Original Dead Space splash boot (native headless smoke)
+on:
+  push:
+    branches:
+      - work/deadspace-remote-preflight-2026-11-01
+    paths:
+      - "apps/deadspace_native.cpp"
+      - "src/original_splash_host.cpp"
+      - "src/im_ui_image.cpp"
+      - "include/ds_port/im_ui_image.hpp"
+      - "include/ds_port/original_splash_host.hpp"
+      - "CMakeLists.txt"
+      - ".github/workflows/original-splash-boot.yml"
+  pull_request:
+    paths:
+      - "apps/deadspace_native.cpp"
+      - "src/original_splash_host.cpp"
+      - "src/im_ui_image.cpp"
+      - "include/ds_port/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/original-splash-boot.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-splashes-native:
+    if: github.repository == 'daniyalshakeel5/Dead-Space-Mobile-PC-port'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SDL2 for actual native splash rendering
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev
+      - name: Configure original splash-capable game executable
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          -DDS_BUILD_BOOT_SPLASH=ON -DDS_BUILD_INPUT_PROBE=ON
+      - name: Compile native game executable and test UI decoder
+        run: cmake --build build --target deadspace_native ds_im_ui_image_tests --parallel 2
+      - name: Verify synthetic IM-M3G Image2D cases
+        run: ctest --test-dir build --output-on-failure -R ds_original_im_m3g_splash_ui_decoder
+      - name: Fetch original APK only into private ephemeral runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 3 --max-time 720 \
+            --max-filesize 400000000 \
+            --output "$RUNNER_TEMP/deadspace.apk" \
+            https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes/releases/download/dead_space_mobile_fixes/Deas.Space.Mobile.Fixes.apk
+          test "$(wc -c < "$RUNNER_TEMP/deadspace.apk" | tr -d ' ')" = 325769461
+      - name: Stage only original EA and Dead Space splash files
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import os
+          root=Path(os.environ["RUNNER_TEMP"])/"boot-assets"/"assets"
+          with ZipFile(Path(os.environ["RUNNER_TEMP"])/"deadspace.apk") as source:
+              for name in ("published/texturepacks_ui/splash_ea.m3g",
+                           "published/texturepacks_ui/splash_deadspace.m3g"):
+                  source_name="assets/"+name
+                  info=source.getinfo(source_name)
+                  if info.file_size>1024*1024:raise RuntimeError("splash oversized")
+                  dst=root/name
+                  dst.parent.mkdir(parents=True,exist_ok=True)
+                  dst.write_bytes(source.read(source_name))
+          PY
+      - name: Execute both ORIGINAL splash screens through SDL2 software renderer
+        shell: bash
+        run: |
+          set +e
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+          SDL_RENDER_DRIVER=software timeout 20s \
+            build/deadspace_native --boot-splash \
+            --assets-dir "$RUNNER_TEMP/boot-assets" \
+            > "$RUNNER_TEMP/native-splash-exit.txt" 2>&1
+          actual_exit=$?
+          set -e
+          # Exit 20 is intentional: original menu code is NOT ready.
+          test "$actual_exit" = 20
+          grep -F "Original EA and Dead Space splash images displayed." \
+            "$RUNNER_TEMP/native-splash-exit.txt"
+          grep -F "Native main-menu renderer still incomplete." \
+            "$RUNNER_TEMP/native-splash-exit.txt"
+      - name: Remove original game bytes from runner
+        if: always()
+        shell: bash
+        run: rm -rf "$RUNNER_TEMP/boot-assets" "$RUNNER_TEMP/deadspace.apk" "$RUNNER_TEMP/native-splash-exit.txt"
