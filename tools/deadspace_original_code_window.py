@@ -84,7 +84,7 @@ def elf32_load_ranges(raw: bytes) -> list[tuple[int,int,int]]:
 
 def bounded_virtual_read(raw: bytes, segs: list[tuple[int,int,int]],
                          va: int, count: int) -> bytes:
-    if count<1 or count>256: raise ValueError("Unsafe instruction window size")
+    if count<1 or count>768: raise ValueError("Unsafe instruction window size")
     for start,end,offset in segs:
         if start<=va and va+count<=end:
             p=offset+(va-start)
