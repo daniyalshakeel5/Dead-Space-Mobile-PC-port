@@ -26,6 +26,8 @@ class AssetReconTests(unittest.TestCase):
             b"dex\n035\x00": "dex",
             b"UnityFS\x00resource": "unityfs",
             b"\x00\x01\x02\x03": "unrecognized",
+            bytes.fromhex("ab4a5352313834bb0d0a1a0a") + b"xx": "m3g_jsr184",
+            b"\x78\x9c\x03\x00": "possible-zlib",
         }
         for data, expected in cases.items():
             with self.subTest(expected=expected):
@@ -94,6 +96,24 @@ class AssetReconTests(unittest.TestCase):
             result = investigate(apk)
             self.assertEqual(result["skipped_counts"]["symlink"], 1)
             self.assertEqual(result["inspected_prefixes"], 1)
+
+    def test_real_format_probe_is_aggregate_only(self):
+        with tempfile.TemporaryDirectory() as folder:
+            apk = Path(folder) / "fixture.apk"
+            with ZipFile(apk, "w") as z:
+                z.writestr("assets/PRIVATE_SPRITE.sph", b"\x00" * 8)
+                z.writestr("assets/PRIVATE_SPRITE.sps", b"\x78\x9c" + b"data")
+                z.writestr("assets/UNMATCHED.sph", b"\x00" * 8)
+                z.writestr("assets/PRIVATE_MODEL.m3g",
+                           bytes.fromhex("ab4a5352313834bb0d0a1a0a") + b"\x00")
+            report = investigate(apk)
+            self.assertEqual(report["sprite_stem_stats"]["paired_count"], 1)
+            self.assertEqual(report["sprite_stem_stats"]["sph_count"], 2)
+            self.assertEqual(report["extension_magic_stats"][".m3g"]["m3g_jsr184"]["count"], 1)
+            self.assertEqual(report["extension_magic_stats"][".sps"]["possible-zlib"]["count"], 1)
+            public_text = json.dumps(report)
+            self.assertNotIn("PRIVATE_SPRITE", public_text)
+            self.assertNotIn("PRIVATE_MODEL", public_text)
 
     def test_invalid_zip_is_reported_without_exception_details(self):
         with tempfile.TemporaryDirectory() as folder:
