@@ -65,6 +65,7 @@ WINDOWS = {
     "resource_token_compare_0x35674": (0x00035674, 128),
     "resource_token_object_0x285590": (0x00285590, 224),
     "resource_record_build_0x28611c": (0x0028611c, 512),
+    "resource_utf16_transform_0x28cc88": (0x0028cc88, 512),
     "resource_record_insert_0x2862e8": (0x002862e8, 256),
     "resource_loader_tree_begin_0x283408": (0x00283408, 192),
     "resource_loader_tree_next_0x2933ec": (0x002933ec, 256),
