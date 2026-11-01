@@ -18,6 +18,11 @@ option(DS_BUILD_IM_MESH_READER "Build native IronMonkey geometry-only mesh expor
 add_library(ds_original_native_abi STATIC src/original_native_abi.cpp src/original_jni_exports.cpp src/original_frame_dispatch.cpp src/original_game_entry.cpp src/original_timing_math.cpp src/original_clock_source.cpp src/original_stage_zero_setup.cpp src/original_stage_zero_followup.cpp src/original_stage_zero_type_two.cpp src/original_record_postalloc.cpp src/original_runtime_globals.cpp src/original_allocator_call.cpp src/original_stage_zero_allocating.cpp src/original_registry_lookup.cpp src/original_secondary_allocator.cpp src/original_secondary_postprocess.cpp src/original_secondary_pipeline.cpp src/original_object_constructor.cpp)
 target_include_directories(ds_original_native_abi PUBLIC include)
 
+# Native executable must report missing original game code rather than run
+# a diagnostic pretending to be playable. It links the same recovered ABI.
+add_executable(deadspace_native apps/deadspace_native.cpp)
+target_link_libraries(deadspace_native PRIVATE ds_original_native_abi)
+
 add_library(ds_port_input STATIC src/input.cpp)
 add_library(ds_port_timing STATIC src/timing.cpp)
 target_include_directories(ds_port_timing PUBLIC include)
@@ -111,6 +116,9 @@ endif()
 
 if(DS_ENABLE_TESTS)
     enable_testing()
+    add_executable(ds_native_startup_gate_tests tests/native_startup_gate_tests.cpp)
+    target_link_libraries(ds_native_startup_gate_tests PRIVATE ds_original_native_abi)
+    add_test(NAME ds_native_startup_blocks_missing_game_code COMMAND ds_native_startup_gate_tests)
     add_executable(ds_original_native_abi_tests tests/original_native_abi_tests.cpp)
     target_link_libraries(ds_original_native_abi_tests PRIVATE ds_original_native_abi)
     add_test(NAME ds_original_native_abi_29_proven_returns COMMAND ds_original_native_abi_tests)
