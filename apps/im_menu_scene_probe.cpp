@@ -65,6 +65,12 @@ int main(int argc,char** argv){
         first_offset=false;
         std::cout<<"\""<<i*4<<"\":"<<counts[i];
     }
-    std::cout<<"}}\n";
+    std::cout<<"},\"verified_group_tables\":"
+             <<scene.validated_group_children.size()
+             <<",\"verified_group_child_links\":";
+    std::size_t link_count=0;
+    for(const auto& group:scene.validated_group_children)
+        link_count+=group.children.size();
+    std::cout<<link_count<<"}\n";
     return 0;
 }
