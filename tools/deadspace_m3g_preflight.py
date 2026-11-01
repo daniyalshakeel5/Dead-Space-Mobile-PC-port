@@ -66,6 +66,7 @@ def analyze_archive(apk: Path) -> dict:
     versions = Counter()
     external = 0
     examined = 0
+    next_sections = Counter()
     try:
         with ZipFile(apk) as archive:
             for info in archive.infolist():
@@ -105,6 +106,47 @@ def analyze_archive(apk: Path) -> dict:
                             versions[evidence["version"]] += 1
                         if evidence.get("external_references"):
                             external += 1
+                        if reason == "valid_jsr184_header":
+                            # Inspect only metadata of the next section, never
+                            # export its content or original entry name.
+                            next_header = stream.read(9)
+                            if len(next_header) < 9:
+                                next_sections["missing_second_section"] += 1
+                            else:
+                                method = next_header[0]
+                                second_len, second_plain = struct.unpack_from(
+                                    "<II", next_header, 1)
+                                next_sections["compression_" + str(method)
+                                              if method in (0, 1)
+                                              else "reserved_compression"] += 1
+                                if (method in (0, 1) and second_len >= 13 and
+                                        second_len <= info.file_size -
+                                            (12 + section_size)):
+                                    if method == 0:
+                                        first = stream.read(5)
+                                    else:
+                                        compressed_prefix = stream.read(
+                                            min(65536, second_len - 13))
+                                        try:
+                                            first = zlib.decompressobj().decompress(
+                                                compressed_prefix, 5)
+                                        except zlib.error:
+                                            first = b""
+                                    if len(first) >= 5:
+                                        obj_type = first[0]
+                                        first_len = struct.unpack_from("<I", first, 1)[0]
+                                        next_sections["first_object_type_" +
+                                                      str(obj_type)] += 1
+                                        if first_len == 0:
+                                            next_sections["first_object_zero_length"] += 1
+                                        elif first_len <= max(0, second_plain - 5):
+                                            next_sections["first_object_length_fits"] += 1
+                                        else:
+                                            next_sections["first_object_length_exceeds"] += 1
+                                    else:
+                                        next_sections["first_object_unavailable"] += 1
+                                else:
+                                    next_sections["second_section_header_invalid"] += 1
                 except (OSError, RuntimeError, ValueError, EOFError, zlib.error):
                     results["read_error"] += 1
     except (OSError, ValueError):
@@ -115,6 +157,7 @@ def analyze_archive(apk: Path) -> dict:
         "header_result_counts": dict(sorted(results.items())),
         "validated_versions": dict(sorted(versions.items())),
         "validated_external_reference_headers": external,
+        "second_section_probe_counts": dict(sorted(next_sections.items())),
         "limitations": "First M3G header section only, not an entire scene or renderer. No game data included.",
     }
 
