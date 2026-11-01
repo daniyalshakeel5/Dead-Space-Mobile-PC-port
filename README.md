@@ -5,6 +5,25 @@
 > desktop host foundation. Original game scene, animation, physics, input
 > semantics, audio, AI, combat and mission loop are **not implemented**.
 
+## Current native reconstruction checkpoint (November 1, 2026)
+
+- Actual original ARM `0x28A718` resource-resolver call/branch sequence
+  reconstructed in native C++, invoked from original mode-one handle
+  constructor `0x28B3A4`. Buffer zeroing, object return on failed
+  lookup, conditional vtable +0x3C/+0x2C dispatch and scratch release
+  match original instruction evidence. Original allocator, lookup,
+  object-method and cleanup implementations still must be recovered.
+- Original `0x283408` tree header and `0x2933EC` predecessor
+  behavior reconstructed with bounded original-node mapping.
+- Three ordered original `0x286918` registration passes now operate
+  natively over caller-mapped original resource-tree nodes, using the
+  already reconstructed `0x284178` registration and native resource map.
+  The preceding original `0x2863EC` parser/loader remains unported.
+- **46/46 synthetic native CTests passed on Windows and Linux** at
+  [verification run 41328643724](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41328643724).
+  These tests do not prove real game-engine boot or scene rendering.
+  [Latest detailed handoff](docs/HANDOFF_2026-11-01.md).
+
 ## Goal
 
 A genuine native x86-64 Windows/Linux game rebuilt in portable C++17/CMake,
