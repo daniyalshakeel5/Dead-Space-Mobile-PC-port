@@ -12,16 +12,28 @@ using OriginalActivationTreeClear = bool (*)(
     std::uint32_t original_tree_arm_va,
     std::uint32_t original_root_arm_va,
     void* context) noexcept;
+// Native integration contract for the original provider's virtual
+// +0x14. This service MUST return its actual mode from the original
+// provider implementation (not a synthetic value).
+using OriginalActivationProviderMode14 = bool (*)(
+    std::uint32_t original_provider_va,
+    std::uint32_t original_vtable_offset,
+    void* context,std::uint32_t* original_r0) noexcept;
 struct OriginalReceiverActivationInputs0x278e58 {
     std::uint32_t owner_arm_va=0;
     void* mapped_owner=nullptr;
     std::size_t owner_bytes=0;
     OriginalActivationTreeClear release_existing_tree=nullptr;
     void* context=nullptr;
+    OriginalActivationProviderMode14 query_provider_mode_0x14=nullptr;
+    std::uint32_t requested_mode=1u;
 };
 enum class OriginalReceiverActivationStatus0x278e58 : std::uint8_t {
     InvalidOwner, MissingOriginalTreeDestructor, OriginalTreeReleaseRefused,
-    CompletedEmptyProviderReset, UnreconstructedProviderActivation
+    CompletedEmptyProviderReset, UnreconstructedProviderActivation,
+    ProviderModeQueryRefused, CompletedProviderRejected,
+    UnreconstructedOwnerApproval,
+    ReachedUnreconstructedStreamInitialization
 };
 struct OriginalReceiverActivationResult0x278e58 {
     OriginalReceiverActivationStatus0x278e58 status;
