@@ -1,4 +1,5 @@
 #include "ds_port/original_startup_object34.hpp"
+#include <initializer_list>
 namespace ds_port::original_runtime {
 namespace {
 void put(std::uint8_t* p,std::uint32_t value) noexcept {
