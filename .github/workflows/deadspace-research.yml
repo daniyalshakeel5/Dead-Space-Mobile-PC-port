@@ -9,6 +9,9 @@ on:
       - "tools/deadspace_native_enum_recover.py"
       - "tools/deadspace_native_leaf_recover.py"
       - "tests/test_deadspace_native_leaf_recover.py"
+      - "src/original_jni_exports.cpp"
+      - "include/ds_port/original_jni_exports.hpp"
+      - "tests/original_jni_exports_tests.cpp"
       - "tests/test_deadspace_native_enum_recover.py"
       - "tests/test_deadspace_audit.py"
       - "tools/deadspace_asset_recon.py"
@@ -49,6 +52,9 @@ on:
       - "tools/deadspace_native_enum_recover.py"
       - "tools/deadspace_native_leaf_recover.py"
       - "tests/test_deadspace_native_leaf_recover.py"
+      - "src/original_jni_exports.cpp"
+      - "include/ds_port/original_jni_exports.hpp"
+      - "tests/original_jni_exports_tests.cpp"
       - "tests/test_deadspace_native_enum_recover.py"
       - "tests/test_deadspace_audit.py"
       - "tools/deadspace_asset_recon.py"
@@ -171,6 +177,15 @@ jobs:
           # JNI exports are public ABI metadata; only instruction-proven constants.
           print("Verified JNI native return implementations:",
                 json.dumps(original,sort_keys=True))
+          import re
+          code=Path("src/original_jni_exports.cpp").read_text()
+          pattern=r'extern "C" DS_ORIGINAL_JNI_EXPORT std::int32_t (Java_com_ea_[A-Za-z0-9_]+)\\(void\\*, void\\*\\) noexcept \\{\\s*return (\\d+);\\s*\\}'
+          matches=re.findall(pattern,code)
+          constructed={name:int(value) for name,value in matches}
+          if len(matches)!=29 or constructed!=original:
+              raise SystemExit("Native C++ JNI bodies differ from the original instruction-proven values")
+          print("Independent real-APK C++ source equivalence: 29/29 original JNI exports match")
+
           PY
           python tools/deadspace_m3g_preflight.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
