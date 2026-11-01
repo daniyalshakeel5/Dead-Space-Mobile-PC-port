@@ -155,6 +155,10 @@ def proven_frame_dispatch_prefix(insns: list[dict]) -> dict[str, bool]:
     These checks define the precise behaviors used by original_frame_dispatch.cpp.
     """
     selected={item["offset"]:(item["op"],item["args"]) for item in insns}
+    frame_global_literal={
+        4:("ldr","r4, [pc, #0x90]"),
+        12:("add","r4, pc, r4"),
+    }
     stage_selectors={
         16:("ldr","r3, [r4]"),
         20:("cmp","r3, #0"),
@@ -181,8 +185,10 @@ def proven_frame_dispatch_prefix(insns: list[dict]) -> dict[str, bool]:
         88:("pop","{r4, lr}"),
         92:("b","#0x27eecc"),
     }
+    verified_global=all(selected.get(k)==v for k,v in frame_global_literal.items())
     verified_selectors=all(selected.get(k)==v for k,v in stage_selectors.items())
     return {
+        "frame_global_pc_relative_literal":verified_global,
         "state_comparison_and_default_return":verified_selectors,
         "state_zero_call_then_store_one":verified_selectors and all(
             selected.get(k)==v for k,v in stage_zero.items()),
@@ -350,6 +356,8 @@ def observe(apk: Path) -> dict:
         "transition_state_global":f"0x{transition_global:08x}",
         "identical":frame_global==transition_global
     }
+    if frame_global!=transition_global:
+        raise ValueError("Original frame and state-two transition globals differ")
     contract=proven_frame_dispatch_prefix(
         out["native_frame_state_dispatch"]["instructions"])
     if not all(contract.values()):
