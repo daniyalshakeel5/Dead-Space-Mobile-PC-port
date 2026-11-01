@@ -101,6 +101,7 @@ def analyze(apk: Path, native_probe: Path,
     diagnostic_types: Counter = Counter()
     image2d_format_counts: Counter = Counter()
     image2d_failure_stages: Counter = Counter()
+    image2d_unknown_formats: Counter = Counter()
     image_decoding_counts: Counter = Counter()
     png_smoke_counts: Counter = Counter()
     decoded_rgba_bytes = 0
@@ -195,8 +196,11 @@ def analyze(apk: Path, native_probe: Path,
                                     if key in {"96", "97", "98", "99", "100"}:
                                         image2d_format_counts[key] += int(val)
                                 for key, val in (extra.get("image2d_failure_stages") or {}).items():
-                                    if key in {"0", "1", "2", "3", "4", "5", "6", "7"}:
+                                    if key in {"0", "1", "2", "3", "4", "5", "6", "7", "8"}:
                                         image2d_failure_stages[key] += int(val)
+                                for key, val in (extra.get("image2d_unknown_format_counts") or {}).items():
+                                    if key.isdecimal() and 0 <= int(key) <= 255:
+                                        image2d_unknown_formats[key] += int(val)
                                 if int(extra.get("image2d_standard_payloads", 0)) > 0:
                                     decoded = subprocess.run(
                                         [str(native_probe), str(stage), "--decode-image"],
@@ -265,6 +269,7 @@ def analyze(apk: Path, native_probe: Path,
         "image2d_validated_pixel_bytes": image2d_validated_pixel_bytes,
         "image2d_jsr184_format_counts": dict(sorted(image2d_format_counts.items())),
         "image2d_failure_stage_counts": dict(sorted(image2d_failure_stages.items())),
+        "image2d_unknown_format_values": dict(sorted(image2d_unknown_formats.items(), key=lambda item: int(item[0]))),
         "image_rgba_decode_outcomes": dict(sorted(image_decoding_counts.items())),
         "image_rgba_decoded_bytes": decoded_rgba_bytes,
         "temporary_png_smoke_test": dict(sorted(png_smoke_counts.items())),
