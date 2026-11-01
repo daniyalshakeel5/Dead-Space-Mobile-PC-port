@@ -1,0 +1,63 @@
+name: Dead Space Mobile - Milestone 4 intake audit
+
+on:
+  push:
+    branches:
+      - work/deadspace-remote-preflight-2026-11-01
+    paths:
+      - "tools/milestone_archive_audit.py"
+      - "tests/test_milestone_archive_audit.py"
+      - ".github/workflows/milestone-intake.yml"
+  pull_request:
+    paths:
+      - "tools/milestone_archive_audit.py"
+      - "tests/test_milestone_archive_audit.py"
+      - ".github/workflows/milestone-intake.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    name: ZIP safety and metadata (no extraction)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test no-game-data archive fixtures
+        run: python -m unittest discover -s tests -v
+
+      - name: Inspect private Milestone 4 archive if configured
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          DS_MILESTONE4_URL: ${{ secrets.DS_MILESTONE4_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p report
+          if [[ -z "${DS_MILESTONE4_URL:-}" ]]; then
+            python tools/milestone_archive_audit.py --output report/milestone-archive.json
+          else
+            case "${DS_MILESTONE4_URL}" in
+              https://*) ;;
+              *) echo "Only HTTPS private URLs are accepted" >&2; exit 2 ;;
+            esac
+            archive="$RUNNER_TEMP/dspc-milestone.zip"
+            trap 'rm -f "$archive"' EXIT
+            curl --silent --show-error --fail --location --max-redirs 3 --retry 1 --max-time 180 --max-filesize 268435456 \
+              --output "$archive" "$DS_MILESTONE4_URL"
+            python tools/milestone_archive_audit.py --archive "$archive" --output report/milestone-archive.json
+          fi
+
+      - name: Upload summary ONLY (not source ZIP)
+        if: github.event_name == 'workflow_dispatch' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deadspace-milestone4-private-metadata-only
+          path: report/milestone-archive.json
+          retention-days: 7
+          if-no-files-found: warn
