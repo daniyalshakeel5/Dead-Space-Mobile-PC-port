@@ -306,21 +306,39 @@ public class GhidraGameCodeMap extends GhidraScript {
                 gameEntry=f; break;
             }
         appendEntryChain(result,gameEntry,0,new LinkedHashSet<String>(),100);
-        result.append("],\"frame_update_native_call_chain\":[");
-        // Instruction-level ARM B target recovered independently from original ELF.
-        // Follow the actual target rather than the four-byte JNI jump wrapper.
-        Function realFrame=currentProgram.getFunctionManager().getFunctionAt(
-            toAddr(0x0027ef68L));
+        // Original ELF dynsym runEntryPoint has ELF vaddr 0x00035de8.
+        // Ghidra imported the library with a non-zero image base. Never
+        // confuse ELF vaddrs with Ghidra's re-based listing addresses.
+        if(gameEntry==null)throw new IllegalStateException(
+            "Missing original JNI game entry for Ghidra load bias proof");
+        long ghidraBias=gameEntry.getEntryPoint().getOffset()-0x00035de8L;
+        if(ghidraBias<0 || ghidraBias>0x10000000L)
+            throw new IllegalStateException("Unexpected original ELF import bias");
+        long verifiedFrameElfVaddr=0x0027ef68L;
+        ghidra.program.model.address.Address addrAt=
+            toAddr(verifiedFrameElfVaddr+ghidraBias);
+        result.append("],\"ghidra_image_load_bias\":")
+            .append(escape(String.format("0x%x",ghidraBias)));
+        result.append(",\"original_elf_frame_target\":")
+            .append(escape(String.format("0x%x",verifiedFrameElfVaddr)));
+        result.append(",\"mapped_ghidra_frame_target\":")
+            .append(escape("0x"+addrAt.toString()));
+        result.append(",\"frame_update_native_call_chain\":[");
+        Function realFrame=currentProgram.getFunctionManager().getFunctionAt(addrAt);
         if(realFrame==null)realFrame=currentProgram.getFunctionManager()
-            .getFunctionContaining(toAddr(0x0027ef68L));
+            .getFunctionContaining(addrAt);
         appendEntryChain(result,realFrame,0,new LinkedHashSet<String>(),75);
         result.append("],\"frame_branch_target_instruction_window\":[");
-        ghidra.program.model.address.Address addrAt=toAddr(0x0027ef68L);
         Instruction frameInstruction=currentProgram.getListing().getInstructionAt(addrAt);
-        for(int n=0;frameInstruction!=null && n<24;n++) {
+        for(int n=0;frameInstruction!=null && n<44;n++) {
             if(n>0)result.append(',');
             result.append("{\"at\":").append(escape("0x"+frameInstruction.getAddress()));
             result.append(",\"mnemonic\":").append(escape(frameInstruction.getMnemonicString()));
+            // Operands are a bounded *instruction-level* research sample, not
+            // a full proprietary source listing or exported library bytes.
+            result.append(",\"operands\":")
+                .append(escape(frameInstruction.toString().replaceFirst(
+                    "^\\\\S+\\\\s*", "")));
             result.append(",\"flows\":[");
             ghidra.program.model.address.Address[] flows=frameInstruction.getFlows();
             for(int k=0;k<Math.min(flows.length,5);k++) {
