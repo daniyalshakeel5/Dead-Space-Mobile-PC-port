@@ -4,6 +4,9 @@
 #include "ds_port/original_splash_host.hpp"
 #include "ds_port/im_menu_scene.hpp"
 #include "ds_port/original_menu_draw_stream.hpp"
+#ifdef DS_NATIVE_ORIGINAL_MENU_GL
+#include "ds_port/original_menu_gl.hpp"
+#endif
 #include "ds_port/im_ui_image.hpp"
 #include <filesystem>
 #include <fstream>
@@ -51,6 +54,15 @@ bool load_original_menu_stage(const std::string& root) {
        scene.group_object_indices.empty())return false;
     const auto draw=ds_port::prepare_original_menu_draw_stream(scene);
     if(!draw.valid)return false;
+#ifdef DS_NATIVE_ORIGINAL_MENU_GL
+    // The GPU backend is linked to this native game; do not draw until
+    // original camera, world matrices and material links are recovered.
+    ds_port::OriginalMenuGpuFrame original_frame{};
+    std::string missing_original;
+    if(ds_port::validate_original_menu_gpu_frame(scene,draw,ui.images,
+        original_frame,missing_original))return false;
+    std::cerr<<"Original GPU menu blocked: "<<missing_original<<"\\n";
+#endif
     for(const auto& img:ui.images)
         if(!img.decoded || img.width!=1024 || img.height!=1024 ||
            img.pixels_rgba.size()!=1024u*1024u*4u)return false;
