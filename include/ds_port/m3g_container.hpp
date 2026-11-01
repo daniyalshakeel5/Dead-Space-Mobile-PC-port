@@ -9,6 +9,11 @@ namespace ds_port {
 // JSR-184 M3G v1.0 container/object-chunk inspection ONLY.
 // Does not interpret model geometry, textures, animations or references.
 // Input bytes come from the user's own APK at runtime; no game data shipped.
+enum class M3gScanMode {
+    StrictJsr184,
+    DiagnosticOpaqueVariant // Structural evidence only. NOT gameplay decoding.
+};
+
 struct M3gContainerReport {
     bool valid = false;
     std::string error;
@@ -16,6 +21,9 @@ struct M3gContainerReport {
     std::uint32_t object_count = 0;
     std::uint32_t compressed_sections = 0;
     bool has_external_references = false;
+    bool diagnostic_mode = false;
+    std::uint32_t nonstandard_header_objects = 0;
+    std::uint32_t reserved_type_objects = 0;
     std::array<std::uint32_t, 256> object_type_count{};
 };
 
@@ -24,5 +32,6 @@ struct M3gContainerReport {
 // Use at most one file at a time; do NOT pass an entire APK into memory.
 M3gContainerReport scan_m3g_container(const std::uint8_t* data,
                                      std::size_t size,
-                                     std::size_t max_section_bytes = 64u * 1024u * 1024u);
+                                     std::size_t max_section_bytes = 64u * 1024u * 1024u,
+                                     M3gScanMode mode = M3gScanMode::StrictJsr184);
 }  // namespace ds_port
