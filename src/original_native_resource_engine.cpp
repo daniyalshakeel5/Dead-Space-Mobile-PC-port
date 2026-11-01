@@ -117,6 +117,21 @@ OriginalNativeResourceEngine::read_resource_text_line_0x276d18(
     return original_dispatch_owner_line_0x276d18(
         read32(bytes_.data()+0x8b0u),source,output);
 }
+OriginalOwnerWideLineResult
+OriginalNativeResourceEngine::read_resource_wide_line_0x276d18(
+    OriginalNativeByteSource& source,
+    OriginalNativeUtf16String& output) const noexcept {
+    using S=OriginalOwnerWideLineStatus;
+    if(!constructed_)return {S::InvalidInput,0,0};
+    auto load32=[](const std::uint8_t* ptr) noexcept -> std::uint32_t {
+        return std::uint32_t(ptr[0])|(std::uint32_t(ptr[1])<<8)|
+               (std::uint32_t(ptr[2])<<16)|(std::uint32_t(ptr[3])<<24);
+    };
+    if(!load32(bytes_.data()+0x8acu))
+        return {S::InvalidInput,0,0};
+    return original_read_wide_line_0x276d18(
+        load32(bytes_.data()+0x8b0u),source,output);
+}
 OriginalReceiverPrefixResult0x278018
 OriginalNativeResourceEngine::process_receiver_prefix(
     std::u16string_view record,
