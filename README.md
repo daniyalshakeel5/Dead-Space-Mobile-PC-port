@@ -63,8 +63,16 @@
   UTF-16 temporary objects in the mapped `0x278E58` stack
   frame. Actual resource streaming through provider `+0x2C`
   and owner `+0x70` still requires original native methods.
-- **62/62 synthetic native CTests passed on Windows and Linux** at
-  [verification run 41339111481](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41339111481).
+- Original mode-8 owner stream `0x276FE4` can now read
+  64-byte chunks of caller-provided game data into native
+  growable byte strings. The distinct original `0x26D5FC`
+  decoder converts those resource lines to owned UTF-16
+  preserving original malformed-input and 4-byte truncation
+  behavior. The constructed native resource owner exposes
+  both byte and wide text lines, but real provider virtual
+  methods and game-scene registration are still unported.
+- **64/64 synthetic native CTests passed on Windows and Linux** at
+  [verification run 41340819828](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41340819828).
   These tests do not prove real game-engine boot or scene rendering.
   [Latest detailed handoff](docs/HANDOFF_2026-11-01.md).
 
