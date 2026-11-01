@@ -67,12 +67,14 @@ OriginalNativeResourceEngine::begin_loader_0x286918(
 OriginalOwnerBindResult0x278778
 OriginalNativeResourceEngine::bind_original_owner_0x278778(
     OriginalActivationTreeClear release,void* context,
-    OriginalActivationProviderMode14 provider_mode) noexcept {
+    OriginalActivationProviderMode14 provider_mode,
+    const OriginalReceiverActivationScratch0x278e58* scratch) noexcept {
     if(!constructed_)return {
         OriginalOwnerBindStatus0x278778::InvalidOriginalOwner,
         OriginalReceiverActivationStatus0x278e58::InvalidOwner,0};
     return original_bind_resource_owner_0x278778({
-        owner_va_,bytes_.data(),bytes_.size(),release,context,provider_mode
+        owner_va_,bytes_.data(),bytes_.size(),release,context,
+        provider_mode,scratch
     });
 }
 
