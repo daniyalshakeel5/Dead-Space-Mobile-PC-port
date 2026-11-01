@@ -1,5 +1,8 @@
 #include "ds_port/original_frame_dispatch.hpp"
 #include "ds_port/deadspace_paths.hpp"
+#ifdef DS_NATIVE_SPLASH_PRESENTATION
+#include "ds_port/original_splash_host.hpp"
+#endif
 #ifdef DS_NATIVE_APK_IMPORT
 #include "ds_port/asset_install.hpp"
 #endif
@@ -14,18 +17,21 @@ constexpr int kBadArguments=2;
 }
 int main(int argc, char** argv) {
     bool readiness=false;
+    bool present_splash=false;
     std::string user_apk;
     std::string private_asset_dir;
     std::string inspected_asset_dir;
     for(int i=1;i<argc;++i) {
         const std::string_view arg(argv[i]);
         if(arg=="--check-native" || arg=="--status") readiness=true;
+        else if(arg=="--boot-splash") present_splash=true;
         else if(arg=="--apk" && i+1<argc) user_apk=argv[++i];
         else if(arg=="--assets-dir" && i+1<argc) private_asset_dir=argv[++i];
         else if(arg=="--inspect-assets" && i+1<argc) inspected_asset_dir=argv[++i];
         else if(arg=="--help") {
             std::cout<<"Dead Space Mobile native x86-64 desktop port (incomplete)\n"
                      <<"Usage: deadspace_native [--apk PATH --assets-dir NEW_EMPTY_DIR]\n"
+                     <<"       deadspace_native --boot-splash --assets-dir INSTALLED_DIR\n"
                      <<"       deadspace_native --inspect-assets EXISTING_DIR\n"
                      <<"       deadspace_native --status\n"
                      <<"Original game files are required; no APK or assets are bundled.\n"
@@ -40,9 +46,41 @@ int main(int argc, char** argv) {
         std::cerr<<"--inspect-assets cannot be combined with an APK import.\n";
         return kBadArguments;
     }
-    if(user_apk.empty()!=private_asset_dir.empty()) {
-        std::cerr<<"To import your APK, supply both --apk and --assets-dir.\n";
+    if(present_splash && (private_asset_dir.empty() ||
+                          !user_apk.empty() ||
+                          !inspected_asset_dir.empty() || readiness)) {
+        std::cerr<<"Use --boot-splash --assets-dir INSTALLED_DIR only.\\n";
         return kBadArguments;
+    }
+    if(!present_splash && user_apk.empty()!=private_asset_dir.empty()) {
+        std::cerr<<"To import your APK, supply both --apk and --assets-dir.\\n";
+        return kBadArguments;
+    }
+    if(present_splash) {
+#ifdef DS_NATIVE_SPLASH_PRESENTATION
+        const auto status=ds_port::present_original_splashes(private_asset_dir);
+        switch(status){
+            case ds_port::OriginalSplashResult::Completed:
+                std::cerr<<"Original EA and Dead Space splash images displayed.\\n"
+                         <<"Native main-menu renderer still incomplete.\\n";
+                return kNeedRecoveredEngine;
+            case ds_port::OriginalSplashResult::UserAborted: return 0;
+            case ds_port::OriginalSplashResult::MissingOriginalAssets:
+                std::cerr<<"Original installed splash assets not found.\\n";
+                return 7;
+            case ds_port::OriginalSplashResult::ImageDecodeFailed:
+                std::cerr<<"Original splash UI image parsing failed.\\n";
+                return 8;
+            case ds_port::OriginalSplashResult::GraphicsUnavailable:
+                std::cerr<<"Could not create native SDL2 splash window.\\n";
+                return 9;
+        }
+        return 9;
+#else
+        std::cerr<<"SDL2 splash presentation disabled. "
+                    "Rebuild with SDL2 and -DDS_BUILD_BOOT_SPLASH=ON.\\n";
+        return 5;
+#endif
     }
     if(!inspected_asset_dir.empty()) {
         const auto layout=ds_port::inspect_deadspace_assets(inspected_asset_dir);
