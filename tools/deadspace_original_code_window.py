@@ -572,7 +572,7 @@ def observe(apk: Path) -> dict:
                 {"offset": i.address-address,
                  "op": i.mnemonic.lower(),
                  "args": i.op_str.lower()}
-                for i in decoded[:64 if key.startswith("postprocess_embedded_") else 40]],
+                for i in decoded[:64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" else 40]],
         }
     # Two independently instruction-proven PC-relative literal loads.
     # Frame 0x27ef6c LDR r4,[pc,#0x90], 0x27ef74 ADD r4,pc,r4.
