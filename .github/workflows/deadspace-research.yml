@@ -194,6 +194,10 @@ jobs:
               print("ARM_ALLOCATOR_CHAIN",name,
                     json.dumps(report["windows"][name]["instructions"][:32],
                                separators=(",",":")))
+          print("ORIGINAL_SINGLETON_0x27E560",
+                json.dumps(report["windows"]["startup_allocator_object_init_0x27e560"]["instructions"][:42],separators=(",",":")))
+          print("ORIGINAL_SINGLETON_EVIDENCE",
+                json.dumps(report.get("original_singleton_0x27e560",{}),sort_keys=True))
           print("ORIGINAL_STAGE_ZERO_OWNER_CONSTRUCTION",
                 json.dumps(report["windows"][
                     "stage_zero_owner_construction_tail_0x27f7e0"]["instructions"][:44],
