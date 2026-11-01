@@ -1,5 +1,6 @@
 #pragma once
 #include "ds_port/original_startup_registration.hpp"
+#include "ds_port/original_native_resource_map.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
@@ -50,6 +51,10 @@ struct OriginalNativeRegistrationServices {
     OriginalRegistrationMatchedAction original_0x283f5c=nullptr;
     OriginalRegistrationPairInsert original_0x2837b4=nullptr;
     void* context=nullptr;
+    // Native tree replaces the three unported ARM lookup/remove/insert
+    // virtual implementations with their recovered semantic operation.
+    // If present, this takes priority over the original callback chain.
+    OriginalNativeResourceMap* native_resource_map=nullptr;
 };
 enum class OriginalNativeRegistrationStatus : std::uint8_t {
     InvalidOriginalArguments,

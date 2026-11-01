@@ -45,8 +45,10 @@ OriginalNativeRegistrationStatus original_execute_resource_registration_0x284178
        call.original_subcontext_va>0xfffffffbu||
        !call.original_global_value||!call.descriptor_arm_va)
         return OriginalNativeRegistrationStatus::InvalidOriginalArguments;
-    if(!svc.resolve_string || !svc.original_0x2839c8 ||
-       !svc.original_0x283f5c || !svc.original_0x2837b4)
+    if(!svc.resolve_string ||
+       (!svc.native_resource_map &&
+        (!svc.original_0x2839c8 || !svc.original_0x283f5c ||
+         !svc.original_0x2837b4)))
         return OriginalNativeRegistrationStatus::MissingOriginalService;
     const auto& map=svc.character_table;
     if(!map.mapped_got_word||map.got_word_bytes<4||
@@ -61,11 +63,16 @@ OriginalNativeRegistrationStatus original_execute_resource_registration_0x284178
         return error;
     if(!original_string(call.descriptor_arm_va,svc,&descriptor,&error))
         return error;
-    std::uint32_t found=0;
-    if(!svc.original_0x2839c8(call,svc.context,&found))
-        return OriginalNativeRegistrationStatus::OriginalPrecheckRefused;
-    if(found && !svc.original_0x283f5c(call,svc.context))
-        return OriginalNativeRegistrationStatus::OriginalMatchedActionRefused;
+    // In original callback mode, preserve the precise ARM precheck
+    // and optional existing-node removal order. Native resource-map
+    // mode performs these together as an atomic upsert after folding.
+    if(!svc.native_resource_map) {
+        std::uint32_t found=0;
+        if(!svc.original_0x2839c8(call,svc.context,&found))
+            return OriginalNativeRegistrationStatus::OriginalPrecheckRefused;
+        if(found && !svc.original_0x283f5c(call,svc.context))
+            return OriginalNativeRegistrationStatus::OriginalMatchedActionRefused;
+    }
 
     // The original code loads each byte unsigned, indexes an int16_t
     // locale table at 2*(byte)+2, and truncates to byte on STRB.
@@ -79,7 +86,12 @@ OriginalNativeRegistrationStatus original_execute_resource_registration_0x284178
     // from original parent), plus copies of BOTH strings and r3=0.
     // The original string owner/allocation ABI and container method
     // are intentionally not fabricated here.
-    if(!svc.original_0x2837b4(
+    if(svc.native_resource_map) {
+        if(!svc.native_resource_map->replace(
+             std::string_view(source),std::string_view(descriptor),
+             call.descriptor_arm_va))
+            return OriginalNativeRegistrationStatus::OriginalInsertRefused;
+    } else if(!svc.original_0x2837b4(
         call,call.original_subcontext_va+4u,
         std::string_view(source),std::string_view(descriptor),svc.context))
         return OriginalNativeRegistrationStatus::OriginalInsertRefused;
