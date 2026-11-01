@@ -72,18 +72,19 @@ Bytes replace_scene_type(std::uint8_t scene_type) {
     set32(file, next + n - 4, static_cast<std::uint32_t>(sum));
     return file;
 }
-Bytes make_image_file(bool bad_length) {
+Bytes make_image_file(bool bad_length, bool etc1 = false) {
     const Bytes magic{0xab,'J','S','R','1','8','4',0xbb,13,10,26,10};
     Bytes payload;
     put32(payload, 0); // Object3D userID
     put32(payload, 0); // animation track count
     put32(payload, 0); // user parameter count
-    payload.push_back(100); // RGBA
+    payload.push_back(etc1 ? 116 : 100); // ETC1 IronMonkey / RGBA JSR-184
     payload.push_back(0);   // immutable
-    put32(payload, 2); put32(payload, 2);
+    put32(payload, etc1 ? 4 : 2); put32(payload, etc1 ? 4 : 2);
     put32(payload, 0); // empty palette
-    put32(payload, bad_length ? 15 : 16);
-    payload.insert(payload.end(), bad_length ? 15 : 16, 0x7f);
+    const auto bytes = etc1 ? (bad_length ? 23 : 24) : (bad_length ? 15 : 16);
+    put32(payload, bytes);
+    payload.insert(payload.end(), bytes, etc1 ? 0 : 0x7f);
     Bytes objects{0};
     put32(objects, 0); // nonstandard second header, diagnostic only
     objects.push_back(10);
@@ -165,6 +166,20 @@ int main() {
         REQUIRE(negative.image2d_unrecognized_payloads == 1);
         REQUIRE(!ds_port::decode_m3g_rgba_image(
             malformed.data(), malformed.size()).decoded);
+    }
+    {
+        const auto file = make_image_file(false, true);
+        REQUIRE(!ds_port::decode_m3g_rgba_image(file.data(), file.size()).decoded);
+        const auto image = ds_port::decode_m3g_etc1_image(file.data(), file.size());
+        REQUIRE(image.decoded);
+        REQUIRE(image.width == 4 && image.height == 4);
+        REQUIRE(image.pixels_rgba.size() == 64);
+        REQUIRE(image.pixels_rgba[0] == 2);
+        REQUIRE(image.pixels_rgba[3] == 255);
+
+        const auto bad_mip = make_image_file(true, true);
+        REQUIRE(!ds_port::decode_m3g_etc1_image(
+            bad_mip.data(), bad_mip.size()).decoded);
     }
     for (bool compressed : {false,true}) {
         Bytes file = make_file(compressed);
