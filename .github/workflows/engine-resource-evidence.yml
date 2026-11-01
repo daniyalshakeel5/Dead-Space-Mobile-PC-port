@@ -34,13 +34,13 @@ jobs:
             https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes/releases/download/dead_space_mobile_fixes/Deas.Space.Mobile.Fixes.apk
           test "$(wc -c < "$RUNNER_TEMP/deadspace.apk" | tr -d ' ')" = 325769461
           python tools/deadspace_boot_asset_manifest.py --apk "$RUNNER_TEMP/deadspace.apk"
-          cmake -S . -B "$RUNNER_TEMP/boot-probe-build" \\
-            -DDS_BUILD_INPUT_PROBE=OFF -DDS_ENABLE_TESTS=OFF \\
+          cmake -S . -B "$RUNNER_TEMP/boot-probe-build" \
+            -DDS_BUILD_INPUT_PROBE=OFF -DDS_ENABLE_TESTS=OFF \
             -DDS_BUILD_ASSET_INSTALLER=OFF -DDS_BUILD_M3G_READER=ON
-          cmake --build "$RUNNER_TEMP/boot-probe-build" \\
+          cmake --build "$RUNNER_TEMP/boot-probe-build" \
             --target ds_m3g_probe --parallel 2
-          python tools/deadspace_boot_native_verify.py \\
-            --apk "$RUNNER_TEMP/deadspace.apk" \\
+          python tools/deadspace_boot_native_verify.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
             --probe "$RUNNER_TEMP/boot-probe-build/ds_m3g_probe"
           python tools/deadspace_original_code_window.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
