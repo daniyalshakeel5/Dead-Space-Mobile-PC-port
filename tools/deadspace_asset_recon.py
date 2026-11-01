@@ -29,6 +29,9 @@ CATEGORIES = {"assets", "res", "lib", "META-INF"}
 JSR184_MAGIC = bytes.fromhex("ab4a5352313834bb0d0a1a0a")
 SIGNATURES = (
     ("m3g_jsr184", JSR184_MAGIC),
+    # IronMonkey M3G variants documented in RaduMC/M3G2FBX.
+    ("m3g_im2", bytes.fromhex("ab494d324d3347bb0d0a1a0a")),
+    ("m3g_im3", bytes.fromhex("ab494d334d3347bb0d0a1a0a")),
     ("png", b"\x89PNG\r\n\x1a\n"),
     ("jpeg", b"\xff\xd8\xff"),
     ("dds", b"DDS "),
