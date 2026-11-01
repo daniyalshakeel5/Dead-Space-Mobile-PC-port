@@ -60,6 +60,7 @@ jobs:
                  "resource_owner_line_read_0x276fe4",
                  "resource_embedded_provider_mode_0x26c3c4",
                  "resource_embedded_provider_position_0x271794",
+                 "resource_embedded_provider_query_0x2763ac",
                  "resource_embedded_provider_seek_0x273034",
                  "resource_embedded_provider_read_0x2716f8",
                  "resource_embedded_memory_read_0x2714c4",
