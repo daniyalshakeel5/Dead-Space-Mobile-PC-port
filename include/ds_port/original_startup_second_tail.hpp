@@ -7,6 +7,7 @@
 #include "ds_port/original_static_singleton.hpp"
 #include "ds_port/original_startup_registration.hpp"
 #include "ds_port/original_startup_global_service.hpp"
+#include "ds_port/original_resource_query.hpp"
 #include <cstddef>
 #include <cstdint>
 namespace ds_port::original_runtime {
@@ -43,6 +44,8 @@ struct OriginalStartupSecondTailInputs {
     const OriginalRegistrationInputs* native_registration_0x27fd7c=nullptr;
     // Reconstructed 0x36FD38 -> 0x37000C wrapper.
     const OriginalGlobalServiceInputs* native_global_service_0x36fd38=nullptr;
+    // Native 0x2803E4 control flow; unresolved provider services fail closed.
+    const OriginalResourceQueryInputs* native_resource_query_0x2803e4=nullptr;
 };
 enum class OriginalStartupSecondTailStatus:std::uint8_t {
     InvalidOriginalContext,
