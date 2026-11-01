@@ -66,6 +66,12 @@ int main(){
     assert(original.decoded&&original.mesh_count==1);
     assert(original.vertices.size()==3 && original.indices.size()==3);
     assert(original.surfaces.size()==1);
+    assert(original.mesh_bounds.size()==1);
+    const auto& b=original.mesh_bounds[0];
+    assert(b.mesh_object_index==8);
+    assert(b.min_x==0 && b.max_x==100);
+    assert(b.min_y==0 && b.max_y==100);
+    assert(b.min_z==0 && b.max_z==0);
     assert(original.surfaces[0].original_appearance_index==5);
     assert(original.surfaces[0].mesh_object_index==8);
     assert(original.indices[0]==0&&original.indices[1]==1&&original.indices[2]==2);
