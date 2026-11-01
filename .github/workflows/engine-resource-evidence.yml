@@ -147,6 +147,32 @@ jobs:
                   separators=(",",":")))
           except (ValueError,IndexError,struct.error) as exc:
               print("ORIGINAL_UTF8_TABLE_UNAVAILABLE",type(exc).__name__,str(exc)[:160])
+          # Independent UTF-8-to-wide routine 0x26D5FC, used by
+          # the original mode-8 owner line reader 0x276D18.
+          # Emit numeric validation widths/ranges only.
+          try:
+              from tools.deadspace_original_code_window import elf32_load_ranges
+              lookup_ranges=elf32_load_ranges(elf)
+              lookup_read=lambda va,n: bounded_virtual_read(
+                  elf,lookup_ranges,va,n)
+              width_rel=struct.unpack("<i",lookup_read(0x26d724,4))[0]
+              range_rel=struct.unpack("<i",lookup_read(0x26d728,4))[0]
+              width_base=(0x26d614+width_rel)&0xffffffff
+              range_base=(0x26d618+range_rel)&0xffffffff
+              rows=[]
+              for n in range(1,7):
+                  base=range_base+n*4
+                  rows.append({
+                    "width":n,
+                    "offset":struct.unpack("<I",lookup_read(base+0x100,4))[0],
+                    "min":struct.unpack("<I",lookup_read(base+0x114,4))[0],
+                    "max_exclusive":struct.unpack("<I",lookup_read(base+0x128,4))[0]})
+              print("ORIGINAL_OWNER_STREAM_UTF8_TABLE",json.dumps({
+                  "width_counts_c0_ff":list(lookup_read(width_base+0xc0,64)),
+                  "rows":rows},separators=(",",":")))
+          except (ValueError,IndexError,struct.error) as exc:
+              print("ORIGINAL_OWNER_STREAM_UTF8_TABLE_UNAVAILABLE",
+                    type(exc).__name__,str(exc)[:160])
           # Real parser owner from original 0x27A768: LDR at +0x0
           # from 0x27A85C, ADD at 0x27A770, ADD #0x188 at 0x27A774.
           # Capture numeric original vtable +0x58 target only, not game
