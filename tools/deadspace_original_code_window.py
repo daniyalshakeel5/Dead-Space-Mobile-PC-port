@@ -62,6 +62,8 @@ WINDOWS = {
     "resource_receiver_activation_0x278e58": (0x00278e58, 480),
     "resource_owner_activation_check_0x2733e8": (0x002733e8, 640),
     "resource_owner_virtual60_0x26c4cc": (0x0026c4cc, 360),
+    "resource_owner_stream_begin_0x276d18": (0x00276d18, 768),
+    "resource_owner_stream_tail_0x277018": (0x00277018, 640),
     "resource_receiver_activation_tree_clear_0x273570": (0x00273570, 384),
     "resource_receiver_activation_tail_0x279038": (0x00279038, 384),
     "resource_receiver_tree_lookup_0x2710a8": (0x002710a8, 768),
