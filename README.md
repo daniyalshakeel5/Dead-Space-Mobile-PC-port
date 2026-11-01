@@ -101,3 +101,9 @@ The independent desktop research/code does not confer rights to
 distribute the original game's copyrighted content.
 
 ![Original upstream cover](front.jpg)
+
+## Resume development / handoff
+
+The current verified engineering state, GitHub Actions run IDs, unresolved
+APK evidence, and next steps are in [the November 1, 2026 handoff](docs/HANDOFF_2026-11-01.md).
+Read that document first when starting a new chat or engineering session.
