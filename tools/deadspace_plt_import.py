@@ -20,7 +20,7 @@ def arm_immediate(word: int) -> int:
     return ((imm >> rotate) | (imm << (32-rotate))) & 0xffffffff
 
 def sections_elf32(raw: bytes) -> list[dict]:
-    if raw[:6] != b"\\x7fELF\\x01\\x01" or len(raw) < 52:
+    if raw[:6] != b"\x7fELF\x01\x01" or len(raw) < 52:
         raise ValueError("Expected little-endian ELF32")
     offset=struct.unpack_from("<I",raw,32)[0]
     size,count=struct.unpack_from("<HH",raw,46)
