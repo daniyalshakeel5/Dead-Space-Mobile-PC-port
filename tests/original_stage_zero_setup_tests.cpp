@@ -74,6 +74,25 @@ int main(){
         ==OriginalStageZeroSetupResult::OriginalClockUnavailableAfterSetup);
     CHECK(setup_calls==1 && clock_calls==1 && first_calls==0 && second_calls==0);
     CHECK(state[0x40]==0);
+    // Integrated stage-zero path uses ORIGINAL recovered full 0x2833f4
+    // implementation instead of an injected synthetic followup callback.
+    reset();
+    CHECK(original_execute_stage_zero_setup_with_recovered_followup(
+        state.data(),state.size(),setup,clock,followup_a)
+        ==OriginalStageZeroSetupResult::VerifiedPrefixExecuted);
+    CHECK(stage==3 && setup_calls==1 && clock_calls==1);
+    CHECK(first_calls==1 && second_calls==0); // no stubbed callback
+    CHECK(first_value==0xdeadbeefu);
+    CHECK(state[0x18+0x20]==0 && state[0x18+0x21]==0 &&
+          state[0x18+0x22]==0 && state[0x18+0x23]==0);
+    CHECK(state[0x18+0x1c]==0x78 && state[0x18+0x1d]==0x56 &&
+          state[0x18+0x1e]==0x34 && state[0x18+0x1f]==0x12);
+    CHECK(state[0x18+0x24]==0x78 && state[0x18+0x25]==0x56 &&
+          state[0x18+0x26]==0x34 && state[0x18+0x27]==0x12);
+    CHECK(original_execute_stage_zero_setup_with_recovered_followup(
+        nullptr,state.size(),setup,clock,followup_a)
+        ==OriginalStageZeroSetupResult::InvalidContext);
+
     std::cout<<"Original ARM stage-zero initialization instruction prefix passed\n";
     return 0;
 }
