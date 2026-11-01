@@ -38,4 +38,25 @@ FramePrefixResult execute_original_frame_prefix(
     return FramePrefixResult::OriginalOtherStateReturned;
 }
 
+StageZeroChainResult execute_original_stage_zero_chain(
+    void* original_stage_context, OriginalFrameInit first_original_callee,
+    OriginalFrameInit second_original_callee) noexcept {
+    if (!original_stage_context || !first_original_callee || !second_original_callee)
+        return StageZeroChainResult::MissingNativeCallee;
+
+    // 0x0027f870: MOV r4,r0; BL 0x0027f790; MOV r0,r4;
+    // POP {r4,lr}; B 0x00280520. The same original context reaches
+    // both callees, in this order. Do not assume their implementations.
+    first_original_callee(original_stage_context);
+    second_original_callee(original_stage_context);
+    return StageZeroChainResult::OriginalTwoCallsCompleted;
+}
+
+std::uint32_t original_stage_one_normalized_result(
+    std::uint32_t virtual_method_return) noexcept {
+    // 0x0027fc80: SUBS r0,r0,#1; MOVNE r0,#1.
+    // Exact unsigned 32-bit result: 0 only for argument 1, else 1.
+    return virtual_method_return == 1u ? 0u : 1u;
+}
+
 } // namespace ds_port::original_runtime
