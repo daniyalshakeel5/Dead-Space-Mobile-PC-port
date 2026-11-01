@@ -288,6 +288,17 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
         68:("smlal","r2, r3, r1, r0"),
         72:("strd","r2, r3, [r4, #0x40]"),
     })
+    # Entire original ELF 0x002833f4: three 32-bit stores and BX LR.
+    # Its successor at +0x14 is a separate ARM function and is not decoded
+    # as part of this one. All five instructions and the original caller
+    # target must match before any native implementation is called verified.
+    stage_zero_followup_stores=matched("stage_zero_followup_target_0x2833f4",{
+        0:("mov","r3, #0"),
+        4:("str","r3, [r0, #0x20]"),
+        8:("str","r1, [r0, #0x1c]"),
+        12:("str","r1, [r0, #0x24]"),
+        16:("bx","lr"),
+    })
     stage_zero_setup=matched("frame_stage_zero_second_callee",{
         0:("push","{r4, r5, lr}"),
         4:("mov","r1, #2"),
@@ -308,6 +319,8 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
         "original_signed_time_math_and_store_at_0x40":signed_clock,
         "original_clock_slot_zero_check_before_store":conditional_clock,
         "stage_zero_setup_and_two_followup_calls":stage_zero_setup,
+        "stage_zero_followup_0x2833f4_complete_three_word_store":(
+            stage_zero_setup and stage_zero_followup_stores),
         "original_gettimeofday_stack_arg_and_bl":conditional_clock and gettimeofday_call,
         "original_state_one_transition_stores_two_first":transition_state_two,
         "original_state_one_nonzero_two_vtable_calls":nonzero_calls,
