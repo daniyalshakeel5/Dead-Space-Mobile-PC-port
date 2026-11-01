@@ -581,6 +581,25 @@ def observe(apk: Path) -> dict:
         data,sections,0x002849e4,0x40,0x00284a00)
     if secondary_descriptor_va==0:
         raise ValueError("Secondary allocation descriptor resolves to null")
+    # Original 0x2828AC LDR at +0x00 / ADD at +0x0c / ADD #8 at +0x10.
+    # Original 0x288688 LDR at +0x0c / ADD at +0x18 / ADD #8 at +0x1c.
+    # Both literal-derived addresses are original ARM VAs, not host pointers.
+    constructor_vtable_va=(resolve_arm_literal_based_global(
+        data,sections,0x002828ac,0x24,0x002828b8)+8)&0xffffffff
+    secondary_vtable_va=(resolve_arm_literal_based_global(
+        data,sections,0x00288694,0x40,0x002886a0)+8)&0xffffffff
+    if not constructor_vtable_va or not secondary_vtable_va:
+        raise ValueError("Original constructor vtable literal resolves to zero")
+    for key,prefix in (
+        ("postprocess_constructor_0x2828ac",[
+            ("ldr","r1, [pc, #0x24]"),("mov","r2, #0"),
+            ("strb","r2, [r0, #0x12]")]),
+        ("secondary_allocator_postprocess_0x288688",[
+            ("push","{r4, r5, r6, lr}"),("mov","r4, r0"),
+            ("bl","#0x2828ac")])):
+        ins=out[key]["instructions"]
+        if [(i["op"],i["args"]) for i in ins[:len(prefix)]]!=prefix:
+            raise ValueError("Original ARM constructor instruction proof changed")
     type2_proof=proven_original_code_helpers(out).get(
         "stage_zero_type2_0x28ca24_complete_case")
     if not type2_proof:
@@ -622,6 +641,13 @@ def observe(apk: Path) -> dict:
                 if registry_got_initial is not None else None),
             "requested_interface_id":0x10004,
             "vtable_offset":0x18,
+        },
+        "secondary_postallocation_constructor_evidence":{
+            "constructor_0x2828ac_vtable_va":f"0x{constructor_vtable_va:08x}",
+            "postprocess_0x288688_override_vtable_va":f"0x{secondary_vtable_va:08x}",
+            "constructor_direct_call":"0x002828ac",
+            "constructor_first_byte_range":"0x00..0x12",
+            "verified":True,
         },
         "secondary_allocator_0x2849e0":{
             "descriptor_arm_address":f"0x{secondary_descriptor_va:08x}",
