@@ -143,6 +143,19 @@ bool embedded84(const OriginalEmbeddedMethod84Call& q,void* c,
     assert(q.caller_arg2==kOriginal27fa74SecondArgVA);
     *result=0x5200;return true;
 }
+bool map_registration_strings(std::uint32_t va,void*,
+                              OriginalRegistrationStringBytes* mapped) noexcept {
+    static constexpr std::uint8_t source[]="ENERGY";
+    static constexpr std::uint8_t descriptor[]="BEAM";
+    if(va>=0x9000u&&va<0x9000u+27u){
+        *mapped={source,sizeof(source)};return true;
+    }
+    for(const auto& spec:kOriginalRegistrationSequence0x27fd7c)
+        if(va==spec.descriptor_arm_va){
+            *mapped={descriptor,sizeof(descriptor)};return true;
+        }
+    return false;
+}
 bool registration_global(std::uint32_t original_slot,void* c,
                          OriginalRegistrationMappedGlobal* out) noexcept {
     auto& h=*static_cast<Harness*>(c);
@@ -283,5 +296,40 @@ int main(){
     assert(h.directs==0&&h.registrations==27&&h.registration_lookups==27);
     assert(h.global_service_calls==3&&h.resources==2&&h.allocs==2);
     assert(h.virtuals==4&&h.secondary_allocs==1);
+
+    // Now run the entire stage-zero tail with native 0x27FD7C,
+    // native 0x284178, native ordered resource map, AND native
+    // 0x36FD38/0x37000C. No generic direct or resource insertion
+    // callback remains; unrelated engine leaves are still test fixtures.
+    OriginalNativeResourceMap native_resources{};
+    std::array<std::uint8_t,4> character_table_got{};
+    std::array<std::uint8_t,kOriginalRegistrationCharMapMinBytes> charmap{};
+    put(character_table_got.data(),0x7777u);
+    for(unsigned ch=0;ch<256;++ch){
+        std::uint8_t mapped=std::uint8_t(ch);
+        if(ch>='A'&&ch<='Z')mapped=std::uint8_t(ch+('a'-'A'));
+        charmap[ch*2u+2u]=mapped;
+    }
+    OriginalNativeRegistrationServices native_registration{};
+    native_registration.resolve_string=map_registration_strings;
+    native_registration.character_table={character_table_got.data(),
+        character_table_got.size(),0x7777u,charmap.data(),charmap.size()};
+    native_registration.context=&h;
+    native_registration.native_resource_map=&native_resources;
+    registered.native_helper_0x284178=&native_registration;
+    registered.invoke_original_0x284178=nullptr;
+
+    h.directs=h.resources=h.allocs=h.bases=h.virtuals=0;
+    h.secondary_allocs=h.embedded_virtuals=h.queries=h.service_84=0;
+    h.registrations=h.registration_lookups=h.global_service_calls=0;
+    put(h.global_service_word.data(),0xAAAAu);
+    assert(original_execute_stage_zero_tail_0x280580(in)==
+           OriginalStartupSecondTailStatus::CompletedOriginalSecondRoutine);
+    assert(h.directs==0&&h.registration_lookups==27);
+    assert(h.registrations==0&&native_resources.successful_writes()==27);
+    assert(native_resources.count()==1&&native_resources.replacement_count()==26);
+    OriginalNativeResourceEntry record{};
+    assert(native_resources.find("energy",&record)&&record.descriptor=="BEAM");
+    assert(h.global_service_calls==3&&h.allocs==2&&h.resources==2);
     return 0;
 }
