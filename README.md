@@ -36,8 +36,14 @@
   `0x26E670` comparator, owner flags and `0x278018` no-match path
   are integrated into `0x2862E8`. Matching resources still require
   the original receiver's stream/allocator/object-creation path.
-- **54/54 synthetic native CTests passed on Windows and Linux** at
-  [verification run 41333903890](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41333903890).
+- Original receiver activation `0x278E58` now performs native
+  tree reset and flag updates, with original resource ownership
+  cleanup required for nonempty trees. Original `0x26C410`
+  receiver mode/parameter updates are native, including the
+  conditional original owner reset call. Normal startup still
+  cannot activate the real resource provider.
+- **56/56 synthetic native CTests passed on Windows and Linux** at
+  [verification run 41335144028](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41335144028).
   These tests do not prove real game-engine boot or scene rendering.
   [Latest detailed handoff](docs/HANDOFF_2026-11-01.md).
 
