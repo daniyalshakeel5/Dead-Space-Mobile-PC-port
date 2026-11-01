@@ -211,7 +211,7 @@ jobs:
           print("ORIGINAL_STAGE_ZERO_GLOBAL_SERVICE_CONSTANTS",
                 json.dumps(report["original_startup_global_service_0x37000c"],sort_keys=True))
           print("ORIGINAL_ENGINE_REGISTER_HELPER",
-                json.dumps(report["windows"]["repeated_initializer_callee_0x284178"]["instructions"][:80],separators=(",",":")))
+                json.dumps(report["windows"]["repeated_initializer_callee_0x284178"]["instructions"][:192],separators=(",",":")))
           for name in ("post_setup_direct_callee_0x27fd7c",
                        "post_setup_direct_callee_0x2803e4"):
               print("ORIGINAL_ENGINE_INIT_CALL",
