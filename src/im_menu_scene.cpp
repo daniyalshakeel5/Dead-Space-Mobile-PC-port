@@ -65,6 +65,7 @@ ImMenuGeometry decode_im_menu_geometry(const std::uint8_t* data,
     auto fail=[&](const char* why) {
         out.decoded=false;out.error=why;out.mesh_count=0;
         out.vertices.clear();out.indices.clear();out.surfaces.clear();
+        out.mesh_bounds.clear();
         return out;
     };
     std::vector<Chunk> chunks;
@@ -119,6 +120,21 @@ ImMenuGeometry decode_im_menu_geometry(const std::uint8_t* data,
                     return fail("non-finite decoded menu vertex");
                 out.vertices.push_back(v);
             }
+            ImMenuMeshBounds bounds{};
+            bounds.mesh_object_index=static_cast<std::uint32_t>(i+1);
+            bounds.min_x=bounds.max_x=out.vertices[first].x;
+            bounds.min_y=bounds.max_y=out.vertices[first].y;
+            bounds.min_z=bounds.max_z=out.vertices[first].z;
+            for(std::size_t k=first+1;k<out.vertices.size();++k) {
+                const auto& v=out.vertices[k];
+                bounds.min_x=std::min(bounds.min_x,v.x);
+                bounds.min_y=std::min(bounds.min_y,v.y);
+                bounds.min_z=std::min(bounds.min_z,v.z);
+                bounds.max_x=std::max(bounds.max_x,v.x);
+                bounds.max_y=std::max(bounds.max_y,v.y);
+                bounds.max_z=std::max(bounds.max_z,v.z);
+            }
+            out.mesh_bounds.push_back(bounds);
             const auto part_count=le32(mesh.p+26);
             if(part_count>(mesh.size-30)/4u ||
                mesh.size!=30+std::size_t(part_count)*4u)
