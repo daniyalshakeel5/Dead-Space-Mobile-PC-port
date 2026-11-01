@@ -25,7 +25,9 @@ int main(int argc, char** argv) {
         else if(arg=="--inspect-assets" && i+1<argc) inspected_asset_dir=argv[++i];
         else if(arg=="--help") {
             std::cout<<"Dead Space Mobile native x86-64 desktop port (incomplete)\n"
-                     <<"Usage: deadspace_native [--apk PATH --assets-dir NEW_EMPTY_DIR] [--status]\n"
+                     <<"Usage: deadspace_native [--apk PATH --assets-dir NEW_EMPTY_DIR]\n"
+                     <<"       deadspace_native --inspect-assets EXISTING_DIR\n"
+                     <<"       deadspace_native --status\n"
                      <<"Original game files are required; no APK or assets are bundled.\n"
                      <<"The native gameplay engine is NOT ready.\n";
             return 0;
@@ -35,7 +37,7 @@ int main(int argc, char** argv) {
         }
     }
     if(!inspected_asset_dir.empty() && (!user_apk.empty() || !private_asset_dir.empty())) {
-        std::cerr<<"--inspect-assets cannot be combined with an APK import.\\n";
+        std::cerr<<"--inspect-assets cannot be combined with an APK import.\n";
         return kBadArguments;
     }
     if(user_apk.empty()!=private_asset_dir.empty()) {
@@ -44,10 +46,10 @@ int main(int argc, char** argv) {
     }
     if(!inspected_asset_dir.empty()) {
         const auto layout=ds_port::inspect_deadspace_assets(inspected_asset_dir);
-        std::cout<<"Installed assets: "<<(layout.assets_found?"found":"missing")<<"\\n"
-                 <<"Published data: "<<(layout.published_found?"found":"missing")<<"\\n"
-                 <<"Xperia Play marker: "<<(layout.achievements_found?"present":"absent")<<"\\n"
-                 <<layout.diagnostic<<"\\n";
+        std::cout<<"Installed assets: "<<(layout.assets_found?"found":"missing")<<"\n"
+                 <<"Published data: "<<(layout.published_found?"found":"missing")<<"\n"
+                 <<"Xperia Play marker: "<<(layout.achievements_found?"present":"absent")<<"\n"
+                 <<layout.diagnostic<<"\n";
         return layout.assets_found?0:7;
     }
     if(!user_apk.empty()) {
@@ -58,7 +60,7 @@ int main(int argc, char** argv) {
             return 4;
         }
         const auto layout=ds_port::inspect_deadspace_assets(private_asset_dir);
-        std::cout<<"Asset layout: "<<layout.diagnostic<<"\\n";
+        std::cout<<"Asset layout: "<<layout.diagnostic<<"\n";
         std::cout<<"Imported "<<result.assets_installed<<" private original game files ("
                  <<result.bytes_installed<<" bytes) into "<<private_asset_dir<<"\n"
                  <<"Original files remain local. This does not enable gameplay.\n";
