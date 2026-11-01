@@ -14,7 +14,7 @@ def chunk(t,body): return bytes((t,))+u32(len(body))+body
 
 def file():
     va = bytes(12) + bytes((2,3,0)) + struct.pack("<H",2) + bytes(12)
-    vb = bytes(12)+bytes((255,255,255,255))+u32(2)+bytes(20)+u32(0)+u32(0)+u32(0)
+    vb = bytes(12)+bytes((255,255,255,255))+u32(2)+bytes(16)+u32(0)+u32(0)+u32(0)
     assert len(vb)==48
     mesh = bytes(22)+u32(3)+u32(1)+u32(4)
     objects = chunk(0,bytes(12))+chunk(20,va)+chunk(21,vb)+chunk(100,bytes(8))+chunk(14,mesh)
