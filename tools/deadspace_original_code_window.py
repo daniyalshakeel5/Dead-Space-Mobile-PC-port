@@ -289,6 +289,28 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
         68:("smlal","r2, r3, r1, r0"),
         72:("strd","r2, r3, [r4, #0x40]"),
     })
+    # The original engine passes type 2 to 0x0028ca24. Prove the
+    # dispatch table, selected case, float field read and function epilogue.
+    stage_zero_type2=matched("stage_zero_setup_target_0x28ca24",{
+        0:("vldr","s15, [pc, #0xf4]"),
+        4:("push","{r4, r5, r6, lr}"),
+        8:("sub","r3, r1, #1"),
+        12:("vpush","{d8}"),
+        16:("mov","r4, r0"),
+        20:("vstr","s15, [r0, #0x14]"),
+        24:("str","r1, [r0, #0x10]"),
+        28:("cmp","r3, #5"),
+        32:("addls","pc, pc, r3, lsl #2"),
+        44:("b","#0x28cad8"),
+        132:("vpop","{d8}"),
+        136:("pop","{r4, r5, r6, pc}"),
+    }) and matched("stage_zero_setup_type2_branch_0x28cad8",{
+        0:("ldr","r3, [pc, #0x50]"),
+        4:("add","r3, pc, r3"),
+        8:("vldr","s15, [r3, #0x1c]"),
+        12:("vstr","s15, [r0, #0x14]"),
+        16:("b","#0x28caa8"),
+    })
     # Entire original ELF 0x002833f4: three 32-bit stores and BX LR.
     # Its successor at +0x14 is a separate ARM function and is not decoded
     # as part of this one. All five instructions and the original caller
@@ -322,6 +344,8 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
         "stage_zero_setup_and_two_followup_calls":stage_zero_setup,
         "stage_zero_followup_0x2833f4_complete_three_word_store":(
             stage_zero_setup and stage_zero_followup_stores),
+        "stage_zero_type2_0x28ca24_complete_case":(
+            stage_zero_setup and stage_zero_type2),
         "original_gettimeofday_stack_arg_and_bl":conditional_clock and gettimeofday_call,
         "original_state_one_transition_stores_two_first":transition_state_two,
         "original_state_one_nonzero_two_vtable_calls":nonzero_calls,
@@ -408,6 +432,23 @@ def observe(apk: Path) -> dict:
     }
     if frame_global!=transition_global:
         raise ValueError("Original frame and state-two transition globals differ")
+    type2_proof=proven_original_code_helpers(out).get(
+        "stage_zero_type2_0x28ca24_complete_case")
+    if not type2_proof:
+        raise ValueError("Original ARM type-2 setup instruction proof changed")
+    # ARM VLDR s15,[PC,#0xF4] at ELF 0x28CA24 reads literal at
+    # 0x28CA24+8+0xF4 = 0x28CB20. This is a numeric float literal, not
+    # any exported proprietary asset or decompressed game resource.
+    initial_float_bits=struct.unpack("<I",bounded_virtual_read(
+        data,sections,0x0028cb20,4))[0]
+    type2_source_base=resolve_arm_literal_based_global(
+        data,sections,0x0028cad8,0x50,0x0028cadc)
+    type2_info={
+        "entry_default_float_bits":f"0x{initial_float_bits:08x}",
+        "original_runtime_field_address":f"0x{(type2_source_base+0x1c)&0xffffffff:08x}",
+        "selected_case":2,
+        "verified":True
+    }
     contract=proven_frame_dispatch_prefix(
         out["native_frame_state_dispatch"]["instructions"])
     if not all(contract.values()):
@@ -420,6 +461,7 @@ def observe(apk: Path) -> dict:
         "kind": "original-ARM-targeted-instruction-evidence",
         "frame_dispatch_instruction_proof": contract,
         "frame_transition_global_address_proof":shared_original_global,
+        "stage_zero_type2_runtime_float_evidence":type2_info,
         "reconstructed_native_helper_proof": helpers,
         "windows": out,
         "original_elf_jni_symbols":symbol_windows,
