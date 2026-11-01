@@ -14,6 +14,8 @@ on:
       - "tools/deadspace_m3g_preflight.py"
       - "tests/test_deadspace_m3g_preflight.py"
       - "tools/deadspace_m3g_native_verify.py"
+      - "tools/deadspace_format116_probe.py"
+      - "tests/test_deadspace_format116_probe.py"
       - "include/ds_port/m3g_container.hpp"
       - "src/m3g_container.cpp"
       - "apps/m3g_probe.cpp"
@@ -32,6 +34,8 @@ on:
       - "tools/deadspace_m3g_preflight.py"
       - "tests/test_deadspace_m3g_preflight.py"
       - "tools/deadspace_m3g_native_verify.py"
+      - "tools/deadspace_format116_probe.py"
+      - "tests/test_deadspace_format116_probe.py"
       - "include/ds_port/m3g_container.hpp"
       - "src/m3g_container.cpp"
       - "apps/m3g_probe.cpp"
@@ -121,6 +125,9 @@ jobs:
             --native-probe "$RUNNER_TEMP/m3g-build/ds_m3g_probe" \
             --texture-exporter "$RUNNER_TEMP/m3g-build/ds_m3g_texture_extract" \
             --output report/deadspace-m3g-native-evidence.json
+          python tools/deadspace_format116_probe.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-format116-evidence.json
           python -c 'import json; d=json.load(open("report/deadspace-public-evidence.json",encoding="utf-8")); assert d.get("real_apk_analyzed") and d.get("resources",{}).get("valid_zip"); print("Real upstream release analyzed; redacted aggregate report ready.")'
           echo "::group::Sanitized original-APK evidence (public metadata only)"
           python -m json.tool report/deadspace-public-evidence.json
@@ -131,6 +138,9 @@ jobs:
           echo "::group::Native JSR-184 complete container evidence (aggregate only)"
           python -m json.tool report/deadspace-m3g-native-evidence.json
           echo "::endgroup::"
+          echo "::group::Proprietary format-116 block-size hypotheses (aggregate only)"
+          python -m json.tool report/deadspace-format116-evidence.json
+          echo "::endgroup::"
 
       - name: Upload metadata report only
         uses: actions/upload-artifact@v4
@@ -140,5 +150,6 @@ jobs:
             report/deadspace-public-evidence.json
             report/deadspace-m3g-evidence.json
             report/deadspace-m3g-native-evidence.json
+            report/deadspace-format116-evidence.json
           if-no-files-found: error
           retention-days: 7
