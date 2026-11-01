@@ -25,6 +25,8 @@ WINDOWS = {
     "renderer_native_surface_created": (0x0027ec24, 84),
     "frame_stage_zero_routine": (0x0027f870, 24),
     "frame_stage_zero_first_callee": (0x0027f790, 80),
+    "stage_zero_owner_provider_0x27e930": (0x0027e930, 128),
+    "record_allocator_virtual_call_0x281d54": (0x00281d54, 112),
     "frame_stage_zero_second_callee": (0x00280520, 96),
     "stage_zero_setup_target_0x28ca24": (0x0028ca24, 160),
     "stage_zero_setup_type2_branch_0x28cad8": (0x0028cad8, 96),
