@@ -1,5 +1,6 @@
 #include "ds_port/original_menu_scene_graph.hpp"
 #include <cmath>
+#include <algorithm>
 #include <functional>
 #include <unordered_map>
 #include <unordered_set>
@@ -39,6 +40,38 @@ bool inverse(const Matrix& m,Matrix& result) {
         result[c*4+r]=static_cast<float>(a[r][c+4]);
     return finite(result);
 }
+}
+OriginalSceneTopology recover_original_menu_topology(const ImMenuGeometry& geometry) {
+    OriginalSceneTopology out{};
+    if(!geometry.decoded || geometry.group_object_indices.empty()) {
+        out.error="Original menu group records unavailable";return out;
+    }
+    out.unresolved_groups=geometry.group_object_indices.size()-
+        geometry.validated_group_children.size();
+    std::unordered_map<std::uint32_t,std::uint32_t> parents;
+    for(const auto& group:geometry.validated_group_children) {
+        for(const auto child:group.children) {
+            if(child==group.group_object_index ||
+               !parents.emplace(child,group.group_object_index).second) {
+                out.error="Original menu has duplicate parent or self-link";return out;
+            }
+        }
+    }
+    for(const auto& item:parents) {
+        std::unordered_set<std::uint32_t> seen;
+        auto node=item.first;
+        while(parents.count(node)) {
+            if(!seen.insert(node).second) {
+                out.error="Original menu child hierarchy contains a cycle";
+                return out;
+            }
+            node=parents.at(node);
+        }
+    }
+    for(const auto& item:parents)out.child_parent.push_back(item);
+    std::sort(out.child_parent.begin(),out.child_parent.end());
+    out.valid=true;
+    return out;
 }
 OriginalSceneResolveResult resolve_original_menu_scene(
     const ImMenuGeometry& geometry,const OriginalMenuDrawStream& stream,
