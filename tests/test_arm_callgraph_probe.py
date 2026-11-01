@@ -11,7 +11,8 @@ class ArmCallClassification(unittest.TestCase):
         inst = list(decoder.disasm(machine, 0x1000))
         self.assertEqual(len(inst), 4)
         self.assertTrue(inst[0].group(CS_GRP_CALL))
-        self.assertFalse(inst[0].group(CS_GRP_JUMP))
+        # Capstone also marks BL as a jump; classification prioritizes CALL.
+        self.assertTrue(inst[0].group(CS_GRP_JUMP))
         for i in inst[1:]:
             self.assertFalse(i.group(CS_GRP_CALL),
                              f"{i.mnemonic} misidentified as a call")
