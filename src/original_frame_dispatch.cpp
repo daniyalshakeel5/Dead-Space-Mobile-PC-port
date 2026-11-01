@@ -146,4 +146,60 @@ OriginalActiveFramePrefixResult original_execute_active_frame_prefix(
         : OriginalActiveFramePrefixResult::InvalidOriginalContext;
 }
 
+OriginalNonzeroVirtualSequenceResult original_execute_nonzero_virtual_sequence(
+    void* original_shared_global,
+    OriginalFrameBackendResolver original_backend_resolver,
+    OriginalFrameEventMethod original_event_virtual_0x20,
+    OriginalFrameFollowupMethod original_followup_virtual_0x38) noexcept {
+    if (!original_shared_global || !original_backend_resolver ||
+        !original_event_virtual_0x20 || !original_followup_virtual_0x38)
+        return OriginalNonzeroVirtualSequenceResult::MissingOriginalTargets;
+
+    // Exact original ARM at 0x0027efc8..0x0027efe8:
+    // LDR r1,[r4,#0x68], LDR ip,[r1], MOV r0,r1,
+    // MOV r3,#0, MOV r2,r3, STR r3,[sp], MOV r1,#14,
+    // MOV lr,pc; LDR pc,[ip,#0x20].
+    void* first_backend=original_backend_resolver(original_shared_global);
+    if (!first_backend)
+        return OriginalNonzeroVirtualSequenceResult::FirstBackendUnavailable;
+    original_event_virtual_0x20(first_backend,14u,0u,0u,0u);
+
+    // The original re-loads [r4,#0x68] AFTER the first call. It does not
+    // reuse the initial backend pointer. Preserve that exact dependency.
+    // LDR r3,[r4,#0x68], MOV r0,r3, LDR r3,[r3],
+    // MOV lr,pc; LDR pc,[r3,#0x38]; B 0x0027ef90.
+    void* second_backend=original_backend_resolver(original_shared_global);
+    if (!second_backend)
+        return OriginalNonzeroVirtualSequenceResult::SecondBackendUnavailableAfterFirstCall;
+    original_followup_virtual_0x38(second_backend);
+    return OriginalNonzeroVirtualSequenceResult::TwoOriginalVirtualCallsExecuted;
+}
+
+OriginalActiveFramePrefixResult original_execute_active_frame_verified_branches(
+    void* original_shared_global, std::size_t accessible_bytes,
+    void* original_active_virtual_object,
+    OriginalVirtualFirstMethod original_active_virtual_method,
+    void** context_after_state_two_postincrement,
+    OriginalFrameBackendResolver original_backend_resolver,
+    OriginalFrameEventMethod original_event_virtual_0x20,
+    OriginalFrameFollowupMethod original_followup_virtual_0x38) noexcept {
+    // Execute original stage selector, first virtual method and branch.
+    // Existing zero-result path stores stage 2 and deliberately stops.
+    const auto prefix=original_execute_active_frame_prefix(
+        original_shared_global, accessible_bytes,
+        original_active_virtual_object, original_active_virtual_method,
+        context_after_state_two_postincrement);
+    if(prefix!=OriginalActiveFramePrefixResult::OriginalNonzeroBranchUnimplemented)
+        return prefix;
+
+    const auto result=original_execute_nonzero_virtual_sequence(
+        original_shared_global,original_backend_resolver,
+        original_event_virtual_0x20,original_followup_virtual_0x38);
+    if(result==OriginalNonzeroVirtualSequenceResult::TwoOriginalVirtualCallsExecuted)
+        return OriginalActiveFramePrefixResult::OriginalNonzeroTwoVirtualCallsExecuted;
+    if(result==OriginalNonzeroVirtualSequenceResult::SecondBackendUnavailableAfterFirstCall)
+        return OriginalActiveFramePrefixResult::OriginalNonzeroFirstCallOnly;
+    return OriginalActiveFramePrefixResult::OriginalNonzeroBranchUnimplemented;
+}
+
 } // namespace ds_port::original_runtime
