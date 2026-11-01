@@ -10,10 +10,12 @@
 // Diagnostic ONLY: reads one authorized, locally installed .m3g file,
 // prints metadata counts; never writes original content or decodes models.
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        std::cerr << "usage: ds_m3g_probe <local .m3g file>\n";
+    if (argc != 2 && argc != 3) {
+        std::cerr << "usage: ds_m3g_probe <local .m3g file> [--diagnostic]\n";
         return 2;
     }
+    const bool diagnostic = argc == 3 && std::string(argv[2]) == "--diagnostic";
+    if (argc == 3 && !diagnostic) return 2;
     std::ifstream file(argv[1], std::ios::binary | std::ios::ate);
     if (!file) {
         std::cerr << "Cannot open input (no file name printed)\n";
@@ -31,11 +33,26 @@ int main(int argc, char** argv) {
         std::cerr << "Could not read input file\n";
         return 2;
     }
-    auto result = ds_port::scan_m3g_container(data.data(), data.size());
+    auto result = ds_port::scan_m3g_container(
+        data.data(), data.size(), 64u * 1024u * 1024u,
+        diagnostic ? ds_port::M3gScanMode::DiagnosticOpaqueVariant
+                   : ds_port::M3gScanMode::StrictJsr184);
     std::cout << "{\"valid\":" << (result.valid ? "true" : "false")
               << ",\"sections\":" << result.section_count
               << ",\"compressed_sections\":" << result.compressed_sections
               << ",\"objects\":" << result.object_count
-              << ",\"reason\":\"" << result.error << "\"}\n";
+              << ",\"diagnostic\":" << (diagnostic ? "true" : "false")
+              << ",\"nonstandard_header_objects\":" << result.nonstandard_header_objects
+              << ",\"reserved_type_objects\":" << result.reserved_type_objects
+              << ",\"reason\":\"" << result.error << "\""
+              << ",\"type_counts\":{";
+    bool first = true;
+    for (std::size_t i = 0; i < result.object_type_count.size(); ++i) {
+        if (result.object_type_count[i] == 0) continue;
+        if (!first) std::cout << ",";
+        first = false;
+        std::cout << "\"" << i << "\":" << result.object_type_count[i];
+    }
+    std::cout << "}}\n";
     return 0; // Invalid source content is data for the research tally.
 }
