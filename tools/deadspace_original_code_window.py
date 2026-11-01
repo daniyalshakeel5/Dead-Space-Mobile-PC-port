@@ -54,6 +54,8 @@ WINDOWS = {
     "resource_lookup_0x28a4f8": (0x0028a4f8, 256),
     "resource_lookup_0x283cb4": (0x00283cb4, 384),
     "resource_lookup_0x286918": (0x00286918, 384),
+    "resource_loader_tree_begin_0x283408": (0x00283408, 192),
+    "resource_loader_tree_next_0x2933ec": (0x002933ec, 192),
     "resource_lookup_0x284d38": (0x00284d38, 256),
     "resource_lookup_0x284df8": (0x00284df8, 256),
     "resource_lookup_0x28a644": (0x0028a644, 256),
