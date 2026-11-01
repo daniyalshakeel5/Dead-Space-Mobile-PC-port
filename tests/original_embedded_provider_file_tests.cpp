@@ -62,6 +62,14 @@ int main(){
         provider.data(),provider.size(),fd,out.data(),3u);
     assert(read.status==S::Completed&&read.original_r0==3u);
     assert(std::memcmp(out.data(),"ONE",3)==0);
+    // Original file position virtual +0x28 is a native
+    // lseek(fd,0,SEEK_CUR) when selector=0.
+    auto pos=original_embedded_provider_position_file_0x271794(
+        provider.data(),provider.size(),fd,0u);
+    assert(pos.status==S::Completed&&pos.original_r0==3u);
+    pos=original_embedded_provider_position_file_0x271794(
+        provider.data(),provider.size(),fd+1,0u);
+    assert(pos.status==S::InvalidHostFileBinding);
     read=original_embedded_provider_read_file_0x2716f8(
         provider.data(),provider.size(),fd,out.data(),4u);
     assert(read.status==S::Completed&&read.original_r0==4u);
@@ -99,6 +107,9 @@ int main(){
         provider.data(),provider.size(),fd,nullptr,4u);
     assert(read.status==S::InvalidHostBuffer);
     put(provider.data()+0x10u,0xffffffffu);
+    pos=original_embedded_provider_position_file_0x271794(
+        provider.data(),provider.size(),fd,0u);
+    assert(pos.status==S::Completed&&pos.original_r0==0xffffffffu);
     read=original_embedded_provider_read_file_0x2716f8(
         provider.data(),provider.size(),fd,out.data(),4u);
     assert(read.status==S::Completed&&read.original_r0==0xffffffffu);
