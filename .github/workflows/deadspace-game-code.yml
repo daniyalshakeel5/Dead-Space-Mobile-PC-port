@@ -84,7 +84,11 @@ jobs:
             -scriptPath "$GITHUB_WORKSPACE/tools/ghidra" \
             -postScript GhidraAllocatorTargets.java "$GITHUB_WORKSPACE/report/allocator-targets.json" \
             -analysisTimeoutPerFile 850 -max-cpu 2 -deleteProject \
-            > "$RUNNER_TEMP/allocator-analysis.log" 2>&1 || {\n              tail -n 65 "$RUNNER_TEMP/allocator-analysis.log"\n              exit 1\n            }\n          python - <<'PY'
+            > "$RUNNER_TEMP/allocator-analysis.log" 2>&1 || {
+              tail -n 65 "$RUNNER_TEMP/allocator-analysis.log"
+              exit 1
+            }
+          python - <<'PY'
           import json
           from pathlib import Path
           p = Path("report/native-control-flow.json")
@@ -114,6 +118,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: deadspace-native-game-control-flow
-          path: |\n            report/native-control-flow.json\n            report/allocator-targets.json
+          path: |
+            report/native-control-flow.json
+            report/allocator-targets.json
           if-no-files-found: error
           retention-days: 7
