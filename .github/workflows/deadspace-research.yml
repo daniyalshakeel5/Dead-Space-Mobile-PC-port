@@ -7,6 +7,8 @@ on:
     paths:
       - "tools/deadspace_audit.py"
       - "tools/deadspace_native_enum_recover.py"
+      - "tools/deadspace_native_leaf_recover.py"
+      - "tests/test_deadspace_native_leaf_recover.py"
       - "tests/test_deadspace_native_enum_recover.py"
       - "tests/test_deadspace_audit.py"
       - "tools/deadspace_asset_recon.py"
@@ -45,6 +47,8 @@ on:
     paths:
       - "tools/deadspace_audit.py"
       - "tools/deadspace_native_enum_recover.py"
+      - "tools/deadspace_native_leaf_recover.py"
+      - "tests/test_deadspace_native_leaf_recover.py"
       - "tests/test_deadspace_native_enum_recover.py"
       - "tests/test_deadspace_audit.py"
       - "tools/deadspace_asset_recon.py"
@@ -150,6 +154,9 @@ jobs:
           python tools/deadspace_native_enum_recover.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
             --output report/deadspace-native-enums.json
+          python tools/deadspace_native_leaf_recover.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-original-jni-noops.json
           python - <<'PY'
           import json
           from pathlib import Path
@@ -234,6 +241,7 @@ jobs:
           path: |
             report/deadspace-public-evidence.json
             report/deadspace-native-enums.json
+            report/deadspace-original-jni-noops.json
             report/deadspace-m3g-evidence.json
             report/deadspace-m3g-native-evidence.json
             report/deadspace-format116-evidence.json
