@@ -25,6 +25,12 @@ struct ImMenuMeshBounds {
     float min_x=0,min_y=0,min_z=0;
     float max_x=0,max_y=0,max_z=0;
 };
+// Raw object framing, not interpreted scene transforms.
+struct ImMenuSceneNodeRecord {
+    std::uint32_t object_index=0;
+    std::uint8_t object_type=0;
+    std::uint32_t payload_bytes=0;
+};
 struct ImMenuGeometry {
     bool decoded=false;
     std::string error;
@@ -38,6 +44,7 @@ struct ImMenuGeometry {
     // Original one-based object IDs, retained for reconstructing the scene graph.
     std::vector<std::uint32_t> camera_object_indices;
     std::vector<std::uint32_t> group_object_indices;
+    std::vector<ImMenuSceneNodeRecord> scene_node_records;
 };
 ImMenuGeometry decode_im_menu_geometry(
     const std::uint8_t* original_im_m3g,std::size_t bytes);
