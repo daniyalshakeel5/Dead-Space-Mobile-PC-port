@@ -45,7 +45,9 @@ int main(){
     put(embedded.data()+8u,0xffffffffu);
     pos=original_embedded_provider_position_0x271794(
         embedded.data(),embedded.size(),2u);
-    assert(pos.status==S::Completed&&pos.original_r0==0u);
+    // Original +0x20 invokes a codec to obtain an uncached
+    // size. Do not pretend that an unimplemented codec returned -1.
+    assert(pos.status==S::NeedsOriginalMemoryService);
     put(embedded.data()+8u,0);
     put(embedded.data()+4u,0);
     pos=original_embedded_provider_position_0x271794(
