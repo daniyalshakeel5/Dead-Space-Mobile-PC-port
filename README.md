@@ -32,8 +32,12 @@
   `0x28611C` and UTF-16 record replacement are native. Outer `0x2862E8`
   record preparation and receiver dispatch are integrated, but original
   receiver `0x278018` remains unported.
-- **52/52 synthetic native CTests passed on Windows and Linux** at
-  [verification run 41332413006](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41332413006).
+- Native original `0x2710A8` UTF-16 receiver tree search with
+  `0x26E670` comparator, owner flags and `0x278018` no-match path
+  are integrated into `0x2862E8`. Matching resources still require
+  the original receiver's stream/allocator/object-creation path.
+- **54/54 synthetic native CTests passed on Windows and Linux** at
+  [verification run 41333903890](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41333903890).
   These tests do not prove real game-engine boot or scene rendering.
   [Latest detailed handoff](docs/HANDOFF_2026-11-01.md).
 
