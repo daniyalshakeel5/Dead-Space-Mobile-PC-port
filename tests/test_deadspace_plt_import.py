@@ -5,7 +5,7 @@ from tools.deadspace_plt_import import arm_immediate,resolve_arm_plt_import
 
 def elf_fixture():
     raw=bytearray(1024)
-    raw[:6]=b"\\x7fELF\\x01\\x01"
+    raw[:6]=b"\x7fELF\x01\x01"
     struct.pack_into("<I",raw,32,0x200)
     struct.pack_into("<HH",raw,46,40,5)
     def section(index,kind,flags,va,offset,length,link=0,step=0):
@@ -19,7 +19,7 @@ def elf_fixture():
     struct.pack_into("<III",raw,0x100,0xe28fc000,0xe28cc000,0xe5bcf000)
     struct.pack_into("<II",raw,0x120,0x1008,(1<<8)|22)
     struct.pack_into("<IIIBBH",raw,0x150,1,0,0,0,0,0)
-    symbol=b"\\x00__aeabi_memclr4\\x00"
+    symbol=b"\x00__aeabi_memclr4\x00"
     raw[0x180:0x180+len(symbol)]=symbol
     return raw
 
