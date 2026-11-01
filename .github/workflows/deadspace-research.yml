@@ -212,6 +212,12 @@ jobs:
                 json.dumps(report["original_startup_global_service_0x37000c"],sort_keys=True))
           print("ORIGINAL_REGISTRATION_CHARACTER_MAP",
                 json.dumps(report["original_registration_character_map"],sort_keys=True))
+          for name in ("startup_registration_helper_first_0x2839c8",
+                       "startup_registration_insert_0x2837b4",
+                       "startup_registration_match_action_0x283f5c",
+                       "startup_registration_string_copy_0x281df4"):
+              print("ORIGINAL_RESOURCE_DEPENDENCY",name,
+                    json.dumps(report["windows"][name]["instructions"][:192],separators=(",",":")))
           print("ORIGINAL_ENGINE_REGISTER_HELPER",
                 json.dumps(report["windows"]["repeated_initializer_callee_0x284178"]["instructions"][:192],separators=(",",":")))
           for name in ("post_setup_direct_callee_0x27fd7c",

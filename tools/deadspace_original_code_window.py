@@ -62,7 +62,10 @@ WINDOWS = {
     "repeated_initializer_callee_0x284178": (0x00284178, 768),
     "startup_global_direct_service_0x36fd38": (0x0036fd38, 256),
     "startup_global_direct_service_target_0x37000c": (0x0037000c, 256),
-    "startup_registration_helper_first_0x2839c8": (0x002839c8, 256),
+    "startup_registration_helper_first_0x2839c8": (0x002839c8, 768),
+    "startup_registration_insert_0x2837b4": (0x002837b4, 768),
+    "startup_registration_match_action_0x283f5c": (0x00283f5c, 512),
+    "startup_registration_string_copy_0x281df4": (0x00281df4, 256),
     "original_time_pair_source": (0x000357c4, 12),
     "frame_stage_one_routine": (0x0027fc68, 96),
     "frame_state_one_zero_result_tail": (0x0027eecc, 128),
@@ -582,7 +585,7 @@ def observe(apk: Path) -> dict:
                 {"offset": i.address-address,
                  "op": i.mnemonic.lower(),
                  "args": i.op_str.lower()}
-                for i in decoded[:192 if key=="repeated_initializer_callee_0x284178" else 180 if key=="post_setup_direct_callee_0x27fd7c" else 120 if key=="post_setup_direct_callee_0x2803e4" else 64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" or key.startswith("stage_zero_second_tail_") or key=="startup_allocator_object_init_0x27e560" or key.startswith("verified_vtable_") else 40]],
+                for i in decoded[:192 if key=="repeated_initializer_callee_0x284178" or key.startswith("startup_registration_") else 180 if key=="post_setup_direct_callee_0x27fd7c" else 120 if key=="post_setup_direct_callee_0x2803e4" else 64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" or key.startswith("stage_zero_second_tail_") or key=="startup_allocator_object_init_0x27e560" or key.startswith("verified_vtable_") else 40]],
         }
     # Two independently instruction-proven PC-relative literal loads.
     # Frame 0x27ef6c LDR r4,[pc,#0x90], 0x27ef74 ADD r4,pc,r4.
