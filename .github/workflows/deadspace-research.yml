@@ -6,6 +6,8 @@ on:
       - work/deadspace-remote-preflight-2026-11-01
     paths:
       - "tools/deadspace_audit.py"
+      - "tools/deadspace_native_enum_recover.py"
+      - "tests/test_deadspace_native_enum_recover.py"
       - "tests/test_deadspace_audit.py"
       - "tools/deadspace_asset_recon.py"
       - "tests/test_deadspace_asset_recon.py"
@@ -42,6 +44,8 @@ on:
   pull_request:
     paths:
       - "tools/deadspace_audit.py"
+      - "tools/deadspace_native_enum_recover.py"
+      - "tests/test_deadspace_native_enum_recover.py"
       - "tests/test_deadspace_audit.py"
       - "tools/deadspace_asset_recon.py"
       - "tests/test_deadspace_asset_recon.py"
@@ -143,6 +147,9 @@ jobs:
             --audit "$RUNNER_TEMP/private-audit.json" \
             --recon "$RUNNER_TEMP/private-resource-recon.json" \
             --output report/deadspace-public-evidence.json
+          python tools/deadspace_native_enum_recover.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-native-enums.json
           python tools/deadspace_m3g_preflight.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
             --output report/deadspace-m3g-evidence.json
@@ -201,6 +208,9 @@ jobs:
           echo "::group::IronMonkey position and vertex-index bounds (aggregate only)"
           python -m json.tool report/deadspace-im-numeric-evidence.json
           echo "::endgroup::"
+          echo "::group::Instruction-proven original ARM JNI constant returns"
+          python -m json.tool report/deadspace-native-enums.json
+          echo "::endgroup::"
           echo "::group::Native IronMonkey OBJ mesh reconstruction (aggregate only)"
           python -m json.tool report/deadspace-im-native-evidence.json
           echo "::endgroup::"
@@ -211,6 +221,7 @@ jobs:
           name: deadspace-port-audit
           path: |
             report/deadspace-public-evidence.json
+            report/deadspace-native-enums.json
             report/deadspace-m3g-evidence.json
             report/deadspace-m3g-native-evidence.json
             report/deadspace-format116-evidence.json
