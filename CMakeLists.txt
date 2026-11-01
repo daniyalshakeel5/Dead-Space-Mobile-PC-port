@@ -13,8 +13,9 @@ option(DS_BUILD_ASSET_INSTALLER "Build user-owned APK assets/ installer with zli
 option(DS_BUILD_M3G_READER "Build format-verified JSR-184 M3G section parser" OFF)
 option(DS_BUILD_IM_MESH_READER "Build native IronMonkey geometry-only mesh exporter" OFF)
 
-# These functions are independent x86-64 translations of 29 validated
-# original ARM game JNI constant returns; no guessed gameplay dispatch.
+# The original 29 enum JNI returns, three machine-code-verified pointer
+# constants, and event-record dispatch (pointer/key JNI) are linked here.
+# Virtual allocator/queue targets still require original-game recovery.
 add_library(ds_original_native_abi STATIC src/original_native_abi.cpp src/original_jni_exports.cpp src/original_frame_dispatch.cpp src/original_game_entry.cpp src/original_timing_math.cpp src/original_clock_source.cpp src/original_stage_zero_setup.cpp src/original_stage_zero_followup.cpp src/original_stage_zero_type_two.cpp src/original_record_postalloc.cpp src/original_runtime_globals.cpp src/original_allocator_call.cpp src/original_stage_zero_allocating.cpp src/original_registry_lookup.cpp src/original_secondary_allocator.cpp src/original_secondary_postprocess.cpp src/original_secondary_pipeline.cpp src/original_object_constructor.cpp src/original_embedded_setup.cpp src/original_embedded_initializer.cpp src/original_input_events.cpp src/original_input_jni_bridge.cpp src/original_pointer_jni_exports.cpp)
 target_include_directories(ds_original_native_abi PUBLIC include)
 
