@@ -31,7 +31,16 @@ def constant_return(code: bytes, thumb: bool) -> int | None:
             return None
         first, last = struct.unpack_from("<HH", code, pos)
         if first & 0xff00 != 0x2000 or last != 0x4770:
-            return None
+            # Thumb-2 MOVW r0, #imm16, followed by unconditional BX LR.
+            if len(code) < pos + 6:
+                return None
+            hw1, hw2, bx = struct.unpack_from("<HHH", code, pos)
+            if (hw1 & 0xfbf0) != 0xf240 or ((hw2 >> 8) & 0xf) != 0 or bx != 0x4770:
+                return None
+            if code[pos+6:].strip(b"\x00"):
+                return None
+            return ((hw1 & 0xf) << 12) | (((hw1 >> 10) & 1) << 11) | (
+                ((hw2 >> 12) & 7) << 8) | (hw2 & 0xff)
         # 16-bit Thumb MOVS r0, #imm8; BX LR.
         if any(b not in (0x00,0xbf,0xc0,0x46) for b in code[pos+4:]):
             # Symbol body can contain alignment NOPs; never accept other ops.
@@ -44,15 +53,17 @@ def constant_return(code: bytes, thumb: bool) -> int | None:
     first, second = words
     if first >> 28 != 0xe or second >> 28 != 0xe:
         return None
-    if (first & 0x0FE0F000) != 0x03A00000:
-        return None
     if (second & 0x0fffffff) not in (0x012fff1e, 0x01a0f00e):
         return None
     if len(code) > 8 and code[8:].strip(b"\x00"):
         return None
-    imm = first & 0xff
-    rotation = ((first >> 8) & 0xf) * 2
-    return rotate_right(imm, rotation)
+    if (first & 0x0fe0f000) == 0x03a00000:
+        imm = first & 0xff
+        rotation = ((first >> 8) & 0xf) * 2
+        return rotate_right(imm, rotation)
+    if (first & 0xfff0f000) == 0xe3000000:
+        return (((first >> 16) & 0xf) << 12) | (first & 0xfff)
+    return None
 
 
 def native_enum_constants(binary: bytes) -> dict:
