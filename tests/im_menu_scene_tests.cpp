@@ -72,6 +72,7 @@ int main(){
     assert(original.camera_object_indices.empty());
     assert(original.group_object_indices.empty());
     assert(original.scene_node_records.empty());
+    assert(original.scene_reference_candidates.empty());
     assert(original.mesh_bounds.size()==1);
     const auto& b=original.mesh_bounds[0];
     assert(b.mesh_object_index==8);
