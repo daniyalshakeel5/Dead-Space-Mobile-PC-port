@@ -34,4 +34,17 @@ OriginalStageZeroSetupResult original_execute_stage_zero_setup_with_recovered_fo
     OriginalStageZeroSetupCall setup_0x28ca24,
     OriginalGetTimeOfDay clock_0x357c4,
     OriginalStageZeroFollowupA followup_0x281d54) noexcept;
+// Both original ARM callees 0x28CA24 (the actually selected type-2
+// branch) and 0x2833F4 are now FULLY reconstructed and called directly.
+// Runtime float source is the caller-owned current raw 32-bit value at
+// original ELF VA 0x0049CD1C. The first native callee 0x281D54 still
+// requires an evidence-backed implementation and cannot be omitted.
+// This covers verified ARM 0x280520 through the second follow-up call;
+// later instructions remain beyond the proof window.
+OriginalStageZeroSetupResult original_execute_stage_zero_setup_with_recovered_type_two(
+    void* original_context, std::size_t accessible_bytes,
+    const void* original_float_field_0x0049cd1c, std::size_t source_bytes,
+    OriginalGetTimeOfDay clock_0x357c4,
+    OriginalStageZeroFollowupA followup_0x281d54) noexcept;
+
 } // namespace ds_port::original_runtime
