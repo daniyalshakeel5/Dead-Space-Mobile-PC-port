@@ -36,7 +36,9 @@ struct M3gContainerReport {
     // 0=unknown; 1=superclass; 2=metadata short; 3=format/flag;
     // 4=dimensions; 5=stored field bounds; 6=pixel representation;
     // 7=trailing bytes. Opaque categories, no original payload bytes.
-    std::array<std::uint32_t, 8> image2d_failure_stage_counts{};
+    std::array<std::uint32_t, 9> image2d_failure_stage_counts{};
+    // 3=unknown Image2D format, 8=non-boolean mutability flag.
+    std::array<std::uint32_t, 256> image2d_unknown_format_counts{};
 
     std::array<std::uint32_t, 256> object_type_count{};
 };
