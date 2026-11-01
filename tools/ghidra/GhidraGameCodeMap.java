@@ -191,6 +191,52 @@ public class GhidraGameCodeMap extends GhidraScript {
             }
             result.append('}');
         }
+        result.append("],\"critical_runtime_abi\":[");
+        final String[] critical = {
+            "JNI_OnLoad",
+            "Java_com_ea_DeadSpace_DeadSpace_runEntryPoint",
+            "Java_com_ea_blast_MainActivity_NativeOnCreate",
+            "Java_com_ea_blast_MainActivity_NativeOnPause",
+            "Java_com_ea_blast_MainActivity_NativeOnResume",
+            "Java_com_ea_blast_MainActivity_NativeOnStop",
+            "Java_com_ea_blast_AndroidRenderer_NativeOnSurfaceCreated",
+            "Java_com_ea_blast_AndroidRenderer_NativeOnSurfaceChanged",
+            "Java_com_ea_blast_AndroidRenderer_NativeOnDrawFrame",
+            "Java_com_ea_blast_TouchSurfaceAndroid_NativeOnPointerEvent",
+            "Java_com_ea_blast_KeyboardAndroid_NativeOnKeyDown",
+            "Java_com_ea_blast_KeyboardAndroid_NativeOnKeyUp",
+            "Java_com_ea_EAIO_EAIO_Startup",
+            "Java_com_ea_EAIO_EAIO_Shutdown"
+        };
+        int emitted=0;
+        for (String name: critical) {
+            Function target=null;
+            for (Function f:internals)
+                if (f.getName().equals(name)) {target=f;break;}
+            if(target==null)continue;
+            if(emitted++>0)result.append(',');
+            result.append("{\"jni_export\":").append(escape(name));
+            result.append(",\"native_entry\":").append(escape(addr(target)));
+            result.append(",\"native_code_addresses\":").append(target.getBody().getNumAddresses());
+            result.append(",\"direct_native_callees\":[");
+            List<String> child=new ArrayList<>();
+            for (Function callee:target.getCalledFunctions(monitor)) {
+                if (!callee.isExternal())
+                    child.add(addr(callee));
+                else {
+                    for(String publicAnchor:ANCHORS)
+                        if (callee.getName().equals(publicAnchor))
+                            child.add("API:"+publicAnchor);
+                }
+                if(child.size()>=40)break;
+            }
+            Collections.sort(child);
+            for(int i=0;i<child.size();i++) {
+                if(i>0)result.append(',');
+                result.append(escape(child.get(i)));
+            }
+            result.append("]}");
+        }
         result.append("],");
         stringField(result,"limitations",
             "Function and calling-API evidence only. ARM code is not translated; "+
