@@ -670,6 +670,17 @@ def observe(apk: Path) -> dict:
         data,sections,0x0027e564,0x84,0x0027e56c)
     singleton_got_base_va=resolve_arm_literal_based_global(
         data,sections,0x0027e568,0x84,0x0027e574)
+    singleton_got_slot_offsets={
+        "field8_source_pointer":0x0027e5fc,
+        "table4_pointer":0x0027e600,
+        "destructor_pointer":0x0027e604,
+        "dso_handle_pointer":0x0027e608,
+    }
+    singleton_got_slots={
+        key:(singleton_got_base_va+struct.unpack(
+            "<I",bounded_virtual_read(data,sections,literal,4))[0])&0xffffffff
+        for key,literal in singleton_got_slot_offsets.items()
+    }
     singleton_object_va=resolve_arm_literal_based_global(
         data,sections,0x0027e580,0x70,0x0027e584)+4
     if singleton_guard_va+4 != singleton_object_va:
@@ -810,6 +821,9 @@ def observe(apk: Path) -> dict:
             "guard_word_va":f"0x{singleton_guard_va:08x}",
             "returned_object_va":f"0x{singleton_object_va:08x}",
             "got_base_va":f"0x{singleton_got_base_va:08x}",
+            "got_slots":{
+                key:f"0x{value:08x}" for key,value in singleton_got_slots.items()
+            },
             "singletons_per_call":1,
             "verified":True,
         },
