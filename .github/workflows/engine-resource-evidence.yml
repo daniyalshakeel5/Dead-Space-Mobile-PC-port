@@ -59,8 +59,26 @@ jobs:
                              "instructions":item["instructions"],
                              "complete_arm_decode":item["complete_arm_decode"]}
               print("RESOURCE_FUNC",name,json.dumps(windows[name],separators=(",",":")))
+          # Exact original factory vtable: LDR LR,[PC,#0x10c] at
+          # 0x28B3A8, ADD LR,PC,LR at 0x28B3B4, ADD LR,LR,#8.
+          import struct
+          from zipfile import ZipFile
+          from tools.deadspace_original_code_window import (
+              elf32_executable_sections,bounded_virtual_read)
+          with ZipFile(Path(os.environ["RUNNER_TEMP"])/"deadspace.apk") as apk:
+              libs=[i for i in apk.infolist() if i.filename.startswith("lib/")
+                    and i.filename.endswith(".so") and 1024<i.file_size<=64*1024*1024]
+              if len(libs)!=1:
+                  raise ValueError("Expected exactly one original ARM ELF")
+              elf=apk.read(libs[0])
+          displacement=struct.unpack("<i",bounded_virtual_read(
+              elf,elf32_executable_sections(elf),0x28b4bc,4))[0]
+          vtable=(0x28b3b4+8+displacement+8)&0xffffffff
+          print("ORIGINAL_FACTORY_VTABLE",hex(vtable))
           outfile=Path(os.environ["RUNNER_TEMP"])/"resource-instructions.json"
-          outfile.write_text(json.dumps({"schema":1,"windows":windows},indent=2)+"\n")
+          outfile.write_text(json.dumps({"schema":2,
+               "factory_mode1_vtable_arm_va":hex(vtable),
+               "windows":windows},indent=2)+"\n")
           PY
       - name: Publish ARM instruction metadata only
         uses: actions/upload-artifact@v4
