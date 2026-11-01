@@ -194,6 +194,11 @@ jobs:
               print("ARM_ALLOCATOR_CHAIN",name,
                     json.dumps(report["windows"][name]["instructions"][:32],
                                separators=(",",":")))
+          for name in ("post_setup_direct_callee_0x27fd7c",
+                       "post_setup_direct_callee_0x2803e4"):
+              print("ORIGINAL_ENGINE_INIT_CALL",
+                    name,
+                    json.dumps(report["windows"][name]["instructions"][:44],separators=(",",":")))
           print("ORIGINAL_SINGLETON_0x27E560",
                 json.dumps(report["windows"]["startup_allocator_object_init_0x27e560"]["instructions"][:42],separators=(",",":")))
           print("ORIGINAL_SINGLETON_EVIDENCE",
