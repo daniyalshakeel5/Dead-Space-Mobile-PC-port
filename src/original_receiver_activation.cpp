@@ -1,4 +1,5 @@
 #include "ds_port/original_receiver_activation.hpp"
+#include "ds_port/original_embedded_provider.hpp"
 
 namespace ds_port::original_runtime {
 namespace {
@@ -53,11 +54,29 @@ original_execute_receiver_activation_0x278e58(
     // Original 0x278EAC..0x278EBC invokes provider virtual +0x14,
     // then compares the returned mode against the incoming r1.
     // Missing native provider methods NEVER imply loaded resources.
-    if(!in.query_provider_mode_0x14)
+    const bool is_embedded_provider=
+        (provider==in.owner_arm_va+0x804u);
+    // The original owner constructs a concrete embedded provider
+    // at owner+0x804 with real vtable 0x004896F8. Its +0x14 is
+    // machine-verified 0x26C3C4 (just load word +0x90), so no
+    // callback or host stand-in is needed for that precise case.
+    auto original_provider_mode=[&](std::uint32_t* original_r0) noexcept {
+        if(is_embedded_provider) {
+            const auto native=original_embedded_provider_mode_0x26c3c4(
+                owner+0x804u,in.owner_bytes-0x804u);
+            if(native.status!=OriginalEmbeddedProviderStatus::Completed)
+                return false;
+            *original_r0=native.original_r0;
+            return true;
+        }
+        return in.query_provider_mode_0x14 &&
+               in.query_provider_mode_0x14(
+                   provider,0x14u,in.context,original_r0);
+    };
+    if(!in.query_provider_mode_0x14 && !is_embedded_provider)
         return fail(S::UnreconstructedProviderActivation,root,provider);
     std::uint32_t original_mode=0;
-    if(!in.query_provider_mode_0x14(
-        provider,0x14u,in.context,&original_mode))
+    if(!original_provider_mode(&original_mode))
         return fail(S::ProviderModeQueryRefused,root,provider);
     if(original_mode==in.requested_mode) {
         // ARM 0x278EE0..0x278F08 executes THREE constructors
@@ -103,8 +122,7 @@ original_execute_receiver_activation_0x278e58(
     // For an external provider with a persistently mismatched
     // mode, 0x273478 returns r0=0, and 0x278EDC returns r0=0.
     std::uint32_t retry_mode=0;
-    if(!in.query_provider_mode_0x14(
-        provider,0x14u,in.context,&retry_mode))
+    if(!original_provider_mode(&retry_mode))
         return fail(S::ProviderModeQueryRefused,root,provider);
     const std::uint32_t owner_embedded=in.owner_arm_va+0x804u;
     const bool special_mode=(in.requested_mode==1u && retry_mode==3u);
