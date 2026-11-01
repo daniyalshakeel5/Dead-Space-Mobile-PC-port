@@ -93,6 +93,8 @@ class ArmWindowTests(unittest.TestCase):
 
     def test_exact_original_arm_frame_dispatch_proof(self):
         specs={
+            4:("ldr","r4, [pc, #0x90]"),
+            12:("add","r4, pc, r4"),
             16:("ldr","r3, [r4]"),20:("cmp","r3, #0"),
             24:("beq","#0x27ef98"),28:("ldr","r3, [r4]"),
             32:("cmp","r3, #1"),36:("beq","#0x27efac"),
@@ -107,6 +109,10 @@ class ArmWindowTests(unittest.TestCase):
         code=[{"offset":at,"op":op,"args":args}
               for at,(op,args) in specs.items()]
         self.assertTrue(all(proven_frame_dispatch_prefix(code).values()))
+        wrong_global=[dict(entry) for entry in code]
+        next(x for x in wrong_global if x["offset"]==4)["args"]="r4, [pc, #0x94]"
+        self.assertFalse(proven_frame_dispatch_prefix(wrong_global)[
+            "frame_global_pc_relative_literal"])
         altered=[dict(entry) for entry in code]
         next(x for x in altered if x["offset"]==60)["args"]="r3, [r4, #4]"
         result=proven_frame_dispatch_prefix(altered)
