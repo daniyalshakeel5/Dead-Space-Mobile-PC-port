@@ -27,6 +27,7 @@ WINDOWS = {
     "frame_stage_zero_first_callee": (0x0027f790, 80),
     "frame_stage_zero_second_callee": (0x00280520, 96),
     "stage_zero_setup_target_0x28ca24": (0x0028ca24, 160),
+    "stage_zero_setup_type2_branch_0x28cad8": (0x0028cad8, 96),
     "stage_zero_followup_target_0x281d54": (0x00281d54, 160),
     "stage_zero_followup_target_0x2833f4": (0x002833f4, 160),
     "original_time_pair_source": (0x000357c4, 12),
