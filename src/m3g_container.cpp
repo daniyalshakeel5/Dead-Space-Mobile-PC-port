@@ -64,7 +64,9 @@ bool parse_image2d_payload(const std::uint8_t* bytes,
     if (size - at < 10) return fail(2);
     const std::uint8_t format = bytes[at++];
     const std::uint8_t mutable_flag = bytes[at++];
-    if (format < 96 || format > 100 || mutable_flag > 1) return fail(3);
+    evidence.format = format; // used for aggregate unknown-code research
+    if (format < 96 || format > 100) return fail(3);
+    if (mutable_flag > 1) return fail(8);
     const std::uint32_t width = le32(bytes + at); at += 4;
     const std::uint32_t height = le32(bytes + at); at += 4;
     if (!width || !height || width > 8192 || height > 8192) return fail(4);
@@ -221,6 +223,8 @@ M3gContainerReport scan_m3g_container(const std::uint8_t* data,
                 } else {
                     ++report.image2d_unrecognized_payloads;
                     ++report.image2d_failure_stage_counts[evidence.failure_stage];
+                    if (evidence.failure_stage == 3)
+                        ++report.image2d_unknown_format_counts[evidence.format];
                 }
             }
             ++objects_in_section;
