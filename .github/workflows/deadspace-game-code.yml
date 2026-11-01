@@ -78,7 +78,13 @@ jobs:
               tail -n 65 "$RUNNER_TEMP/ghidra-analysis.log"
               exit 1
             }
-          python - <<'PY'
+          "$GHIDRA_ROOT/support/analyzeHeadless" \
+            "$RUNNER_TEMP/ghidra-project" AllocatorTargets \
+            -import "$RUNNER_TEMP/native_game.so" \
+            -scriptPath "$GITHUB_WORKSPACE/tools/ghidra" \
+            -postScript GhidraAllocatorTargets.java "$GITHUB_WORKSPACE/report/allocator-targets.json" \
+            -analysisTimeoutPerFile 850 -max-cpu 2 -deleteProject \
+            > "$RUNNER_TEMP/allocator-analysis.log" 2>&1 || {\n              tail -n 65 "$RUNNER_TEMP/allocator-analysis.log"\n              exit 1\n            }\n          python - <<'PY'
           import json
           from pathlib import Path
           p = Path("report/native-control-flow.json")
@@ -89,6 +95,11 @@ jobs:
           assert report["kind"] == "arm32-native-game-code-reconstruction-map"
           print("Recovered actual ARM function map and reachable public API boundaries.")
           print(json.dumps(report, indent=2))
+          targets = json.loads(Path("report/allocator-targets.json").read_text())
+          assert targets["kind"] == "original-allocator-target-metadata"
+          assert targets["address_bias"] == 65536
+          assert len(targets["roots"]) == 4
+          print(json.dumps(targets, indent=2))
           PY
 
       - name: Erase original code, library and analysis workspace
@@ -96,13 +107,13 @@ jobs:
         shell: bash
         run: |
           rm -f "$RUNNER_TEMP/original.apk" "$RUNNER_TEMP/native_game.so"
-          rm -f "$RUNNER_TEMP/ghidra-analysis.log"
+          rm -f "$RUNNER_TEMP/ghidra-analysis.log" "$RUNNER_TEMP/allocator-analysis.log"
           rm -rf "$RUNNER_TEMP/ghidra" "$RUNNER_TEMP/ghidra-project"
 
       - name: Publish metadata only, never APK or decompiled game source
         uses: actions/upload-artifact@v4
         with:
           name: deadspace-native-game-control-flow
-          path: report/native-control-flow.json
+          path: |\n            report/native-control-flow.json\n            report/allocator-targets.json
           if-no-files-found: error
           retention-days: 7
