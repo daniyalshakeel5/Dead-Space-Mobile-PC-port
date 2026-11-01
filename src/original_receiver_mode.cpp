@@ -30,17 +30,20 @@ OriginalReceiverModeResult0x26c410 original_set_receiver_mode_0x26c410(
     const std::uint32_t normalized=value?1u:0u;
     if(old==normalized)
         return ret(S::Completed,old,normalized);
-    // Original 0x26C430: boolean reduction; 0x26C43C STRB.
-    // A nonzero -> zero transition then invokes vtable+0x28.
-    // Fail closed before mutating the original owner if the concrete
-    // 0x273A0C reset implementation is still missing/refuses.
-    if(normalized==0u) {
-        if(!in.native_reset_0x273a0c)
-            return ret(S::MissingOriginalDisableReset,old,old);
-        if(!in.native_reset_0x273a0c(in.owner_arm_va,in.context))
-            return ret(S::OriginalDisableResetRefused,old,old);
-    }
+    // Original 0x26C430: boolean reduction; 0x26C43C STRB,
+    // followed by vtable+0x28 if the NEW value is zero. Require
+    // the missing native reset service before modifying state.
+    if(normalized==0u&&!in.native_reset_0x273a0c)
+        return ret(S::MissingOriginalDisableReset,old,old);
     obj[0x8b5u]=static_cast<std::uint8_t>(normalized);
+    if(normalized==0u &&
+       !in.native_reset_0x273a0c(in.owner_arm_va,in.context)) {
+        // A failing host service cannot advance the native receiver.
+        // Restore mode; external reset-service side effects must be
+        // transactional independently.
+        obj[0x8b5u]=static_cast<std::uint8_t>(old);
+        return ret(S::OriginalDisableResetRefused,old,old);
+    }
     return ret(S::Completed,old,normalized);
 }
 } // namespace ds_port::original_runtime
