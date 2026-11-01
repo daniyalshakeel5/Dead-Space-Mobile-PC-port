@@ -24,6 +24,11 @@ on:
       - "tests/test_deadspace_im_topology_probe.py"
       - "tools/deadspace_im_numeric_probe.py"
       - "tests/test_deadspace_im_numeric_probe.py"
+      - "tools/deadspace_im_native_verify.py"
+      - "src/im_mesh.cpp"
+      - "include/ds_port/im_mesh.hpp"
+      - "apps/im_mesh_extract.cpp"
+      - "tests/im_mesh_tests.cpp"
       - "include/ds_port/m3g_container.hpp"
       - "src/m3g_container.cpp"
       - "apps/m3g_probe.cpp"
@@ -55,6 +60,11 @@ on:
       - "tests/test_deadspace_im_topology_probe.py"
       - "tools/deadspace_im_numeric_probe.py"
       - "tests/test_deadspace_im_numeric_probe.py"
+      - "tools/deadspace_im_native_verify.py"
+      - "src/im_mesh.cpp"
+      - "include/ds_port/im_mesh.hpp"
+      - "apps/im_mesh_extract.cpp"
+      - "tests/im_mesh_tests.cpp"
       - "include/ds_port/m3g_container.hpp"
       - "src/m3g_container.cpp"
       - "apps/m3g_probe.cpp"
@@ -138,10 +148,10 @@ jobs:
             --output report/deadspace-m3g-evidence.json
           cmake -S . -B "$RUNNER_TEMP/m3g-build" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DDS_BUILD_INPUT_PROBE=OFF -DDS_BUILD_M3G_READER=ON \
+            -DDS_BUILD_INPUT_PROBE=OFF -DDS_BUILD_M3G_READER=ON -DDS_BUILD_IM_MESH_READER=ON \
             -DDS_ENABLE_TESTS=OFF
           cmake --build "$RUNNER_TEMP/m3g-build" \
-            --config Release --target ds_m3g_probe ds_m3g_texture_extract --parallel 2
+            --config Release --target ds_m3g_probe ds_m3g_texture_extract ds_im_mesh_extract --parallel 2
           python tools/deadspace_m3g_native_verify.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
             --native-probe "$RUNNER_TEMP/m3g-build/ds_m3g_probe" \
@@ -162,6 +172,10 @@ jobs:
           python tools/deadspace_im_numeric_probe.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
             --output report/deadspace-im-numeric-evidence.json
+          python tools/deadspace_im_native_verify.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --native-mesh "$RUNNER_TEMP/m3g-build/ds_im_mesh_extract" \
+            --output report/deadspace-im-native-evidence.json
           python -c 'import json; d=json.load(open("report/deadspace-public-evidence.json",encoding="utf-8")); assert d.get("real_apk_analyzed") and d.get("resources",{}).get("valid_zip"); print("Real upstream release analyzed; redacted aggregate report ready.")'
           echo "::group::Sanitized original-APK evidence (public metadata only)"
           python -m json.tool report/deadspace-public-evidence.json
@@ -187,6 +201,9 @@ jobs:
           echo "::group::IronMonkey position and vertex-index bounds (aggregate only)"
           python -m json.tool report/deadspace-im-numeric-evidence.json
           echo "::endgroup::"
+          echo "::group::Native IronMonkey OBJ mesh reconstruction (aggregate only)"
+          python -m json.tool report/deadspace-im-native-evidence.json
+          echo "::endgroup::"
 
       - name: Upload metadata report only
         uses: actions/upload-artifact@v4
@@ -201,5 +218,6 @@ jobs:
             report/deadspace-im-geometry-evidence.json
             report/deadspace-im-topology-evidence.json
             report/deadspace-im-numeric-evidence.json
+            report/deadspace-im-native-evidence.json
           if-no-files-found: error
           retention-days: 7
