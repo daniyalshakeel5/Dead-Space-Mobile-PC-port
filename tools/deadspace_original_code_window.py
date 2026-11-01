@@ -28,7 +28,7 @@ WINDOWS = {
     "startup_first_direct_0x27f124": (0x0027f124, 224),
     "startup_first_direct_0x2713b8": (0x002713b8, 224),
     "startup_first_direct_0xf895c": (0x000f895c, 224),
-    "startup_allocator_object_init_0x27e560": (0x0027e560, 128),
+    "startup_allocator_object_init_0x27e560": (0x0027e560, 224),
     "stage_zero_owner_construction_tail_0x27f7e0": (0x0027f7e0, 176),
     "stage_zero_owner_provider_0x27e930": (0x0027e930, 128),
     "original_input_ready_guard_0x27e97c": (0x0027e97c, 28),
@@ -574,7 +574,7 @@ def observe(apk: Path) -> dict:
                 {"offset": i.address-address,
                  "op": i.mnemonic.lower(),
                  "args": i.op_str.lower()}
-                for i in decoded[:64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" or key.startswith("stage_zero_second_tail_") else 40]],
+                for i in decoded[:64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" or key.startswith("stage_zero_second_tail_") or key=="startup_allocator_object_init_0x27e560" else 40]],
         }
     # Two independently instruction-proven PC-relative literal loads.
     # Frame 0x27ef6c LDR r4,[pc,#0x90], 0x27ef74 ADD r4,pc,r4.

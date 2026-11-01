@@ -94,6 +94,13 @@ def main()->int:
         if len(libs)!=1:raise ValueError("Expected exactly one original ARM game ELF")
         raw=archive.read(libs[0])
     evidence=resolve_arm_plt_import(raw,0x00035194)
+    # Additional original 0x27E560 imported helpers. Do not infer from
+    # address spacing; validate exact R_ARM_JUMP_SLOT relocation for each.
+    singleton_helpers={
+        "0x0003580c":resolve_arm_plt_import(raw,0x0003580c),
+        "0x00035a28":resolve_arm_plt_import(raw,0x00035a28),
+    }
+    evidence["startup_singleton_imports"]=singleton_helpers
     args.output.parent.mkdir(parents=True,exist_ok=True)
     args.output.write_text(json.dumps(evidence,indent=2,sort_keys=True)+"\\n")
     print("ORIGINAL_ARM_INPUT_CONSTRUCTOR_IMPORT",json.dumps(evidence,sort_keys=True))
