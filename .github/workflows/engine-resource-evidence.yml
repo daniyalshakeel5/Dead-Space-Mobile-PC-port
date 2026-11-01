@@ -38,11 +38,12 @@ jobs:
             -DDS_BUILD_INPUT_PROBE=OFF -DDS_ENABLE_TESTS=OFF \
             -DDS_BUILD_ASSET_INSTALLER=OFF -DDS_BUILD_M3G_READER=ON -DDS_BUILD_IM_MESH_READER=ON
           cmake --build "$RUNNER_TEMP/boot-probe-build" \
-            --target ds_m3g_probe ds_im_mesh_extract --parallel 2
+            --target ds_m3g_probe ds_im_mesh_extract ds_im_ui_probe --parallel 2
           python tools/deadspace_boot_native_verify.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
             --probe "$RUNNER_TEMP/boot-probe-build/ds_m3g_probe" \
-            --im-probe "$RUNNER_TEMP/boot-probe-build/ds_im_mesh_extract"
+            --im-probe "$RUNNER_TEMP/boot-probe-build/ds_im_mesh_extract" \
+            --ui-probe "$RUNNER_TEMP/boot-probe-build/ds_im_ui_probe"
           python tools/deadspace_original_code_window.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
             --output "$RUNNER_TEMP/full-instruction-windows.json"
