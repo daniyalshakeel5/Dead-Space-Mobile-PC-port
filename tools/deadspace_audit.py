@@ -102,7 +102,7 @@ def analyze_library(path: Path, archive_path: str) -> dict:
     data = path.read_bytes()[:64]
     result = {"apk_path": archive_path, "size_bytes": path.stat().st_size,
               "sha256": sha256_file(path)}
-    if len(data) < 24 or data[:4] != b"\\x7fELF":
+    if len(data) < 24 or data[:4] != b"\x7fELF":
         result["error"] = "Not an ELF library"
         return result
     if data[4] not in (1, 2) or data[5] not in (1, 2):
@@ -126,7 +126,7 @@ def analyze_library(path: Path, archive_path: str) -> dict:
     })
     dyn = command_output("readelf", "-d", str(path))
     result["needed_libraries"] = sorted(
-        set(re.findall(r"\\(NEEDED\\).*?\\[([^]]+)\\]", dyn))
+        set(re.findall(r"\(NEEDED\).*?\[([^]]+)\]", dyn))
     )
     symbols = command_output("readelf", "-Ws", str(path))
     imported, exported = parse_readelf_symbol_rows(symbols)
