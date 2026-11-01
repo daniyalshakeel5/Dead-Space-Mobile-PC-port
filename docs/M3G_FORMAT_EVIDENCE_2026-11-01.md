@@ -1,0 +1,72 @@
+# Dead Space Mobile M3G resource research — November 1, 2026
+
+## Source and provenance
+
+The developer branch uses the already-published upstream APK release
+`RAFALAMAO/Dead-Space-Mobile-Fixes`, release asset ID `158932873`.
+The user confirmed that this is the APK supplied privately in ChatGPT Library.
+No game binaries, models, audio, source data, proprietary assets or native
+libraries are stored in this port repository or any CI artifact. The APK is
+downloaded into an ephemeral GitHub Actions workspace and removed on exit.
+
+### Credited external research and format references
+
+- [JSR-184 M3G file format (section framing, Adler32, header objects)](https://wupp.cc/j2meapi/JSR_184_Mobile_3D_Graphics_API_1_1/file-format.html)
+- [Mobile Dead Space M3G model/texture discussion, ResHax (2025)](https://reshax.com/topic/1460-mobile-dead-space-m3g-modeltexture-bundles-help/): early observation that model resources use an IronMonkey-specific M3G variant, while other resources use the standard JSR-184 identifier.
+- [RaduMC/M3G2FBX](https://github.com/RaduMC/M3G2FBX): conversion research for standard and related IM2/IM3 formats. Its approach is a reference, **not** a verified decoder for this game's exact IM-M3G variant. Preserve its original authors' credits and license if any code is subsequently adapted.
+- [Original fixes author RAFALAMAO](https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes): the upstream APK fixes, separate from this independently developed desktop research.
+
+## Findings: confirmed against real APK
+
+Source: GitHub Actions push runs `41285804108`, `41286597401`,
+`41286095902`, `41286351778` and subsequent research runs.
+
+- One ARM32 ELF shared library (ELF32 ET_DYN); this is not x86-64 code.
+- 265 files with extension `.m3g`, totaling 195,942,656 declared bytes.
+- **174** use the exact JSR-184 12-byte identifier (125,907,703 bytes).
+- **91** use `IM-M3G` identifier (70,034,953 bytes); neither IM2 nor IM3.
+- Of 174 standard-header candidates: 167 passed our strict *first-section*
+  Adler32, header-size, version 1.0 and total-length checks. 7 need format
+  investigation (length/checksum mismatch).
+- In all 167 first-section-valid candidates, the next section is **uncompressed**
+  and begins with object type 0 with a bounded object length. In strict JSR-184,
+  object type 0 denotes a file header and must occur only in the first section.
+  These files therefore do **not yet** pass full standard M3G validation.
+- The strict native C++ `ds_port_m3g` container reader built and passed synthetic
+  tests on Windows/Linux. When run against the real APK, it reported
+  `unexpected second M3G header object` for those 167 assets, checksum mismatch
+  on 7 and other signatures for 91. **Zero real full containers were accepted**.
+  Do not describe the strict decoder as fully game-verified.
+- Exactly 686 `.sph` and 686 `.sps` asset paths share 686 stems, confirming
+  a consistent 1:1 paired resource naming pattern. Their internal layout
+  remains unknown; no sprite/audio decoder is claimed.
+
+## What is implemented
+
+- `tools/deadspace_asset_recon.py`: redacted extension/sig census,
+  includes JSR-184 and IronMonkey M3G identifiers, and paired resource counts.
+- `tools/deadspace_m3g_preflight.py`: checks mandatory JSR-184 first sections,
+  checksums, version/declared size, and summarizes the second-section layout.
+- `include/ds_port/m3g_container.hpp` and `src/m3g_container.cpp`:
+  bounds-limited, zlib-backed strict JSR-184 section + object-chunk reader.
+- `apps/m3g_probe.cpp` and `tools/deadspace_m3g_native_verify.py`:
+  native metadata-only checks of ephemeral game resources on the GitHub runner.
+- `tests/m3g_container_tests.cpp` and Python synthetic regression fixtures.
+- Reports are aggregate JSON metadata only; real game resource bytes are never
+  part of builds, commits, releases, or published artifacts.
+
+## Next format gate (do not bypass)
+
+1. Compare `IM-M3G` first-section layout and compression/checksum with
+   JSR-184, keeping dialects distinct.
+2. For the JSR-184-header assets, investigate why **every** second section
+   starts with object type 0; confirm the intended IronMonkey custom object
+   structure against genuine native loader routines before relaxing strict
+   validation. The strict parser must remain available as a baseline.
+3. Implement a separately labeled IronMonkey structural parser, with bounded
+   synthetic tests, and verify it against actual game files privately.
+4. Only after object and texture layouts are verified, add a native OpenGL
+   texture/mesh viewer; then animation, collision, engine behavior and missions.
+   Green fixture CI is not evidence of playable game functionality.
+
+**No native x86-64 playable game exists at this checkpoint.**
