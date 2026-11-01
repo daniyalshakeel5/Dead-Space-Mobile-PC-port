@@ -51,6 +51,8 @@ jobs:
                  "resource_parser_0x2863ec",
                  "resource_parser_owner_init_0x27a768",
                  "resource_parser_receiver_0x278018",
+                 "resource_parser_receiver_tail_0x278318",
+                 "resource_parser_receiver_tail_0x278618",
                  "resource_parser_owner_mode_0x26c410",
                  "resource_parser_owner_bind_0x278778",
                  "resource_parser_tail_0x2866ec",
