@@ -48,6 +48,7 @@ jobs:
                  "resource_lookup_0x28a4f8",
                  "resource_lookup_0x283cb4",
                  "resource_lookup_0x286918",
+                 "resource_parser_0x2863ec",
                  "resource_loader_tree_begin_0x283408",
                  "resource_loader_tree_next_0x2933ec",
                  "resource_lookup_0x284d38",
