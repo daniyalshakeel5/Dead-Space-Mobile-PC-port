@@ -38,6 +38,11 @@ class PublicReportTests(unittest.TestCase):
                             "SECRET_GROUP": {"count": 1}},
             "magic_stats": {"unrecognized": {"count": 1, "declared_bytes": 100},
                             "SECRET_RESOURCE_MAGIC": {"count": 1}},
+            "extension_stats": {
+                ".dat": {"count": 4, "declared_bytes": 1000},
+                ".png": {"count": 1, "declared_bytes": 10},
+                ".SECRET_PRIVATE_FULL_FILENAME": {"count": 2, "declared_bytes": 100},
+            },
         }
         report = publish(audit, recon)
         serialized = json.dumps(report)
@@ -52,6 +57,9 @@ class PublicReportTests(unittest.TestCase):
             lib["recognized_public_api_imports"]["android_asset_manager"],
             ["AAssetManager_open"])
         self.assertEqual(report["resources"]["magic_stats"]["unrecognized"]["count"], 1)
+        self.assertEqual(report["resources"]["extension_stats"][".dat"]["count"], 4)
+        self.assertNotIn(".png", report["resources"]["extension_stats"])
+        self.assertNotIn(".SECRET_PRIVATE_FULL_FILENAME", report["resources"]["extension_stats"])
 
     def test_repository_only_report_contains_no_apk(self):
         report = publish({"apk": None, "repo": {"native_file_paths": ["secret"]}})
