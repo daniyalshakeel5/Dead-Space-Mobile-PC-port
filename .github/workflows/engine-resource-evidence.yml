@@ -55,6 +55,7 @@ jobs:
                  "resource_parser_receiver_0x278018",
                  "resource_receiver_activation_0x278e58",
                  "resource_owner_activation_check_0x2733e8",
+                 "resource_owner_virtual60_0x26c4cc",
                  "resource_receiver_activation_tree_clear_0x273570",
                  "resource_receiver_activation_tail_0x279038",
                  "resource_receiver_tree_lookup_0x2710a8",
