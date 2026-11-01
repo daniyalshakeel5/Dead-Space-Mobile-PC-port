@@ -2,7 +2,8 @@
 import struct
 import unittest
 from tools.deadspace_original_code_window import (
-    elf32_load_ranges, bounded_virtual_read, proven_frame_dispatch_prefix,
+    elf32_load_ranges, bounded_virtual_read, resolve_arm_literal_based_global,
+    proven_frame_dispatch_prefix,
     proven_original_code_helpers)
 
 
@@ -116,6 +117,20 @@ class ArmWindowTests(unittest.TestCase):
         result=proven_frame_dispatch_prefix(altered)
         self.assertTrue(result["state_zero_call_then_store_one"])
         self.assertFalse(result["state_one_tick_result_branch"])
+
+    def test_arm_pc_relative_signed_global_address(self):
+        # Artificial ELF section and literal pool; never ship game bytes.
+        contents=bytearray(64)
+        spans=[(0x1000,0x1040,0)]
+        struct.pack_into("<i",contents,0x0c,0x50)
+        self.assertEqual(resolve_arm_literal_based_global(
+            contents,spans,0x1000,4,0x1010),0x1068)
+        struct.pack_into("<i",contents,0x0c,-0x20)
+        self.assertEqual(resolve_arm_literal_based_global(
+            contents,spans,0x1000,4,0x1010),0x0ff8)
+        with self.assertRaises(ValueError):
+            resolve_arm_literal_based_global(
+                contents,spans,0x1000,0x500,0x1010)
 
     def test_file_backed_segment_and_exact_offsets(self):
         buf=self.make_elf()
