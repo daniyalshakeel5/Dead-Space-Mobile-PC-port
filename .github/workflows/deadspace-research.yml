@@ -177,6 +177,12 @@ jobs:
           import json
           from pathlib import Path
           report=json.loads(Path("report/deadspace-original-instruction-window.json").read_text())
+          for name in ("stage_zero_setup_target_0x28ca24",
+                       "stage_zero_followup_target_0x281d54",
+                       "stage_zero_followup_target_0x2833f4"):
+              item=report["windows"][name]
+              print("Original startup target",name,
+                    json.dumps(item["instructions"][:40], separators=(",",":")))
           for name in ("frame_stage_zero_first_callee",
                        "frame_stage_zero_second_callee",
                        "frame_state_one_zero_result_tail"):
