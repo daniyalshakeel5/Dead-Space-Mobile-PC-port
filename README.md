@@ -71,8 +71,14 @@
   behavior. The constructed native resource owner exposes
   both byte and wide text lines, but real provider virtual
   methods and game-scene registration are still unported.
-- **64/64 synthetic native CTests passed on Windows and Linux** at
-  [verification run 41340819828](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41340819828).
+- The original embedded provider vtable `0x004896F8` has
+  native `+0x14` (`0x26C3C4`) mode and in-memory
+  `+0x28` (`0x271794`) position implementations.
+  Owners that supply their actual embedded provider no longer
+  require an invented callback to query its mode. External
+  provider seek/read methods and full game boot remain incomplete.
+- **65/65 synthetic native CTests passed on Windows and Linux** at
+  [verification run 41341415738](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41341415738).
   These tests do not prove real game-engine boot or scene rendering.
   [Latest detailed handoff](docs/HANDOFF_2026-11-01.md).
 
