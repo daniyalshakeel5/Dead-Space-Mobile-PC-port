@@ -212,7 +212,7 @@ jobs:
           print("ORIGINAL_RECEIVER_EMBEDDED_VTABLE",hex(embedded_vtable),
                 "ALLOCATOR_SLOT",hex(allocator_global_slot))
           embedded_methods={}
-          for method_slot in (0x14,0x24,0x28,0x2c,0x34):
+          for method_slot in (0x14,0x18,0x1c,0x20,0x24,0x28,0x2c,0x30,0x34):
               embedded_methods[hex(method_slot)]=hex(struct.unpack(
                   "<I",bounded_virtual_read(
                       elf,original_segments,embedded_vtable+method_slot,4))[0])
