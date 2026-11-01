@@ -32,8 +32,23 @@ original_execute_receiver_prefix_0x278018(
     const auto* owner=static_cast<const std::uint8_t*>(in.mapped_owner);
     // ARM 0x278064..0x278078: original flag at owner+0x8b6.
     // When zero it jumps to an independent path at 0x2786F0.
-    if(owner[0x8b6u]==0)
-        return fail(S::UnreconstructedAlternateMode);
+    if(owner[0x8b6u]==0) {
+        if(!in.native_activation)
+            return fail(S::UnreconstructedAlternateMode);
+        const auto& activation=*in.native_activation;
+        if(activation.owner_arm_va!=in.original_owner_arm_va ||
+           activation.mapped_owner!=in.mapped_owner ||
+           activation.owner_bytes>in.owner_accessible_bytes)
+            return fail(S::InvalidOriginalOwner);
+        // ARM 0x2786F0..0x278710 calls original owner's vtable
+        // +0x64 (0x278E58) with r1=1. The recovered native reset is
+        // performed, but the provider-dependent activation is not.
+        // It MUST NOT be misreported as a successful receiver call.
+        const auto active=original_execute_receiver_activation_0x278e58(
+            activation);
+        (void)active;
+        return fail(S::OriginalActivationBlocked);
+    }
     if(!table_valid(in.original_character_table))
         return fail(S::InvalidOriginalCharacterTable);
     try {
