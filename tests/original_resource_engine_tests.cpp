@@ -160,5 +160,44 @@ int main() {
     assert(started.status==
            OriginalReceiverActivationStatus0x278e58::UnreconstructedProviderActivation);
     assert(started.original_provider_arm_va==0x51000u);
+    // Verify the actual first two original calls from 0x286918,
+    // not an invented "engine ready" state.
+    std::array<std::uint8_t,12> loader{};
+    put(loader.data()+4,0x37000u);
+    OriginalNativeResourceEngine boot(0x42000u);
+    inputs.original_pool_arm_va=0u; // must reload loader+4
+    inputs.original_provider_arm_va=0x51000u; // must overwrite from arg
+    auto startup=boot.begin_loader_0x286918(
+        loader.data(),loader.size(),0u,inputs);
+    assert(startup.status==
+           OriginalLoaderPrefixStatus0x286918::ReachedUnreconstructedOriginalBind);
+    assert(startup.constructor_status==S::Completed);
+    assert(startup.mode_status==OriginalReceiverModeStatus0x26c410::Completed);
+    assert(boot.constructed());
+    const auto* bp=boot.mapped_bytes();
+    assert(word(bp)==kOriginalOwnerVtable0x27a768);
+    assert(word(bp+0x8acu)==0u); // original provider arg r1
+    assert(word(bp+0x8d4u)==0x37000u); // from original [r0+4]
+    assert(bp[0x8b5u]==1u);
+    // Reusing the same ARM stack owner must fail rather than
+    // reconstructing over live allocated/registered state.
+    startup=boot.begin_loader_0x286918(
+        loader.data(),loader.size(),0u,inputs);
+    assert(startup.status==OriginalLoaderPrefixStatus0x286918::InvalidLoaderContext);
+    OriginalNativeResourceEngine no_pool(0x50000u);
+    put(loader.data()+4,0u);
+    inputs.default_pool_0x271914=nullptr;
+    startup=no_pool.begin_loader_0x286918(
+        loader.data(),loader.size(),0u,inputs);
+    assert(startup.status==OriginalLoaderPrefixStatus0x286918::ConstructorBlocked);
+    assert(startup.constructor_status==S::MissingDefaultPool);
+    assert(!no_pool.constructed());
+    inputs.default_pool_0x271914=pool;
+    startup=no_pool.begin_loader_0x286918(
+        loader.data(),loader.size(),0u,inputs);
+    assert(startup.status==
+           OriginalLoaderPrefixStatus0x286918::ReachedUnreconstructedOriginalBind);
+    assert(no_pool.constructed());
+    assert(word(no_pool.mapped_bytes()+0x8f4u)==0x37000u);
     return 0;
 }
