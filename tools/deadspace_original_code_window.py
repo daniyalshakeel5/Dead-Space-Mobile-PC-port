@@ -27,6 +27,7 @@ WINDOWS = {
     "frame_stage_zero_first_callee": (0x0027f790, 80),
     "stage_zero_owner_construction_tail_0x27f7e0": (0x0027f7e0, 176),
     "stage_zero_owner_provider_0x27e930": (0x0027e930, 128),
+    "original_input_ready_guard_0x27e97c": (0x0027e97c, 28),
     "record_allocator_virtual_call_0x281d54": (0x00281d54, 112),
     "frame_stage_zero_second_callee": (0x00280520, 96),
     "stage_zero_setup_target_0x28ca24": (0x0028ca24, 160),
@@ -572,6 +573,17 @@ def observe(apk: Path) -> dict:
     # Two independently instruction-proven PC-relative literal loads.
     # Frame 0x27ef6c LDR r4,[pc,#0x90], 0x27ef74 ADD r4,pc,r4.
     # Transition 0x27eed0 LDR r4,[pc,#0x84], 0x27eedc ADD r4,pc,r4.
+    # Exact input guard: LDR r3,[pc,#0x10]; LDR r0,[pc,r3];
+    # CMP r0,#1; MOVNE r0,#0; MOVEQ r0,#1; BX lr.
+    guard_ops=[(x["op"],x["args"]) for x in
+        out["original_input_ready_guard_0x27e97c"]["instructions"][:6]]
+    if guard_ops!=[
+        ("ldr","r3, [pc, #0x10]"),("ldr","r0, [pc, r3]"),
+        ("cmp","r0, #1"),("movne","r0, #0"),
+        ("moveq","r0, #1"),("bx","lr")]:
+        raise ValueError("Original input readiness ARM guard proof changed")
+    input_ready_slot=resolve_arm_got_slot_from_pc_index(
+        data,sections,0x0027e97c,0x10,0x0027e980)
     frame_global=resolve_arm_literal_based_global(
         data,sections,0x0027ef6c,0x90,0x0027ef74)
     transition_global=resolve_arm_literal_based_global(
@@ -707,6 +719,13 @@ def observe(apk: Path) -> dict:
             "final_vtable_va":f"0x{input_final_table:08x}",
             "direct_helper_0x35194":"import-plt-target-still-unresolved",
             "required_event_bytes":48,
+            "verified":True,
+        },
+        "original_input_ready_guard":{
+            "guard_function_va":"0x0027e97c",
+            "compares_original_runtime_word_to":1,
+            "original_host_global_slot_va":f"0x{input_ready_slot:08x}",
+            "same_as_frame_state_global":input_ready_slot==frame_global,
             "verified":True,
         },
         "embedded_initializer_0x27fb28_literals":{
