@@ -64,7 +64,7 @@ public class GhidraGameCodeMap extends GhidraScript {
             }
         }
         out.append(",\"instruction_count\":").append(instructionCount);
-        out.append(",\"exact_bx_lr_only\":").append(justReturn);
+        out.append(",\"exact_bx_lr_only\":").append(instructionCount==1 && justReturn);
         List<Function> callees=new ArrayList<>();
         for(Function child:root.getCalledFunctions(monitor)) {
             if(!child.isExternal())callees.add(child);
@@ -314,6 +314,22 @@ public class GhidraGameCodeMap extends GhidraScript {
         if(realFrame==null)realFrame=currentProgram.getFunctionManager()
             .getFunctionContaining(toAddr(0x0027ef68L));
         appendEntryChain(result,realFrame,0,new LinkedHashSet<String>(),75);
+        result.append("],\"frame_branch_target_instruction_window\":[");
+        ghidra.program.model.address.Address addrAt=toAddr(0x0027ef68L);
+        Instruction frameInstruction=currentProgram.getListing().getInstructionAt(addrAt);
+        for(int n=0;frameInstruction!=null && n<24;n++) {
+            if(n>0)result.append(',');
+            result.append("{\"at\":").append(escape("0x"+frameInstruction.getAddress()));
+            result.append(",\"mnemonic\":").append(escape(frameInstruction.getMnemonicString()));
+            result.append(",\"flows\":[");
+            ghidra.program.model.address.Address[] flows=frameInstruction.getFlows();
+            for(int k=0;k<Math.min(flows.length,5);k++) {
+                if(k>0)result.append(',');
+                result.append(escape("0x"+flows[k]));
+            }
+            result.append("]}");
+            frameInstruction=frameInstruction.getNext();
+        }
         result.append("],\"frame_callback_exact_return_only\":");
         Function frame=null;
         for(Function f:internals)
