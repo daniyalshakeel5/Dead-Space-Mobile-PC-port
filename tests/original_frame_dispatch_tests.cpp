@@ -41,6 +41,18 @@ static void second_native_call_test_only(void* arg) noexcept {
     original_call_order[chain_calls++]=2;
     same_context = same_context && (arg==memory.data()+8);
 }
+static std::uint32_t simulated_original_return = 0;
+static void* seen_original_virtual_object = nullptr;
+static unsigned original_virtual_calls = 0;
+static std::uint32_t original_virtual_test_only(void* object) noexcept {
+    ++original_virtual_calls;
+    seen_original_virtual_object=object;
+    return simulated_original_return;
+}
+static unsigned original_transition_calls = 0;
+static void original_transition_test_only() noexcept {
+    ++original_transition_calls;
+}
 int main() {
     memory.fill(0x22);
     set_state(0);
@@ -95,6 +107,38 @@ int main() {
         memory.data()+8,nullptr,second_native_call_test_only)
         ==StageZeroChainResult::MissingNativeCallee);
     REQUIRE(chain_calls==2);
+
+    REQUIRE(original_invoke_stage_one_first_virtual(
+        memory.data()+8, nullptr)
+        ==OriginalVirtualDispatchResult::MissingOriginalObjectOrMethod);
+    REQUIRE(original_invoke_stage_one_first_virtual(
+        nullptr,original_virtual_test_only)
+        ==OriginalVirtualDispatchResult::MissingOriginalObjectOrMethod);
+    REQUIRE(original_virtual_calls==0);
+    simulated_original_return=1;
+    REQUIRE(original_invoke_stage_one_first_virtual(
+        memory.data()+8,original_virtual_test_only)
+        ==OriginalVirtualDispatchResult::OriginalReturnWasOne);
+    REQUIRE(original_virtual_calls==1);
+    REQUIRE(seen_original_virtual_object==memory.data()+8);
+    simulated_original_return=0;
+    REQUIRE(original_invoke_stage_one_first_virtual(
+        memory.data()+8,original_virtual_test_only)
+        ==OriginalVirtualDispatchResult::OriginalReturnWasOther);
+    simulated_original_return=0xffffffffu;
+    REQUIRE(original_invoke_stage_one_first_virtual(
+        memory.data()+8,original_virtual_test_only)
+        ==OriginalVirtualDispatchResult::OriginalReturnWasOther);
+    REQUIRE(original_virtual_calls==3);
+    REQUIRE(original_dispatch_stage_one_result(1,original_transition_test_only)
+        ==OriginalStageOneBranchResult::OriginalNonzeroBranchNotYetReconstructed);
+    REQUIRE(original_transition_calls==0);
+    REQUIRE(original_dispatch_stage_one_result(0,nullptr)
+        ==OriginalStageOneBranchResult::MissingOriginalTransition);
+    REQUIRE(original_transition_calls==0);
+    REQUIRE(original_dispatch_stage_one_result(0,original_transition_test_only)
+        ==OriginalStageOneBranchResult::OriginalZeroResultTransitionCalled);
+    REQUIRE(original_transition_calls==1);
 
     REQUIRE(original_stage_one_normalized_result(0u)==1u);
     REQUIRE(original_stage_one_normalized_result(1u)==0u);
