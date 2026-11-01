@@ -59,6 +59,7 @@ jobs:
                  "resource_token_compare_0x35674",
                  "resource_token_object_0x285590",
                  "resource_record_build_0x28611c",
+                 "resource_utf16_transform_0x28cc88",
                  "resource_record_insert_0x2862e8",
                  "resource_loader_tree_begin_0x283408",
                  "resource_loader_tree_next_0x2933ec",
