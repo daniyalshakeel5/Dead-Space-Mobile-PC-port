@@ -66,6 +66,42 @@ def constant_return(code: bytes, thumb: bool) -> int | None:
     return None
 
 
+def literal_return(code: bytes, thumb: bool, address: int,
+                   section: bytes, section_address: int) -> int | None:
+    """Instruction-proven PC-relative literal load into r0, then BX LR.
+
+    A literal may live outside the ELF function's symbol-size range. Both
+    *instructions* must still be exactly the recognized, unconditional forms.
+    Resolve PC using actual ARM/Thumb instruction addresses, not host offsets.
+    """
+    if thumb:
+        if len(code) < 4:
+            return None
+        first, last = struct.unpack_from("<HH", code)
+        if (first & 0xff00) != 0x4800 or last != 0x4770:
+            return None  # Thumb16 LDR r0,[PC,#imm8*4] then BX LR
+        target = ((address + 4) & ~3) + ((first & 0xff) * 4)
+    else:
+        if len(code) < 8:
+            return None
+        first, last = struct.unpack_from("<II", code)
+        if last != 0xe12fff1e:
+            return None  # ARM BX LR (unconditional).
+        # E59F0xxx: unconditional, positive offset, word load, base PC, dest r0
+        # E51F0xxx: same with subtract offset.
+        if (first & 0xfffff000) == 0xe59f0000:
+            target = address + 8 + (first & 0xfff)
+        elif (first & 0xfffff000) == 0xe51f0000:
+            target = address + 8 - (first & 0xfff)
+        else:
+            return None
+    start = target - section_address
+    if (target & 3) or start < 0 or start + 4 > len(section):
+        return None
+    # No jumps or register-side effects: data in target address is a literal.
+    return struct.unpack_from("<I", section, start)[0]
+
+
 def native_enum_constants(binary: bytes) -> dict:
     if len(binary) < 52 or binary[:4] != b"\x7fELF" or binary[4:6] != b"\x01\x01":
         raise ValueError("Expected 32-bit little-endian ELF")
@@ -112,7 +148,12 @@ def native_enum_constants(binary: bytes) -> dict:
                 exports.append((name, None))
                 continue
             code=binary[dest["offset"]+rel:dest["offset"]+rel+size]
-            exports.append((name,constant_return(code,bool(value&1))))
+            result=constant_return(code,bool(value&1))
+            if result is None:
+                section_bytes=binary[dest["offset"]:dest["offset"]+dest["size"]]
+                result=literal_return(code,bool(value&1),actual_addr,
+                                      section_bytes,dest["addr"])
+            exports.append((name,result))
     # Do not silently overwrite if symbol duplicates disagree.
     results={}
     for name,value in exports:
@@ -129,7 +170,7 @@ def native_enum_constants(binary: bytes) -> dict:
         "unverified_functions":len(results)-len(proven),
         "unverified_jni_symbols": sorted(k for k,v in results.items() if v is None),
         "constants":dict(sorted(proven.items())),
-        "limitations":"Only unconditional two-instruction ARM/Thumb integer returns proven. No original game logic or ABI beyond these tiny functions assumed."
+        "limitations":"Only exact ARM/Thumb constant-return or PC-relative literal-load/BX-LR routines proven. No original game logic or ABI beyond these tiny functions assumed."
     }
 
 
