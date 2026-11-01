@@ -306,6 +306,14 @@ public class GhidraGameCodeMap extends GhidraScript {
                 gameEntry=f; break;
             }
         appendEntryChain(result,gameEntry,0,new LinkedHashSet<String>(),100);
+        result.append("],\"frame_update_native_call_chain\":[");
+        // Instruction-level ARM B target recovered independently from original ELF.
+        // Follow the actual target rather than the four-byte JNI jump wrapper.
+        Function realFrame=currentProgram.getFunctionManager().getFunctionAt(
+            toAddr(0x0027ef68L));
+        if(realFrame==null)realFrame=currentProgram.getFunctionManager()
+            .getFunctionContaining(toAddr(0x0027ef68L));
+        appendEntryChain(result,realFrame,0,new LinkedHashSet<String>(),75);
         result.append("],\"frame_callback_exact_return_only\":");
         Function frame=null;
         for(Function f:internals)
