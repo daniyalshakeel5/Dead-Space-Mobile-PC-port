@@ -494,6 +494,17 @@ def observe(apk: Path) -> dict:
         "on_surface_created": "Java_com_ea_blast_AndroidRenderer_NativeOnSurfaceCreated",
         "game_entry": "Java_com_ea_DeadSpace_DeadSpace_runEntryPoint",
         "on_create": "Java_com_ea_blast_MainActivity_NativeOnCreate",
+        # These were identified independently in the Vita loader's
+        # controls.c, but all actual instruction values below come from
+        # our *different* user-confirmed original game APK.
+        "input_raw_down": "Java_com_ea_blast_TouchSurfaceAndroid_NativeGetIdRawPointerDown",
+        "input_raw_move": "Java_com_ea_blast_TouchSurfaceAndroid_NativeGetIdRawPointerMove",
+        "input_raw_up": "Java_com_ea_blast_TouchSurfaceAndroid_NativeGetIdRawPointerUp",
+        "input_pointer_event": "Java_com_ea_blast_TouchSurfaceAndroid_NativeOnPointerEvent",
+        "input_key_down": "Java_com_ea_blast_KeyboardAndroid_NativeOnKeyDown",
+        "input_key_up": "Java_com_ea_blast_KeyboardAndroid_NativeOnKeyUp",
+        "input_acceleration": "Java_com_ea_blast_AccelerometerAndroidDelegate_NativeOnAcceleration",
+        "audio_startup": "Java_com_ea_EAIO_EAIO_Startup",
     }
     located=elf32_jni_symbols(data,set(symbols.values()))
     symbol_windows={}
