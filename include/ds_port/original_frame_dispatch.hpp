@@ -73,4 +73,18 @@ OriginalStageOneBranchResult original_dispatch_stage_one_result(
     std::uint32_t result_from_0x0027fc68,
     OriginalFrameTransition original_transition_0x0027eecc) noexcept;
 
+// The ORIGINAL zero-result transition routine 0x0027eecc begins by
+// obtaining a global state object, storing the integer 2 to [object],
+// post-incrementing the pointer by 8 bytes, and passing that context
+// into further native calls. Those subsequent calls are NOT ported.
+// This executes only its proven prefix. Never describe it as a complete
+// game shutdown/transition or a playable frame.
+enum class OriginalStateTwoPrefixResult : std::uint8_t {
+    InvalidOriginalStateObject,
+    OriginalStateTwoStored
+};
+OriginalStateTwoPrefixResult original_write_state_two_transition_prefix(
+    void* original_global_state, std::size_t accessible_bytes,
+    void** original_context_after_postincrement) noexcept;
+
 } // namespace ds_port::original_runtime
