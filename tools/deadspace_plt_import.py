@@ -70,7 +70,7 @@ def resolve_arm_plt_import(raw: bytes, plt_va: int) -> dict:
             if name_offset>=strings["size"]:
                 raise ValueError("Invalid original ELF string offset")
             start=strings["start"]+name_offset
-            end=raw.find(b"\\0",start,strings["start"]+strings["size"])
+            end=raw.find(b"\0",start,strings["start"]+strings["size"])
             if end<0:raise ValueError("Unterminated original ELF import name")
             found.append(raw[start:end].decode("utf-8","replace"))
     if len(found)!=1:
