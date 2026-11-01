@@ -41,6 +41,8 @@ class ArmWindowTests(unittest.TestCase):
                 28:("ldr","r3, [r4, #0x44]"),
                 32:("orrs","r1, r1, r3"),
                 36:("bne","#0x28056c"),
+                40:("add","r0, sp, #8"),
+                44:("bl","#0x357c4"),
                 48:("ldr","r2, [sp, #0xc]"),
                 52:("ldr","r0, [sp, #8]"),
                 56:("mov","r1, #0xf4000"),
@@ -48,6 +50,13 @@ class ArmWindowTests(unittest.TestCase):
                 64:("asr","r3, r2, #0x1f"),
                 68:("smlal","r2, r3, r1, r0"),
                 72:("strd","r2, r3, [r4, #0x40]")}),
+            "frame_state_one_zero_result_tail":decoded({
+                0:("push","{r4, r5, lr}"),
+                4:("ldr","r4, [pc, #0x84]"),
+                8:("mov","r3, #2"),
+                12:("sub","sp, sp, #0x14"),
+                16:("add","r4, pc, r4"),
+                20:("str","r3, [r4], #8")}),
             "frame_stage_one_routine":decoded({
                 0:("push","{r4, lr}"),4:("ldr","r3, [r0, #0xc]"),
                 8:("mov","r0, r3"),12:("ldr","r3, [r3]"),
@@ -71,6 +80,15 @@ class ArmWindowTests(unittest.TestCase):
         windows["frame_stage_zero_second_callee"]["instructions"][3]["args"]="#0x280570"
         self.assertFalse(proven_original_code_helpers(windows)[
             "original_clock_slot_zero_check_before_store"])
+        self.assertFalse(proven_original_code_helpers(windows)[
+            "original_gettimeofday_stack_arg_and_bl"])
+        windows["frame_stage_zero_second_callee"]["instructions"][3]["args"]="#0x28056c"
+        windows["frame_stage_zero_second_callee"]["instructions"][5]["args"]="#0x357c8"
+        self.assertFalse(proven_original_code_helpers(windows)[
+            "original_gettimeofday_stack_arg_and_bl"])
+        windows["frame_state_one_zero_result_tail"]["instructions"][5]["args"] = "r3, [r4, #4]"
+        self.assertFalse(proven_original_code_helpers(windows)[
+            "original_state_one_transition_stores_two_first"])
 
     def test_exact_original_arm_frame_dispatch_proof(self):
         specs={
