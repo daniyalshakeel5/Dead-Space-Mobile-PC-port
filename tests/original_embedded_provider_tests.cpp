@@ -36,7 +36,17 @@ int main(){
     assert(pos.status==S::Completed&&pos.original_r0==37u);
     pos=original_embedded_provider_position_0x271794(
         embedded.data(),embedded.size(),2u);
-    assert(pos.status==S::NeedsOriginalMemoryService);
+    assert(pos.status==S::Completed&&pos.original_r0==37u);
+    // +0x20 returns cached +8; +0x28 subtracts it from current.
+    put(embedded.data()+8u,10u);
+    pos=original_embedded_provider_position_0x271794(
+        embedded.data(),embedded.size(),2u);
+    assert(pos.status==S::Completed&&pos.original_r0==27u);
+    put(embedded.data()+8u,0xffffffffu);
+    pos=original_embedded_provider_position_0x271794(
+        embedded.data(),embedded.size(),2u);
+    assert(pos.status==S::Completed&&pos.original_r0==0u);
+    put(embedded.data()+8u,0);
     put(embedded.data()+4u,0);
     pos=original_embedded_provider_position_0x271794(
         embedded.data(),embedded.size(),0);
