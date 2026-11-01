@@ -52,7 +52,7 @@ public class GhidraGameCodeMap extends GhidraScript {
     private static String addr(Function f) {
         return "0x" + f.getEntryPoint().toString();
     }
-    private static int directCallers(Function f) {
+    private int directCallers(Function f) {
         try {return f.getCallingFunctions(monitor).size();}
         catch (Exception ex) {return 0;}
     }
