@@ -1,4 +1,5 @@
 #include "ds_port/original_stage_zero_setup.hpp"
+#include "ds_port/original_stage_zero_followup.hpp"
 #include <cstdint>
 
 namespace ds_port::original_runtime {
@@ -18,7 +19,7 @@ OriginalStageZeroSetupResult original_execute_stage_zero_setup_prefix(
     // context+0x18. Reject invalid memory before any irreversible callback.
     if(!original_context || accessible_bytes < 0x48)
         return OriginalStageZeroSetupResult::InvalidContext;
-    if(!setup_0x28ca24 || !followup_0x281d54 || !followup_0x2833f4)
+    if(!setup_0x28ca24 || !followup_0x281d54)
         return OriginalStageZeroSetupResult::MissingOriginalCallee;
     auto* bytes=static_cast<std::uint8_t*>(original_context);
     // Original ARM 0x00280530, setup always precedes clock-slot load.
@@ -32,8 +33,28 @@ OriginalStageZeroSetupResult original_execute_stage_zero_setup_prefix(
     // ARM LDR r0,[r4,#4] before first BL; another LDR r1,[r4,#4]
     // after first BL. Reload is essential if first call mutates the field.
     followup_0x281d54(original_arm_le32(bytes+4));
-    followup_0x2833f4(bytes+0x18,original_arm_le32(bytes+4));
+    const std::uint32_t reloaded = original_arm_le32(bytes+4);
+    if (followup_0x2833f4) {
+        // Only the synthetic order tests inject a target here.
+        followup_0x2833f4(bytes+0x18,reloaded);
+    } else {
+        // Full original ARM 0x002833f4 recovered, so call the real
+        // independently authored x86-64 implementation by default.
+        if(!original_followup_store_0x2833f4(
+             bytes+0x18,accessible_bytes-0x18,reloaded))
+            return OriginalStageZeroSetupResult::InvalidContext;
+    }
     // Only 96 instruction-window bytes proven; do not claim later steps run.
     return OriginalStageZeroSetupResult::VerifiedPrefixExecuted;
 }
+OriginalStageZeroSetupResult original_execute_stage_zero_setup_with_recovered_followup(
+    void* original_context, std::size_t accessible_bytes,
+    OriginalStageZeroSetupCall setup_0x28ca24,
+    OriginalGetTimeOfDay clock_0x357c4,
+    OriginalStageZeroFollowupA followup_0x281d54) noexcept {
+    return original_execute_stage_zero_setup_prefix(
+        original_context,accessible_bytes,
+        setup_0x28ca24,clock_0x357c4,followup_0x281d54,nullptr);
+}
+
 } // namespace ds_port::original_runtime
