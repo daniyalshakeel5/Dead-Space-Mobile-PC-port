@@ -73,7 +73,21 @@ jobs:
         shell: bash
         run: |
           build/ds_im_menu_scene_probe \
-            "$RUNNER_TEMP/boot-assets/assets/published/models/main_menu.m3g"
+            "$RUNNER_TEMP/boot-assets/assets/published/models/main_menu.m3g" > "$RUNNER_TEMP/menu-inventory.json"
+          python - "$RUNNER_TEMP/menu-inventory.json" <<'PY'
+          import json
+          import sys
+          with open(sys.argv[1], encoding="utf-8") as stream:
+              inventory=json.load(stream)
+          assert inventory["decoded"] is True
+          assert inventory["meshes"]==52
+          assert inventory["triangles"]==9750
+          assert inventory["object_types"]["5"]==1
+          assert inventory["object_types"]["9"]==57
+          assert len(inventory["camera_object_ids"])==1
+          assert inventory["group_count"]==57
+          print("Original camera and group IDs retained in native decoder")
+          PY
       - name: Execute both ORIGINAL splash screens through SDL2 software renderer
         shell: bash
         run: |
@@ -96,4 +110,4 @@ jobs:
       - name: Remove original game bytes from runner
         if: always()
         shell: bash
-        run: rm -rf "$RUNNER_TEMP/boot-assets" "$RUNNER_TEMP/deadspace.apk" "$RUNNER_TEMP/native-splash-exit.txt"
+        run: rm -rf "$RUNNER_TEMP/boot-assets" "$RUNNER_TEMP/deadspace.apk" "$RUNNER_TEMP/native-splash-exit.txt" "$RUNNER_TEMP/menu-inventory.json"
