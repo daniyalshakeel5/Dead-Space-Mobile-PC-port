@@ -19,8 +19,12 @@
   natively over caller-mapped original resource-tree nodes, using the
   already reconstructed `0x284178` registration and native resource map.
   The preceding original `0x2863EC` parser/loader remains unported.
-- **46/46 synthetic native CTests passed on Windows and Linux** at
-  [verification run 41328643724](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41328643724).
+- Native bounded ARM `0x285918` byte-string append and `0x2863EC`
+  missing-suffix copy behavior are implemented. Original UTF-16 range
+  constructor `0x285590` is native. The complete resource parser
+  `0x2863EC`, token matching, and record insertion remain unported.
+- **48/48 synthetic native CTests passed on Windows and Linux** at
+  [verification run 41330632152](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41330632152).
   These tests do not prove real game-engine boot or scene rendering.
   [Latest detailed handoff](docs/HANDOFF_2026-11-01.md).
 
