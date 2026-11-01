@@ -37,6 +37,10 @@ class ArmWindowTests(unittest.TestCase):
                 8:("bl","#0x27f790"),12:("mov","r0, r4"),
                 16:("pop","{r4, lr}"),20:("b","#0x280520")}),
             "frame_stage_zero_second_callee":decoded({
+                24:("ldr","r1, [r4, #0x40]"),
+                28:("ldr","r3, [r4, #0x44]"),
+                32:("orrs","r1, r1, r3"),
+                36:("bne","#0x28056c"),
                 48:("ldr","r2, [sp, #0xc]"),
                 52:("ldr","r0, [sp, #8]"),
                 56:("mov","r1, #0xf4000"),
@@ -64,6 +68,9 @@ class ArmWindowTests(unittest.TestCase):
         windows["frame_stage_zero_second_callee"]["instructions"][3]["args"]="r1, r1, #0x244"
         self.assertFalse(proven_original_code_helpers(windows)[
             "original_signed_time_math_and_store_at_0x40"])
+        windows["frame_stage_zero_second_callee"]["instructions"][3]["args"]="#0x280570"
+        self.assertFalse(proven_original_code_helpers(windows)[
+            "original_clock_slot_zero_check_before_store"])
 
     def test_exact_original_arm_frame_dispatch_proof(self):
         specs={
