@@ -59,4 +59,35 @@ std::uint32_t original_stage_one_normalized_result(
     return virtual_method_return == 1u ? 0u : 1u;
 }
 
+OriginalVirtualDispatchResult original_invoke_stage_one_first_virtual(
+    void* original_virtual_object,
+    OriginalVirtualFirstMethod original_first_method) noexcept {
+    if (!original_virtual_object || !original_first_method)
+        return OriginalVirtualDispatchResult::MissingOriginalObjectOrMethod;
+
+    // Original ELF 0x0027fc68:
+    // r0 = *[context+0xc]; r3 = [r0]; BLX first virtual target;
+    // SUBS r0,r0,#1; MOVNE r0,#1.
+    // These are the verified call/return semantics; the 32-bit
+    // virtual pointer layout is deliberately provided by the caller.
+    const std::uint32_t returned = original_first_method(original_virtual_object);
+    return original_stage_one_normalized_result(returned) == 0
+        ? OriginalVirtualDispatchResult::OriginalReturnWasOne
+        : OriginalVirtualDispatchResult::OriginalReturnWasOther;
+}
+
+OriginalStageOneBranchResult original_dispatch_stage_one_result(
+    std::uint32_t result_from_0x0027fc68,
+    OriginalFrameTransition original_transition_0x0027eecc) noexcept {
+    // At original frame branch ELF 0x0027efb4:
+    // CMP r0,#0 ; BNE 0x0027efc8 ;
+    // for zero: stack restoration and direct B 0x0027eecc.
+    if (result_from_0x0027fc68 != 0)
+        return OriginalStageOneBranchResult::OriginalNonzeroBranchNotYetReconstructed;
+    if (!original_transition_0x0027eecc)
+        return OriginalStageOneBranchResult::MissingOriginalTransition;
+    original_transition_0x0027eecc();
+    return OriginalStageOneBranchResult::OriginalZeroResultTransitionCalled;
+}
+
 } // namespace ds_port::original_runtime
