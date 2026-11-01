@@ -34,4 +34,28 @@ OriginalMode1FactoryResult original_construct_mode1_handle_0x28b3a4(
     return {OriginalMode1FactoryStatus::CompletedOriginalMode1Constructor,
             {in.mapped_handle,in.handle_bytes,0,nullptr,0,0,nullptr,0}};
 }
+
+OriginalUnreadyHandleStatus original_cleanup_unready_mode1_0x28a4f8(
+    const OriginalResourceHandleInput& in) noexcept {
+    if(!in.mapped_handle||in.handle_bytes<kOriginalMode1HandleBytes)
+        return OriginalUnreadyHandleStatus::InvalidMemory;
+    auto* p=static_cast<std::uint8_t*>(
+        const_cast<void*>(in.mapped_handle));
+    const auto load=[](const std::uint8_t* x) noexcept -> std::uint32_t {
+        return std::uint32_t(x[0])|(std::uint32_t(x[1])<<8)|
+               (std::uint32_t(x[2])<<16)|(std::uint32_t(x[3])<<24);
+    };
+    if(load(p)!=kOriginalMode1HandleVtable||load(p+4)!=1u)
+        return OriginalUnreadyHandleStatus::WrongOriginalMode;
+    // Original 0x28A4F8 calls a resource vtable +0x0c only if +8 !=0.
+    // That unrelated virtual method is not reconstructed; never release
+    // an unknown live object with invented behavior.
+    if(load(p+8)!=0u)
+        return OriginalUnreadyHandleStatus::UnreconstructedNonNullResource;
+    // Original destructor's vtable literal was independently proven
+    // to be 0x00489B20 (run 41327221816).
+    store32(p,kOriginalMode1HandleVtable);
+    store32(p+8,0u);
+    return OriginalUnreadyHandleStatus::CompletedNullResourceCleanup;
+}
 } // namespace ds_port::original_runtime
