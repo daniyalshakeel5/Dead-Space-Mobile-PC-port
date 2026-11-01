@@ -45,6 +45,10 @@ WINDOWS = {
     # Observation only: no implementation or gameplay semantics inferred.
     "post_setup_direct_callee_0x27fd7c": (0x0027fd7c, 704),
     "post_setup_direct_callee_0x2803e4": (0x002803e4, 460),
+    "verified_vtable_object34_slot0c_0x2876d0": (0x002876d0, 256),
+    "verified_vtable_object58_slot24_0x281b40": (0x00281b40, 256),
+    "verified_vtable_secondary_slot0c_0x2828e4": (0x002828e4, 256),
+    "verified_vtable_embedded_slot18_0x2800e0": (0x002800e0, 256),
     "post_setup_direct_callee_0x287a94": (0x00287a94, 160),
     "post_setup_direct_callee_0x2849e0": (0x002849e0, 160),
     "post_setup_direct_callee_0x280a34": (0x00280a34, 160),
@@ -575,7 +579,7 @@ def observe(apk: Path) -> dict:
                 {"offset": i.address-address,
                  "op": i.mnemonic.lower(),
                  "args": i.op_str.lower()}
-                for i in decoded[:180 if key=="post_setup_direct_callee_0x27fd7c" else 120 if key in ("post_setup_direct_callee_0x2803e4","repeated_initializer_callee_0x284178") else 64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" or key.startswith("stage_zero_second_tail_") or key=="startup_allocator_object_init_0x27e560" else 40]],
+                for i in decoded[:180 if key=="post_setup_direct_callee_0x27fd7c" else 120 if key in ("post_setup_direct_callee_0x2803e4","repeated_initializer_callee_0x284178") else 64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" or key.startswith("stage_zero_second_tail_") or key=="startup_allocator_object_init_0x27e560" or key.startswith("verified_vtable_") else 40]],
         }
     # Two independently instruction-proven PC-relative literal loads.
     # Frame 0x27ef6c LDR r4,[pc,#0x90], 0x27ef74 ADD r4,pc,r4.
