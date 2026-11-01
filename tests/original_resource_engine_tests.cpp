@@ -190,6 +190,24 @@ int main() {
     assert(stream.status==
            OriginalNativeOwnerStreamStatus::MissingOriginalProvider);
     assert(resource_bytes.position==0);
+    // The original owner byte reader feeds its distinct 0x26D5FC
+    // converter. The same real mapped user resource text is now
+    // consumable as owned UTF-16 without ARM execution.
+    OriginalNativeUtf16String wide_resource{};
+    auto decoded=with_provider.read_resource_wide_line_0x276d18(
+        resource_bytes,wide_resource);
+    assert(decoded.status==OriginalOwnerWideLineStatus::LineDecoded);
+    assert(wide_resource.contents==u"RESOURCE=YES");
+    decoded=with_provider.read_resource_wide_line_0x276d18(
+        resource_bytes,wide_resource);
+    assert(decoded.status==OriginalOwnerWideLineStatus::LineDecoded);
+    assert(wide_resource.contents==u"NEXT=2");
+    assert(resource_bytes.position==asset_text.size());
+    resource_bytes.position=0;
+    decoded=engine.read_resource_wide_line_0x276d18(
+        resource_bytes,wide_resource);
+    assert(decoded.status==OriginalOwnerWideLineStatus::InvalidInput);
+    assert(resource_bytes.position==0);
     // Verify the actual first two original calls from 0x286918,
     // not an invented "engine ready" state.
     std::array<std::uint8_t,12> loader{};
