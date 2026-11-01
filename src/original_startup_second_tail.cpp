@@ -84,10 +84,21 @@ OriginalStartupSecondTailStatus original_execute_stage_zero_tail_0x280580(
     auto* ctx=static_cast<std::uint8_t*>(in.original_context);
     if(!in.invoke_original_direct)
         return OriginalStartupSecondTailStatus::MissingOriginalDirect;
-    // 0x280580..0x280584: original BL 0x27FD7C(context).
-    if(!in.invoke_original_direct(0x0027fd7cu,in.original_context_arm_va,
-                                  in.callback_context))
+    // Complete 0x27FD7C wrapper: 27 ordered native calls into the
+    // still-unresolved original 0x284178 engine resource handler.
+    if(in.native_registration_0x27fd7c) {
+        if(in.native_registration_0x27fd7c->original_context_arm_va!=
+           in.original_context_arm_va)
+            return OriginalStartupSecondTailStatus::InvalidOriginalContext;
+        if(original_register_stage_resources_0x27fd7c(
+            *in.native_registration_0x27fd7c)!=
+             OriginalRegistrationStatus::CompletedOriginalSequence)
+            return OriginalStartupSecondTailStatus::OriginalDirectRefused;
+    } else if(!in.invoke_original_direct(
+                  0x0027fd7cu,in.original_context_arm_va,
+                  in.callback_context)) {
         return OriginalStartupSecondTailStatus::OriginalDirectRefused;
+    }
     OriginalStartupVirtualResult r{};
     // Original context vtable +0x54 (r1..r3 caller-saved by direct call).
     if(!x.invoke(in.original_context_arm_va,0x54u,0,0,0,0,&r))return x.status;
