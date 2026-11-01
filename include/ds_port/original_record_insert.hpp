@@ -1,5 +1,6 @@
 #pragma once
 #include "ds_port/original_record_text.hpp"
+#include "ds_port/original_receiver_prefix.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
@@ -31,10 +32,13 @@ struct OriginalRecordInsertInputs0x2862e8 {
     std::size_t record_utf8_bytes=0;
     OriginalRecordReceiverMethod58 original_virtual_0x58=nullptr;
     void* context=nullptr;
+    // Native original receiver prefix handles only the verified
+    // no-match branch. Matched resources still require real 0x278018.
+    const OriginalReceiverPrefixInputs0x278018* native_receiver_0x278018=nullptr;
 };
 enum class OriginalRecordInsertStatus0x2862e8:std::uint8_t {
     InvalidOriginalInput,MissingOriginalReceiver,OriginalLiteralBlocked,
-    OriginalRecordTextBlocked,OriginalReceiverRefused,CompletedCallSequence
+    OriginalRecordTextBlocked,OriginalReceiverRefused,CompletedCallSequence,CompletedOriginalNoMatch
 };
 struct OriginalRecordInsertResult0x2862e8 {
     OriginalRecordInsertStatus0x2862e8 status;
