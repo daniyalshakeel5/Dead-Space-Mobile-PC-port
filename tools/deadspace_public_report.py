@@ -7,6 +7,7 @@ they contain user-owned binary hashes, archive paths and JNI export names.
 from __future__ import annotations
 import argparse
 import json
+import re
 from pathlib import Path
 
 from tools.deadspace_audit import IMPORT_FAMILIES
@@ -74,6 +75,16 @@ def publish(audit: dict, recon: dict | None = None) -> dict:
                 key: counts_only(value)
                 for key, value in (recon.get("magic_stats") or {}).items()
                 if key in MAGIC_CATEGORIES
+            },
+            # Aggregate extension labels only. Never publish complete paths or
+            # unique filenames. Allow ordinary short suffixes and [none].
+            "extension_stats": {
+                key: counts_only(value)
+                for key, value in (recon.get("extension_stats") or {}).items()
+                if (key == "[none]" or
+                    (isinstance(key, str) and
+                     re.fullmatch(r"\\.[a-z0-9]{1,12}", key)))
+                and isinstance(value, dict) and value.get("count", 0) >= 2
             },
             "group_stats": {
                 key: counts_only(value)
