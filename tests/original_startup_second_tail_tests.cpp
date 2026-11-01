@@ -181,6 +181,8 @@ int main(){
     assert(get(h.object58.data())==kOriginal280a34Table0);
     assert(get(h.secondary.data())==kOriginal288688OverrideVtableVA);
     h.refuse_last=true;
+    h.directs=h.resources=h.allocs=h.bases=h.virtuals=0;
+    h.secondary_allocs=h.embedded_virtuals=h.queries=h.service_84=0;
     assert(original_execute_stage_zero_tail_0x280580(in)==
            OriginalStartupSecondTailStatus::OriginalVirtualRefused);
     return 0;
