@@ -49,8 +49,16 @@
   lookup. Original `0x286918` now begins with native construction
   and `0x26C410` mode setup, stopping at the missing
   `0x278778` resource-binding call.
-- **57/57 synthetic native CTests passed on Windows and Linux** at
-  [verification run 41336280754](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41336280754).
+- Original `0x278778` resource-owner binding now follows the
+  verified no-provider early-exit path, invoking native receiver
+  activation and protecting live resource-tree nodes. Original
+  `0x271914` reads the shared singleton global `0x0049BCA8`
+  and can construct `0x27E560` natively when the slot is empty.
+  The original `0x27541C` 0x21C-byte UTF-16 string object is
+  also constructed in native C++ with original pointer layout.
+  **Actual non-null resource-provider activation remains incomplete.**
+- **60/60 synthetic native CTests passed on Windows and Linux** at
+  [verification run 41337741146](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41337741146).
   These tests do not prove real game-engine boot or scene rendering.
   [Latest detailed handoff](docs/HANDOFF_2026-11-01.md).
 
