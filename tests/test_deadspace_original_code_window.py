@@ -36,6 +36,14 @@ class ArmWindowTests(unittest.TestCase):
                 0:("push","{r4, lr}"),4:("mov","r4, r0"),
                 8:("bl","#0x27f790"),12:("mov","r0, r4"),
                 16:("pop","{r4, lr}"),20:("b","#0x280520")}),
+            "frame_stage_zero_second_callee":decoded({
+                48:("ldr","r2, [sp, #0xc]"),
+                52:("ldr","r0, [sp, #8]"),
+                56:("mov","r1, #0xf4000"),
+                60:("add","r1, r1, #0x240"),
+                64:("asr","r3, r2, #0x1f"),
+                68:("smlal","r2, r3, r1, r0"),
+                72:("strd","r2, r3, [r4, #0x40]")}),
             "frame_stage_one_routine":decoded({
                 0:("push","{r4, lr}"),4:("ldr","r3, [r0, #0xc]"),
                 8:("mov","r0, r3"),12:("ldr","r3, [r3]"),
@@ -52,6 +60,10 @@ class ArmWindowTests(unittest.TestCase):
         windows["frame_stage_one_routine"]["instructions"][7]["op"]="mov"
         self.assertFalse(proven_original_code_helpers(windows)[
             "stage_one_normalizes_virtual_return_to_zero_or_one"])
+        windows["frame_stage_one_routine"]["instructions"][7]["op"]="movne"
+        windows["frame_stage_zero_second_callee"]["instructions"][3]["args"]="r1, r1, #0x244"
+        self.assertFalse(proven_original_code_helpers(windows)[
+            "original_signed_time_math_and_store_at_0x40"])
 
     def test_exact_original_arm_frame_dispatch_proof(self):
         specs={
