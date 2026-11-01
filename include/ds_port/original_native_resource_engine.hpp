@@ -45,7 +45,8 @@ public:
     OriginalOwnerBindResult0x278778 bind_original_owner_0x278778(
         OriginalActivationTreeClear release_tree=nullptr,
         void* context=nullptr,
-        OriginalActivationProviderMode14 query_provider_mode=nullptr) noexcept;
+        OriginalActivationProviderMode14 query_provider_mode=nullptr,
+        const OriginalReceiverActivationScratch0x278e58* scratch=nullptr) noexcept;
     OriginalReceiverModeResult0x26c410 set_mode(
         std::uint32_t opcode,std::uint32_t value,
         OriginalReceiverDisableReset original_reset=nullptr,
