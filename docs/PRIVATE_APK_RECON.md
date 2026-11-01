@@ -56,6 +56,38 @@ Push/PR actions run synthetic fixture tests and a **repository-only**
 audit without original content. A green CI check does not mean the APK
 has been analyzed.
 
+## Native-library entrypoint and loader API evidence
+
+The audited ELF import evidence is now more targeted than a library count.
+On **your machine** or a properly configured **private** runner, run:
+
+```sh
+python3 tools/deadspace_audit.py --root . --apk "/path/to/owned.apk" --output "native-evidence.json"
+```
+
+For each native library, this records the actual ELF class, endianness, machine
+architecture, shared-library type (`ET_DYN` or otherwise), ELF entry address,
+linked library names and any available JNI/bootstrap symbols. The
+`platform_api_import_evidence` field lists only known public platform
+imports in these families: Android `AAssetManager` resource access, standard
+file I/O, decompression, GLES texture upload, GLES draw calls, EGL contexts
+and audio. Broad heuristic `import_hint_counts` are **counts**, not private
+symbol names. Native ELF data is inspected in a temporary folder, not copied
+into a report.
+
+**Evidence rules:** JNI exports such as `JNI_OnLoad` identify potential
+bootstrap points; an ELF `e_entry` is **not** the frame update loop. An
+`AAssetManager_open` import proves a dependency on that API, **not** which
+resource files it reads. A GLES texture call is **not** a decoded proprietary
+texture format. Stripping, static linkage and runtime JNI registration can
+hide original function boundaries. This report must be cross-checked against
+actual private disassembly and resource samples before implementing loaders.
+
+The native report includes library paths, JNI export names, and build hashes,
+so **review it before sharing**; unlike the aggregate resource-recon report,
+it is not designed to be fully name-anonymized. Never upload or commit native
+library binaries, APKs, full symbol dumps or disassembled original code.
+
 ## What findings mean for implementation
 
 - Numerous DDS/PVR/KTX/PKM/ASTC entries suggest relevant texture decoders;
