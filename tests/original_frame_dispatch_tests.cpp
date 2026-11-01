@@ -28,6 +28,19 @@ static std::uint32_t get_state() {
     std::memcpy(&value,memory.data(),sizeof(value));
     return value;
 }
+static std::array<int,2> original_call_order{};
+static int chain_calls=0;
+static bool same_context=true;
+static void first_native_call_test_only(void* arg) noexcept {
+    if(chain_calls>=2)return;
+    original_call_order[chain_calls++]=1;
+    same_context = same_context && (arg==memory.data()+8);
+}
+static void second_native_call_test_only(void* arg) noexcept {
+    if(chain_calls>=2)return;
+    original_call_order[chain_calls++]=2;
+    same_context = same_context && (arg==memory.data()+8);
+}
 int main() {
     memory.fill(0x22);
     set_state(0);
@@ -71,6 +84,22 @@ int main() {
     REQUIRE(execute_original_frame_prefix(
         memory.data(),8,original_init_test_only)
         ==FramePrefixResult::InvalidContext);
-    std::cout << "Original ARM frame state-zero transition and dispatch verified\n";
+    REQUIRE(execute_original_stage_zero_chain(
+        memory.data()+8,first_native_call_test_only,second_native_call_test_only)
+        ==StageZeroChainResult::OriginalTwoCallsCompleted);
+    REQUIRE(chain_calls==2);
+    REQUIRE(original_call_order[0]==1);
+    REQUIRE(original_call_order[1]==2);
+    REQUIRE(same_context);
+    REQUIRE(execute_original_stage_zero_chain(
+        memory.data()+8,nullptr,second_native_call_test_only)
+        ==StageZeroChainResult::MissingNativeCallee);
+    REQUIRE(chain_calls==2);
+
+    REQUIRE(original_stage_one_normalized_result(0u)==1u);
+    REQUIRE(original_stage_one_normalized_result(1u)==0u);
+    REQUIRE(original_stage_one_normalized_result(2u)==1u);
+    REQUIRE(original_stage_one_normalized_result(0xffffffffu)==1u);
+        std::cout << "Original ARM frame state-zero transition and dispatch verified\n";
     return 0;
 }
