@@ -71,6 +71,37 @@ int main(){
     CHECK(read32(record.data()+0x08)==0x10203044u);
     // Record publication cannot clobber the distinct original float.
     CHECK(read32(static_cast<const std::uint8_t*>(float_field))==0x3f200000u);
+    // The original service registry slot precedes the frame state by
+    // eight bytes, but its RUNTIME value is unknown and must not be
+    // guessed from the uninitialized ELF BSS.
+    std::array<std::uint8_t,0x290> registry_based{};
+    registry_based.fill(0xe1);
+    void* registry=reinterpret_cast<void*>(0x1);
+    void* frame=reinterpret_cast<void*>(0x2);
+    void* record_slot_full=reinterpret_cast<void*>(0x3);
+    const void* float_full=reinterpret_cast<void*>(0x4);
+    CHECK(!original_bind_registry_and_runtime_globals(
+        registry_based.data(),0x27f,
+        &registry,&frame,&record_slot_full,&float_full));
+    CHECK(registry==reinterpret_cast<void*>(0x1));
+    CHECK(frame==reinterpret_cast<void*>(0x2));
+    CHECK(record_slot_full==reinterpret_cast<void*>(0x3));
+    CHECK(float_full==reinterpret_cast<void*>(0x4));
+    CHECK(original_bind_registry_and_runtime_globals(
+        registry_based.data(),registry_based.size(),
+        &registry,&frame,&record_slot_full,&float_full));
+    CHECK(registry==registry_based.data());
+    CHECK(frame==registry_based.data()+0x08);
+    CHECK(record_slot_full==registry_based.data()+0xf4);
+    CHECK(float_full==registry_based.data()+0x27c);
+    CHECK(read32(static_cast<const std::uint8_t*>(registry))==0xe1e1e1e1u);
+    // No model-created service registry is written or initialized.
+    CHECK(original_complete_allocator_postreturn_0x281d54(
+        nullptr,0,0,0,record_slot_full,4)
+        ==OriginalPostAllocateResult::OriginalNullResultPublished);
+    CHECK(read32(static_cast<const std::uint8_t*>(registry))==0xe1e1e1e1u);
+    CHECK(read32(static_cast<const std::uint8_t*>(record_slot_full))==0u);
+    CHECK(read32(static_cast<const std::uint8_t*>(float_full))==0xe1e1e1e1u);
     std::cout<<"Three original ELF global addresses mapped to bounded native state\n";
     return 0;
 }
