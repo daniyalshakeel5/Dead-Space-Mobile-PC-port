@@ -664,6 +664,19 @@ def observe(apk: Path) -> dict:
         data,sections,0x002807a4,0x34,0x002807b0)
     input_initial_table=(event_constructor_base+8)&0xffffffff
     input_final_table=(event_constructor_base+0x20)&0xffffffff
+    # Original 0x280520 later stage setup and three allocations.
+    second_tail_descriptors={
+        "resource_primary":(0x00280598,0x104,0x002805a0),
+        "resource_fallback":(0x002805b0,0x0f0,0x002805b8),
+        "allocated_0x34":(0x002805c4,0x0e0,0x002805e4),
+        "allocated_0x58":(0x00280644,0x064,0x00280664),
+    }
+    original_tail_vas={
+        name:resolve_arm_literal_based_global(data,sections,*site)
+        for name,site in second_tail_descriptors.items()
+    }
+    if not all(original_tail_vas.values()):
+        raise ValueError("Original stage-zero second tail descriptor is null")
     # Original ELF startup 0x27F790 and nested 0x27F124: preserve all
     # seven original ARM PC-relative descriptor addresses. Each pair
     # has been independently instruction-decoded, not guessed from Vita.
@@ -769,6 +782,13 @@ def observe(apk: Path) -> dict:
             "final_vtable_va":f"0x{input_final_table:08x}",
             "direct_helper_0x35194":"import-plt-target-still-unresolved",
             "required_event_bytes":48,
+            "verified":True,
+        },
+        "original_stage_zero_second_tail_descriptors":{
+            "literal_ARM_virtual_addresses":{
+                name:f"0x{va:08x}" for name,va in original_tail_vas.items()
+            },
+            "returns_at":"0x002806a0",
             "verified":True,
         },
         "original_stage_zero_first_routine_descriptors":{
