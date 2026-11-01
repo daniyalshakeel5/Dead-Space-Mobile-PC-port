@@ -69,6 +69,8 @@ int main(){
     assert(original.original_object_type_counts[14]==1);
     assert(original.original_object_type_counts[20]==2);
     assert(original.original_object_type_counts[21]==1);
+    assert(original.camera_object_indices.empty());
+    assert(original.group_object_indices.empty());
     assert(original.mesh_bounds.size()==1);
     const auto& b=original.mesh_bounds[0];
     assert(b.mesh_object_index==8);
