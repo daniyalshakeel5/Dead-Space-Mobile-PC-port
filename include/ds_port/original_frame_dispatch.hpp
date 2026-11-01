@@ -63,14 +63,13 @@ OriginalVirtualDispatchResult original_invoke_stage_one_first_virtual(
 // zero leads to the original transition routine 0x0027eecc. Nonzero
 // proceeds to other indirect dispatches that are not yet reconstructed.
 // We never report those unknown side effects as executed.
-using OriginalFrameTransition = void (*)(void*) noexcept;
+using OriginalFrameTransition = void (*)() noexcept;
 enum class OriginalStageOneBranchResult : std::uint8_t {
     MissingOriginalTransition,
     OriginalZeroResultTransitionCalled,
     OriginalNonzeroBranchNotYetReconstructed
 };
 OriginalStageOneBranchResult original_dispatch_stage_one_result(
-    void* original_frame_object,
     std::uint32_t result_from_0x0027fc68,
     OriginalFrameTransition original_transition_0x0027eecc) noexcept;
 
