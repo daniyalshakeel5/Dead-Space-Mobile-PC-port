@@ -90,4 +90,22 @@ OriginalStageOneBranchResult original_dispatch_stage_one_result(
     return OriginalStageOneBranchResult::OriginalZeroResultTransitionCalled;
 }
 
+OriginalStateTwoPrefixResult original_write_state_two_transition_prefix(
+    void* original_global_state, std::size_t accessible_bytes,
+    void** original_context_after_postincrement) noexcept {
+    if (!original_global_state || accessible_bytes < 8 ||
+        !original_context_after_postincrement)
+        return OriginalStateTwoPrefixResult::InvalidOriginalStateObject;
+
+    // Original ELF routine 0x0027eecc:
+    // MOV r3,#2 ; ... ; STR r3,[r4],#8.
+    // The stored word is little-endian (original ARM ELF32).
+    auto* bytes=static_cast<std::uint8_t*>(original_global_state);
+    bytes[0]=2; bytes[1]=0; bytes[2]=0; bytes[3]=0;
+    // ARM post-indexed STR advances r4 by 8. Later native routines
+    // use that address; they are deliberately left unresolved.
+    *original_context_after_postincrement=bytes+8;
+    return OriginalStateTwoPrefixResult::OriginalStateTwoStored;
+}
+
 } // namespace ds_port::original_runtime
