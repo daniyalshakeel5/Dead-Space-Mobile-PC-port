@@ -41,14 +41,14 @@ OriginalResolverResult0x28a718 original_execute_resolver_0x28a718(
     if(!s.lookup(1u,6u,1u,0u,s.context,&lookup))
         return fail(Status::OriginalLookupBlocked);
     if(lookup) {
-        std::uint32_t produced=0;
+        std::uint32_t produced=0,scratch_token=0;
         // ARM 0x28A7F0: 0x2716F8(name,scratch,0x2710).
-        if(!s.transform(0x2710u,s.context,&produced))
+        if(!s.transform(0x2710u,s.context,&produced,&scratch_token))
             return fail(Status::OriginalTransformBlocked);
         // ARM 0x28A810: vtable +0x3C (r1=scratch,r2=produced).
-        // Scratch is native-owned inside the transform/invocation
-        // service; the pointer is never guessed here.
-        if(!s.invoke_virtual(object,0x3cu,produced,0u,s.context))
+        // The callback maps the original stack scratch into a native
+        // token, never an invented ARM pointer.
+        if(!s.invoke_virtual(object,0x3cu,scratch_token,produced,s.context))
             return fail(Status::OriginalVirtualBlocked);
         // ARM 0x28A818: compare produced with 0x2710, and only
         // when unequal call vtable +0x2C (r1=0,r2=0).
