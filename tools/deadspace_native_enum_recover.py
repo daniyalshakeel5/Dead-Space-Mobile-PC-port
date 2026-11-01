@@ -116,6 +116,7 @@ def native_enum_constants(binary: bytes) -> dict:
         "examined_export_functions":len(results),
         "proven_constant_functions":len(proven),
         "unverified_functions":len(results)-len(proven),
+        "unverified_jni_symbols": sorted(k for k,v in results.items() if v is None),
         "constants":dict(sorted(proven.items())),
         "limitations":"Only unconditional two-instruction ARM/Thumb integer returns proven. No original game logic or ABI beyond these tiny functions assumed."
     }
