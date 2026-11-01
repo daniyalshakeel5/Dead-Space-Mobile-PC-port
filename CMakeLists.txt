@@ -15,7 +15,7 @@ option(DS_BUILD_IM_MESH_READER "Build native IronMonkey geometry-only mesh expor
 
 # These functions are independent x86-64 translations of 29 validated
 # original ARM game JNI constant returns; no guessed gameplay dispatch.
-add_library(ds_original_native_abi STATIC src/original_native_abi.cpp src/original_jni_exports.cpp src/original_frame_dispatch.cpp src/original_game_entry.cpp src/original_timing_math.cpp)
+add_library(ds_original_native_abi STATIC src/original_native_abi.cpp src/original_jni_exports.cpp src/original_frame_dispatch.cpp src/original_game_entry.cpp src/original_timing_math.cpp src/original_clock_source.cpp)
 target_include_directories(ds_original_native_abi PUBLIC include)
 
 add_library(ds_port_input STATIC src/input.cpp)
@@ -126,6 +126,9 @@ if(DS_ENABLE_TESTS)
     target_link_libraries(ds_original_game_entry_tests PRIVATE ds_original_native_abi)
     add_test(NAME ds_original_arm_run_entrypoint_constant_zero
         COMMAND ds_original_game_entry_tests)
+    add_executable(ds_original_clock_source_tests tests/original_clock_source_tests.cpp)
+    target_link_libraries(ds_original_clock_source_tests PRIVATE ds_original_native_abi)
+    add_test(NAME ds_original_gettimeofday_clock_source COMMAND ds_original_clock_source_tests)
     add_executable(ds_original_timing_math_tests tests/original_timing_math_tests.cpp)
     target_link_libraries(ds_original_timing_math_tests PRIVATE ds_original_native_abi)
     add_test(NAME ds_original_arm_time_smlal_strd
