@@ -26,6 +26,13 @@ struct ImMenuMeshBounds {
     float max_x=0,max_y=0,max_z=0;
 };
 // Raw object framing, not interpreted scene transforms.
+// Candidate raw 32-bit references in node payloads. Not yet interpreted
+// as actual parent/child links; counts alone cannot establish semantics.
+struct ImMenuReferenceCandidate {
+    std::uint32_t source_object_index=0;
+    std::uint32_t payload_offset=0;
+    std::uint32_t target_object_index=0;
+};
 struct ImMenuSceneNodeRecord {
     std::uint32_t object_index=0;
     std::uint8_t object_type=0;
@@ -45,6 +52,7 @@ struct ImMenuGeometry {
     std::vector<std::uint32_t> camera_object_indices;
     std::vector<std::uint32_t> group_object_indices;
     std::vector<ImMenuSceneNodeRecord> scene_node_records;
+    std::vector<ImMenuReferenceCandidate> scene_reference_candidates;
 };
 ImMenuGeometry decode_im_menu_geometry(
     const std::uint8_t* original_im_m3g,std::size_t bytes);
