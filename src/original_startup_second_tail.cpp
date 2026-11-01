@@ -110,7 +110,8 @@ OriginalStartupSecondTailStatus original_execute_stage_zero_tail_0x280580(
     // Exactly one original 0x27E560 implementation remains, with
     // verified GOT binding through original_bind_static_singleton_from_got.
     const auto base_provider=in.native_singleton_0x27e560
-        ? original_static_singleton_base_provider:in.original_base_0x27e560;
+        ? original_static_singleton_base_provider
+        : in.original_base_0x27e560;
     void* base_context=in.native_singleton_0x27e560
         ? const_cast<OriginalSingletonInputs*>(in.native_singleton_0x27e560)
         : in.callback_context;
