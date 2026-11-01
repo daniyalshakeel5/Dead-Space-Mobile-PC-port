@@ -11,6 +11,8 @@ on:
       - "tests/test_deadspace_asset_recon.py"
       - "tools/deadspace_public_report.py"
       - "tests/test_deadspace_public_report.py"
+      - "tools/deadspace_m3g_preflight.py"
+      - "tests/test_deadspace_m3g_preflight.py"
       - "docs/private-apk-analysis.trigger"
       - ".github/workflows/deadspace-research.yml"
   pull_request:
@@ -21,6 +23,8 @@ on:
       - "tests/test_deadspace_asset_recon.py"
       - "tools/deadspace_public_report.py"
       - "tests/test_deadspace_public_report.py"
+      - "tools/deadspace_m3g_preflight.py"
+      - "tests/test_deadspace_m3g_preflight.py"
       - "docs/private-apk-analysis.trigger"
       - ".github/workflows/deadspace-research.yml"
   workflow_dispatch:
@@ -88,15 +92,23 @@ jobs:
             --audit "$RUNNER_TEMP/private-audit.json" \
             --recon "$RUNNER_TEMP/private-resource-recon.json" \
             --output report/deadspace-public-evidence.json
+          python tools/deadspace_m3g_preflight.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-m3g-evidence.json
           python -c 'import json; d=json.load(open("report/deadspace-public-evidence.json",encoding="utf-8")); assert d.get("real_apk_analyzed") and d.get("resources",{}).get("valid_zip"); print("Real upstream release analyzed; redacted aggregate report ready.")'
           echo "::group::Sanitized original-APK evidence (public metadata only)"
           python -m json.tool report/deadspace-public-evidence.json
+          echo "::endgroup::"
+          echo "::group::JSR-184 real APK header validation (aggregate only)"
+          python -m json.tool report/deadspace-m3g-evidence.json
           echo "::endgroup::"
 
       - name: Upload metadata report only
         uses: actions/upload-artifact@v4
         with:
           name: deadspace-port-audit
-          path: report/deadspace-public-evidence.json
+          path: |
+            report/deadspace-public-evidence.json
+            report/deadspace-m3g-evidence.json
           if-no-files-found: error
           retention-days: 7
