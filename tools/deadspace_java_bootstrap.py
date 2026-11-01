@@ -105,9 +105,6 @@ def survey(root: Path) -> dict:
     total_classes = 0
     truncated = 0
     for path in sorted(root.rglob("*.java")):
-        if len(relevant) >= 120:
-            truncated += 1
-            break
         try:
             if path.stat().st_size > 3 * 1024 * 1024:
                 truncated += 1
@@ -119,12 +116,20 @@ def survey(root: Path) -> dict:
         v = examine(src)
         if v:
             relevant.append(v)
+    # JNI and library-loading classes are much more relevant to portable
+    # bootstrap recovery than arbitrary background Runnable implementations.
+    relevant.sort(key=lambda x: (
+        -int(bool(x["native_declarations"] or x["library_names"])),
+        -sum(method["callback"] != "run" for method in x["callbacks"]),
+        x["class"]))
+    selected = relevant[:45]
     return {
         "schema": 1,
         "kind": "original-android-bootstrap-call-sequences",
         "java_sources_scanned": total_classes,
-        "relevant_classes": relevant,
-        "skipped_or_remaining": truncated,
+        "relevant_classes": selected,
+        "total_relevant_classes": len(relevant),
+        "skipped_or_remaining": truncated + max(0, len(relevant) - len(selected)),
         "limitations": (
             "Ordered public method calls and native declarations only. "
             "JADX is not byte-for-byte Java source; branch predicates, loops, "
