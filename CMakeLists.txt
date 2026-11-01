@@ -20,7 +20,11 @@ target_include_directories(ds_original_native_abi PUBLIC include)
 
 # Native executable must report missing original game code rather than run
 # a diagnostic pretending to be playable. It links the same recovered ABI.
+add_library(ds_port_game_paths STATIC src/deadspace_paths.cpp)
+target_include_directories(ds_port_game_paths PUBLIC include)
+
 add_executable(deadspace_native apps/deadspace_native.cpp)
+target_link_libraries(deadspace_native PRIVATE ds_port_game_paths)
 target_link_libraries(deadspace_native PRIVATE ds_original_native_abi)
 
 add_library(ds_port_input STATIC src/input.cpp)
@@ -120,6 +124,9 @@ endif()
 
 if(DS_ENABLE_TESTS)
     enable_testing()
+    add_executable(ds_deadspace_paths_tests tests/deadspace_paths_tests.cpp)
+    target_link_libraries(ds_deadspace_paths_tests PRIVATE ds_port_game_paths)
+    add_test(NAME ds_vita_research_native_game_paths COMMAND ds_deadspace_paths_tests)
     add_test(NAME ds_native_executable_help COMMAND deadspace_native --help)
     add_executable(ds_native_startup_gate_tests tests/native_startup_gate_tests.cpp)
     target_link_libraries(ds_native_startup_gate_tests PRIVATE ds_original_native_abi)

@@ -1,4 +1,5 @@
 #include "ds_port/original_frame_dispatch.hpp"
+#include "ds_port/deadspace_paths.hpp"
 #ifdef DS_NATIVE_APK_IMPORT
 #include "ds_port/asset_install.hpp"
 #endif
@@ -15,11 +16,13 @@ int main(int argc, char** argv) {
     bool readiness=false;
     std::string user_apk;
     std::string private_asset_dir;
+    std::string inspected_asset_dir;
     for(int i=1;i<argc;++i) {
         const std::string_view arg(argv[i]);
         if(arg=="--check-native" || arg=="--status") readiness=true;
         else if(arg=="--apk" && i+1<argc) user_apk=argv[++i];
         else if(arg=="--assets-dir" && i+1<argc) private_asset_dir=argv[++i];
+        else if(arg=="--inspect-assets" && i+1<argc) inspected_asset_dir=argv[++i];
         else if(arg=="--help") {
             std::cout<<"Dead Space Mobile native x86-64 desktop port (incomplete)\n"
                      <<"Usage: deadspace_native [--apk PATH --assets-dir NEW_EMPTY_DIR] [--status]\n"
@@ -31,9 +34,21 @@ int main(int argc, char** argv) {
             return kBadArguments;
         }
     }
+    if(!inspected_asset_dir.empty() && (!user_apk.empty() || !private_asset_dir.empty())) {
+        std::cerr<<"--inspect-assets cannot be combined with an APK import.\\n";
+        return kBadArguments;
+    }
     if(user_apk.empty()!=private_asset_dir.empty()) {
         std::cerr<<"To import your APK, supply both --apk and --assets-dir.\n";
         return kBadArguments;
+    }
+    if(!inspected_asset_dir.empty()) {
+        const auto layout=ds_port::inspect_deadspace_assets(inspected_asset_dir);
+        std::cout<<"Installed assets: "<<(layout.assets_found?"found":"missing")<<"\\n"
+                 <<"Published data: "<<(layout.published_found?"found":"missing")<<"\\n"
+                 <<"Xperia Play marker: "<<(layout.achievements_found?"present":"absent")<<"\\n"
+                 <<layout.diagnostic<<"\\n";
+        return layout.assets_found?0:7;
     }
     if(!user_apk.empty()) {
 #ifdef DS_NATIVE_APK_IMPORT
@@ -42,6 +57,8 @@ int main(int argc, char** argv) {
             std::cerr<<"Private asset import failed: "<<result.error<<"\n";
             return 4;
         }
+        const auto layout=ds_port::inspect_deadspace_assets(private_asset_dir);
+        std::cout<<"Asset layout: "<<layout.diagnostic<<"\\n";
         std::cout<<"Imported "<<result.assets_installed<<" private original game files ("
                  <<result.bytes_installed<<" bytes) into "<<private_asset_dir<<"\n"
                  <<"Original files remain local. This does not enable gameplay.\n";
