@@ -50,6 +50,8 @@ jobs:
                  "resource_lookup_0x286918",
                  "resource_parser_0x2863ec",
                  "resource_parser_owner_init_0x27a768",
+                 "resource_owner_embedded_init_0x27a4f0",
+                 "resource_owner_default_pool_0x271914",
                  "resource_parser_receiver_0x278018",
                  "resource_receiver_activation_0x278e58",
                  "resource_receiver_activation_tree_clear_0x273570",
