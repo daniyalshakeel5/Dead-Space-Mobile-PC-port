@@ -48,37 +48,47 @@ jobs:
           python tools/deadspace_audit.py --root . --output "$RUNNER_TEMP/private-audit.json"
           python -m tools.deadspace_public_report --audit "$RUNNER_TEMP/private-audit.json" --output report/deadspace-public-evidence.json
 
-      - name: Private APK analysis if an authorized URL is configured (owner push or manual)
+      - name: Inspect upstream release APK on GitHub runner (owner push or manual)
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         env:
           DS_APK_URL: ${{ secrets.DS_APK_URL }}
+          UPSTREAM_APK_URL: https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes/releases/download/dead_space_mobile_fixes/Deas.Space.Mobile.Fixes.apk
         shell: bash
         run: |
           set -euo pipefail
           trap 'rm -f "$RUNNER_TEMP/deadspace.apk" "$RUNNER_TEMP/private-audit.json" "$RUNNER_TEMP/private-resource-recon.json"' EXIT
+          # This is an already-published upstream asset, not an APK committed or
+          # redistributed by this port. Asset ID 158932873, 325769461 bytes.
           if [[ -n "${DS_APK_URL:-}" ]]; then
-            # No APK bytes, archive member names or original ELF symbols reach artifacts.
-            curl --fail --silent --show-error --location --retry 2 \
-              --max-time 480 --max-filesize 1073741824 \
-              --output "$RUNNER_TEMP/deadspace.apk" "$DS_APK_URL"
-            python tools/deadspace_audit.py --root . \
-              --apk "$RUNNER_TEMP/deadspace.apk" \
-              --output "$RUNNER_TEMP/private-audit.json"
-            python tools/deadspace_asset_recon.py \
-              --apk "$RUNNER_TEMP/deadspace.apk" \
-              --output "$RUNNER_TEMP/private-resource-recon.json"
-            python -m tools.deadspace_public_report \
-              --audit "$RUNNER_TEMP/private-audit.json" \
-              --recon "$RUNNER_TEMP/private-resource-recon.json" \
-              --output report/deadspace-public-evidence.json
+            source_url="$DS_APK_URL"
+            echo "Using privately configured APK source."
           else
-            echo "No DS_APK_URL: repository-only audit. Real APK was NOT analyzed."
-            python tools/deadspace_audit.py --root . \
-              --output "$RUNNER_TEMP/private-audit.json"
-            python -m tools.deadspace_public_report \
-              --audit "$RUNNER_TEMP/private-audit.json" \
-              --output report/deadspace-public-evidence.json
+            source_url="$UPSTREAM_APK_URL"
+            echo "Using original upstream GitHub release asset 158932873."
           fi
+          curl --fail --silent --show-error --location --retry 3 \
+            --retry-delay 3 --max-time 720 --max-filesize 1073741824 \
+            --output "$RUNNER_TEMP/deadspace.apk" "$source_url"
+          unset source_url
+          actual_size=$(wc -c < "$RUNNER_TEMP/deadspace.apk" | tr -d ' ')
+          if [[ "$actual_size" != "325769461" ]]; then
+            echo "::error::APK size mismatch (expected 325769461, received $actual_size); refusing analysis."
+            exit 1
+          fi
+          echo "Release size matches private Library asset metadata: $actual_size bytes. SHA-256 equivalence unverified."
+          # Never emit original file contents, ZIP member names, game-library
+          # symbols, private URLs or raw report JSON to public CI logs/artifacts.
+          python tools/deadspace_audit.py --root . \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output "$RUNNER_TEMP/private-audit.json"
+          python tools/deadspace_asset_recon.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output "$RUNNER_TEMP/private-resource-recon.json"
+          python -m tools.deadspace_public_report \
+            --audit "$RUNNER_TEMP/private-audit.json" \
+            --recon "$RUNNER_TEMP/private-resource-recon.json" \
+            --output report/deadspace-public-evidence.json
+          python -c 'import json; d=json.load(open("report/deadspace-public-evidence.json",encoding="utf-8")); assert d.get("real_apk_analyzed") and d.get("resources",{}).get("valid_zip"); print("Real upstream release analyzed; redacted aggregate report ready.")'
 
       - name: Upload metadata report only
         uses: actions/upload-artifact@v4
