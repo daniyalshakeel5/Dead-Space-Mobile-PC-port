@@ -81,7 +81,7 @@ int main() {
     auto disp=original_dispatch_owner_line_0x276d18(0x10,source,line);
     assert(disp.status==D::UnsupportedOriginalMode&&source.position==0);
     disp=original_dispatch_owner_line_0x276d18(8,source,line);
-    assert(disp.status==D::LineReady&&line.contents=="FIRST");
+    assert(disp.status==D::LineReadyAwaitingOwnerPostprocess&&line.contents=="FIRST");
     assert(disp.consumed_bytes==7);
     source.position=source.total_bytes+1;
     read=original_read_byte_line_0x276fe4(source,line);
