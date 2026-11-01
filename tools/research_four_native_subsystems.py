@@ -14,7 +14,7 @@ with zipfile.ZipFile(apk) as archive:
     names=archive.namelist()
     def scene(name):
         content=archive.read("assets/"+name)
-        assert content[:12]==b"\\xabIM-M3G\\xbb\\r\\n\\x1a\\n"
+        assert content[:12]==b"\xabIM-M3G\xbb\r\n\x1a\n"
         pos=21;end=len(content)-4;items=[]
         while pos<end:
             typ=content[pos];size=struct.unpack_from("<I",content,pos+1)[0];pos+=5
