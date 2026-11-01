@@ -68,7 +68,7 @@ def image_payload(data: bytes) -> tuple[bytes, int] | None:
     if length != len(second) - image_at - 5:
         return None
     payload = second[image_at + 5:]
-    absolute = 12 + len(first) + 13 + image_at + 5
+    absolute = 12 + len(first) + 13 + 9 + image_at + 5
     return payload, absolute
 
 
@@ -141,34 +141,35 @@ def analyze(apk: Path) -> dict:
     status = Counter()
     flags, sizes, palettes, offsets, dims = (Counter() for _ in range(5))
     candidate_count = 0
-    for info in ZipFile(apk).infolist():
-        if not info.filename.startswith("assets/") or not info.filename.lower().endswith(".m3g"):
-            continue
-        candidate_count += 1
-        if candidate_count > MAX_ENTRIES:
-            status["file_limit_reached"] += 1
-            break
-        if info.file_size > MAX_FILE:
-            status["file_too_large"] += 1
-            continue
-        with ZipFile(apk).open(info) as stream:
-            data = stream.read(MAX_FILE + 1)
-        if len(data) != info.file_size:
-            status["zip_size_mismatch"] += 1
-            continue
-        key, fields = read_116(data)
-        status[key] += 1
-        if fields:
-            flags[str(fields.get("flag", "not_read"))] += 1
-            dims["valid_power_of_two" if fields.get("w",0) > 0 and
-                 fields["w"] & (fields["w"]-1) == 0 and
-                 fields.get("h",0)>0 and fields["h"] & (fields["h"]-1) == 0
-                 else "other"] += 1
-            if "size_class" in fields:
-                sizes[fields["size_class"]] += 1
-                palettes["empty" if fields["palette_len"] == 0 else "nonempty"] += 1
-                offsets["exact_noesis_fixed_0x74" if fields[
-                    "matches_noesis_offset_0x74"] else "variable"] += 1
+    with ZipFile(apk) as archive:
+        for info in archive.infolist():
+            if not info.filename.startswith("assets/") or not info.filename.lower().endswith(".m3g"):
+                continue
+            candidate_count += 1
+            if candidate_count > MAX_ENTRIES:
+                status["file_limit_reached"] += 1
+                break
+            if info.file_size > MAX_FILE or info.file_size < 25 or info.flag_bits & 1:
+                status["file_size_or_flag_skipped"] += 1
+                continue
+            with archive.open(info) as stream:
+                data = stream.read(MAX_FILE + 1)
+            if len(data) != info.file_size:
+                status["zip_size_mismatch"] += 1
+                continue
+            key, fields = read_116(data)
+            status[key] += 1
+            if fields:
+                flags[str(fields.get("flag", "not_read"))] += 1
+                dims["valid_power_of_two" if fields.get("w",0) > 0 and
+                     fields["w"] & (fields["w"]-1) == 0 and
+                     fields.get("h",0)>0 and fields["h"] & (fields["h"]-1) == 0
+                     else "other"] += 1
+                if "size_class" in fields:
+                    sizes[fields["size_class"]] += 1
+                    palettes["empty" if fields["palette_len"] == 0 else "nonempty"] += 1
+                    offsets["exact_noesis_fixed_0x74" if fields[
+                        "matches_noesis_offset_0x74"] else "variable"] += 1
     return {
         "schema": 1, "kind": "public-format116-structure-evidence",
         "m3g_candidates": candidate_count,
