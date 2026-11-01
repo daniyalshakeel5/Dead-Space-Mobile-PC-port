@@ -97,6 +97,21 @@
   These tests do not prove real game-engine boot or scene rendering.
   [Latest detailed handoff](docs/HANDOFF_2026-11-01.md).
 
+## Immediate integration target: original splash → original main menu
+
+The next milestone is **not another standalone model viewer**.
+We are building the actual startup vertical slice: original EA splash,
+original Dead Space splash, the 3D main-menu scene with original UI
+graphics, and interactive menu input on native Windows/Linux.
+
+Real APK evidence confirms two proprietary IM-M3G splash image objects,
+a two-image frontend UI pack, **52 menu meshes (18,211 vertices,
+9,750 triangles) decoded by native C++**, and all four menu-environment
+textures decoded to 1024×1024 RGBA. Rendering is **not yet implemented**,
+and the proprietary splash/UI image payloads still require
+reverse-engineering. See [verified boot/menu milestone](docs/BOOT_MENU_VERTICAL_SLICE_2026-11-02.md)
+and [actual-APK boot asset run 41344354016](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41344354016).
+
 ## Goal
 
 A genuine native x86-64 Windows/Linux game rebuilt in portable C++17/CMake,
@@ -196,16 +211,18 @@ the assistant's local VM has been unstable during archive work.
 
 ## Next engineering gate
 
-Continue reconstructing the **actual original engine**, not additional
-standalone model viewers. The immediate dependency is the original
-provider-backed resource/parser bridge: finish original mode-8
-`0x276D18` postprocessing and the non-null `0x278E58` receiver
-object creation; connect original-asset text and resource entries
-to real native scene entities. Then implement native rendering
-of the game scene and the original input, frame scheduling,
-physics, animation and gameplay loop. Current binary still
-stops when an unrecovered original engine routine is needed.
-A passing resource test is not a playable game.
+**Original splash → original main menu**, using the recovered exact
+original-APK asset files and original game behavior. First decode the
+proprietary IM-M3G splash/UI Image2D payloads, then present the real
+images in a native SDL2/OpenGL window. Next extend the already-verified
+52-mesh main-menu decoder to original UVs, materials, transforms,
+camera and animation, draw the actual menu scene, and wire genuine
+interactive menu navigation/state changes. Only after original menu
+transitions work do we bring up campaign/level loading.
+
+The native engine still stops when unrecovered original startup
+routines are required. A resource-loaded diagnostic, generic splash,
+wireframe scene or screenshot is **not** a running game.
 
 ## Upstream attribution and licensing
 
