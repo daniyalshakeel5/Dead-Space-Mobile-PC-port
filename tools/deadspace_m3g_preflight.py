@@ -16,6 +16,7 @@ from zipfile import ZipFile
 import zlib
 
 MAGIC = bytes.fromhex("ab4a5352313834bb0d0a1a0a")
+IM_MAGIC = bytes.fromhex("ab494d2d4d3347bb0d0a1a0a")
 MAX_HEADER_SECTION = 1024 * 1024
 MAX_M3G_FILES = 10000
 
@@ -67,6 +68,7 @@ def analyze_archive(apk: Path) -> dict:
     external = 0
     examined = 0
     next_sections = Counter()
+    im_sections = Counter()
     try:
         with ZipFile(apk) as archive:
             for info in archive.infolist():
@@ -88,6 +90,38 @@ def analyze_archive(apk: Path) -> dict:
                 try:
                     with archive.open(info) as stream:
                         magic = stream.read(12)
+                        if magic == IM_MAGIC:
+                            results["ironmonkey_m3g_magic"] += 1
+                            section_hdr = stream.read(9)
+                            if len(section_hdr) != 9:
+                                im_sections["missing_first_section"] += 1
+                                continue
+                            scheme = section_hdr[0]
+                            total, uncompressed = struct.unpack_from(
+                                "<II", section_hdr, 1)
+                            im_sections["compression_" + str(scheme)
+                                        if scheme in (0, 1)
+                                        else "unknown_compression"] += 1
+                            if total < 13 or total > MAX_HEADER_SECTION:
+                                im_sections["invalid_section_length"] += 1
+                                continue
+                            section = section_hdr + stream.read(total - 9)
+                            if len(section) != total:
+                                im_sections["truncated_first_section"] += 1
+                                continue
+                            checksum = struct.unpack_from("<I", section, total - 4)[0]
+                            if zlib.adler32(section[:-4]) == checksum:
+                                im_sections["valid_adler32"] += 1
+                            else:
+                                im_sections["checksum_mismatch"] += 1
+                            if scheme == 0 and uncompressed == total - 13:
+                                im_sections["uncompressed_length_matches"] += 1
+                                if total >= 18:
+                                    im_sections["first_object_type_" +
+                                                str(section[9])] += 1
+                            else:
+                                im_sections["custom_or_compressed_length"] += 1
+                            continue
                         if magic != MAGIC:
                             results["non_jsr184_magic"] += 1
                             continue
@@ -158,6 +192,7 @@ def analyze_archive(apk: Path) -> dict:
         "validated_versions": dict(sorted(versions.items())),
         "validated_external_reference_headers": external,
         "second_section_probe_counts": dict(sorted(next_sections.items())),
+        "ironmonkey_first_section_counts": dict(sorted(im_sections.items())),
         "limitations": "First M3G header section only, not an entire scene or renderer. No game data included.",
     }
 
