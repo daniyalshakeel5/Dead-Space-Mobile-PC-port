@@ -59,9 +59,40 @@ original_execute_receiver_activation_0x278e58(
     if(!in.query_provider_mode_0x14(
         provider,0x14u,in.context,&original_mode))
         return fail(S::ProviderModeQueryRefused,root,provider);
-    if(original_mode==in.requested_mode)
-        return fail(S::ReachedUnreconstructedStreamInitialization,
+    if(original_mode==in.requested_mode) {
+        // ARM 0x278EE0..0x278F08 executes THREE constructors
+        // 0x27541C at stack offsets +0xAA0, +0x888, +0x670.
+        // Only proceed when caller provides a real mapped original
+        // scratch region and an independently initialized allocator.
+        if(!in.native_scratch)
+            return fail(S::ReachedUnreconstructedStreamInitialization,
+                        root,provider);
+        const auto& stack=*in.native_scratch;
+        if(!stack.mapped_stack ||
+           !stack.original_stack_arm_va ||
+           stack.original_stack_arm_va>0xffffffffu-0xcd4u ||
+           stack.accessible_bytes<0xcd4u ||
+           !stack.native_allocator_pool)
+            return fail(S::OriginalStringConstructionBlocked,root,provider);
+        constexpr std::uint32_t kStringOffsets[]={0xaa0u,0x888u,0x670u};
+        auto* mapped=static_cast<std::uint8_t*>(stack.mapped_stack);
+        for(const auto offset:kStringOffsets) {
+            const OriginalReceiverStringInputs0x27541c string{
+                stack.original_stack_arm_va+offset,
+                mapped+offset,stack.accessible_bytes-offset,
+                stack.native_allocator_pool
+            };
+            const auto constructed=original_construct_receiver_string_0x27541c(
+                string);
+            if(constructed.status!=OriginalReceiverStringStatus0x27541c::Completed)
+                return fail(S::OriginalStringConstructionBlocked,root,provider);
+        }
+        // The next original methods are provider vtable +0x2C,
+        // provider +0x28, and owner +0x70 (0x276D18).
+        // They must be genuinely rebuilt before activation succeeds.
+        return fail(S::ConstructedThreeStringsAwaitingProviderStreams,
                     root,provider);
+    }
 
     // ARM 0x278EC4..0x278ED4 invokes owner vtable +0x24,
     // resolved in the APK to 0x2733E8. Its fast rejection path is
