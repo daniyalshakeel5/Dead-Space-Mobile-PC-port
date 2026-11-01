@@ -106,6 +106,6 @@ int main() {
     CHECK(!input.current().active(Action::RotateWeapon));
     input.focus_gained();
 
-    std::cout << "All deterministic input checks passed.\\n";
+    std::cout << "All deterministic input checks passed.\n";
     return 0;
 }

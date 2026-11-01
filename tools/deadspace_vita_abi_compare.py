@@ -34,7 +34,7 @@ def summarize(elf_name: str, elf_bytes: bytes, jni_symbols: set[str]) -> dict:
     matched = sorted(set(VITA_REQUIRED_JNI) & jni_symbols)
     missing = sorted(set(VITA_REQUIRED_JNI) - jni_symbols)
     return {
-        "kind": "vite-loader-to-native-apk-abi-comparison",
+        "kind": "vita-loader-to-native-apk-abi-comparison",
         "schema": 1,
         "vita_repository": "https://github.com/v-atamanenko/deadspace-vita",
         "target_game_version": "Xperia Play 1.1.33 (ARMv6)",
