@@ -9,7 +9,9 @@ namespace {
 int calls=0;
 bool create(std::uint32_t method,std::uint32_t owner,
             void*,std::uint32_t* out) noexcept {
-    assert(method==0x27e560u&&owner==0x5000);
+    assert(method==0x27e560u);
+    const std::uint32_t owners[]={0x5000u,0x8001u,0x8002u};
+    assert(calls<3&&owner==owners[calls]);
     ++calls;*out=0x8000u+static_cast<unsigned>(calls);return true;
 }
 std::uint32_t get(const std::uint8_t* p) {
