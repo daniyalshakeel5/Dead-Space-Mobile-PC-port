@@ -13,6 +13,11 @@ on:
       - "tests/test_deadspace_public_report.py"
       - "tools/deadspace_m3g_preflight.py"
       - "tests/test_deadspace_m3g_preflight.py"
+      - "tools/deadspace_m3g_native_verify.py"
+      - "include/ds_port/m3g_container.hpp"
+      - "src/m3g_container.cpp"
+      - "apps/m3g_probe.cpp"
+      - "tests/m3g_container_tests.cpp"
       - "docs/private-apk-analysis.trigger"
       - ".github/workflows/deadspace-research.yml"
   pull_request:
@@ -25,6 +30,11 @@ on:
       - "tests/test_deadspace_public_report.py"
       - "tools/deadspace_m3g_preflight.py"
       - "tests/test_deadspace_m3g_preflight.py"
+      - "tools/deadspace_m3g_native_verify.py"
+      - "include/ds_port/m3g_container.hpp"
+      - "src/m3g_container.cpp"
+      - "apps/m3g_probe.cpp"
+      - "tests/m3g_container_tests.cpp"
       - "docs/private-apk-analysis.trigger"
       - ".github/workflows/deadspace-research.yml"
   workflow_dispatch:
@@ -95,12 +105,25 @@ jobs:
           python tools/deadspace_m3g_preflight.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
             --output report/deadspace-m3g-evidence.json
+          cmake -S . -B "$RUNNER_TEMP/m3g-build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DDS_BUILD_INPUT_PROBE=OFF -DDS_BUILD_M3G_READER=ON \
+            -DDS_ENABLE_TESTS=OFF
+          cmake --build "$RUNNER_TEMP/m3g-build" \
+            --config Release --target ds_m3g_probe --parallel 2
+          python tools/deadspace_m3g_native_verify.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --native-probe "$RUNNER_TEMP/m3g-build/ds_m3g_probe" \
+            --output report/deadspace-m3g-native-evidence.json
           python -c 'import json; d=json.load(open("report/deadspace-public-evidence.json",encoding="utf-8")); assert d.get("real_apk_analyzed") and d.get("resources",{}).get("valid_zip"); print("Real upstream release analyzed; redacted aggregate report ready.")'
           echo "::group::Sanitized original-APK evidence (public metadata only)"
           python -m json.tool report/deadspace-public-evidence.json
           echo "::endgroup::"
           echo "::group::JSR-184 real APK header validation (aggregate only)"
           python -m json.tool report/deadspace-m3g-evidence.json
+          echo "::endgroup::"
+          echo "::group::Native JSR-184 complete container evidence (aggregate only)"
+          python -m json.tool report/deadspace-m3g-native-evidence.json
           echo "::endgroup::"
 
       - name: Upload metadata report only
@@ -110,5 +133,6 @@ jobs:
           path: |
             report/deadspace-public-evidence.json
             report/deadspace-m3g-evidence.json
+            report/deadspace-m3g-native-evidence.json
           if-no-files-found: error
           retention-days: 7
