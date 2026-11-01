@@ -158,6 +158,8 @@ class ArmWindowTests(unittest.TestCase):
                 24:("subs","r0, r0, #1"),28:("movne","r0, #1"),
                 32:("pop","{r4, pc}")})
         }
+        windows["record_allocator_virtual_call_0x281d54"]=(
+            windows["stage_zero_followup_target_0x281d54"])
         self.assertTrue(all(proven_original_code_helpers(windows).values()))
         # Mutation-based ARM instruction proof: any offset, register or
         # return opcode change invalidates this complete recovered routine.
@@ -172,6 +174,18 @@ class ArmWindowTests(unittest.TestCase):
             self.assertFalse(proven_original_code_helpers(windows)[result_key])
             stores[index]["args"]=old
         self.assertTrue(proven_original_code_helpers(windows)[result_key])
+        abi_key="stage_zero_0x281d54_virtual_allocator_call_abi"
+        self.assertTrue(proven_original_code_helpers(windows)[abi_key])
+        allocator_abi=windows["record_allocator_virtual_call_0x281d54"]["instructions"]
+        for off,bad in ((20,"sp, {r3}"),
+                        (32,"r1, #0x24"),
+                        (36,"r3, #0"),
+                        (48,"pc, [ip, #0x10]")):
+            obj=next(v for v in allocator_abi if v["offset"]==off)
+            before=obj["args"]
+            obj["args"]=bad
+            self.assertFalse(proven_original_code_helpers(windows)[abi_key])
+            obj["args"]=before
         post_key="stage_zero_0x281d54_allocator_post_return_and_global_store"
         self.assertTrue(proven_original_code_helpers(windows)[post_key])
         allocator=windows["stage_zero_followup_target_0x281d54"]["instructions"]
