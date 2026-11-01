@@ -25,13 +25,22 @@ public class GhidraAllocatorTargets extends GhidraScript {
         if (fn == null) return "{\"elf_entry\":\"0x"+Long.toHexString(elfVA)+"\",\"found\":false}";
         List<String> calls = new ArrayList<>();
         List<String> indirects = new ArrayList<>();
+        List<String> virtualCallSites = new ArrayList<>();
         InstructionIterator it = currentProgram.getListing().getInstructions(fn.getBody(), true);
         int instructions = 0;
         while (it.hasNext() && instructions++ < 512) {
             Instruction inst = it.next();
             String mnemonic = inst.getMnemonicString().toLowerCase();
-            if (mnemonic.startsWith("ldr") && inst.getDefaultOperandRepresentation(0).equalsIgnoreCase("pc"))
-                indirects.add("\"0x"+Long.toHexString(inst.getAddress().getOffset()-BIAS)+"\"");
+            String site = "\"0x"+Long.toHexString(inst.getAddress().getOffset()-BIAS)+"\"";
+            if (mnemonic.startsWith("ldr") &&
+                inst.getDefaultOperandRepresentation(0).equalsIgnoreCase("pc")) {
+                indirects.add(site);
+                virtualCallSites.add(site);
+            } else if (mnemonic.startsWith("blx") || mnemonic.startsWith("bx")) {
+                // Branch-through-register candidate only. Do not infer its target.
+                if (!inst.getDefaultOperandRepresentation(0).equalsIgnoreCase("lr"))
+                    virtualCallSites.add(site);
+            }
             for (Reference ref : inst.getReferencesFrom()) {
                 if (!ref.getReferenceType().isCall()) continue;
                 Address target = ref.getToAddress();
@@ -41,11 +50,13 @@ public class GhidraAllocatorTargets extends GhidraScript {
             }
         }
         Collections.sort(calls);
+        Collections.sort(virtualCallSites);
         return "{\"elf_entry\":\"0x"+Long.toHexString(elfVA)+
             "\",\"found\":true,\"ghidra_function_start\":"+jsonAddress(fn.getEntryPoint())+
             ",\"instruction_count_bounded\":"+instructions+
             ",\"direct_call_sites\":["+String.join(",",calls)+
-            "],\"pc_destination_load_sites\":["+String.join(",",indirects)+"]}";
+            "],\"pc_destination_load_sites\":["+String.join(",",indirects)+
+            "],\"indirect_branch_candidate_sites\":["+String.join(",",virtualCallSites)+"]}";
     }
     @Override public void run() throws Exception {
         String[] args=getScriptArgs();
