@@ -63,6 +63,8 @@ jobs:
                  "resource_embedded_provider_query_0x2763ac",
                  "resource_embedded_provider_seek_0x273034",
                  "resource_embedded_provider_read_0x2716f8",
+                 "resource_embedded_native_read_wrapper_0x35554",
+                 "resource_embedded_native_seek_wrapper_0x35350",
                  "resource_embedded_memory_read_0x2714c4",
                  "resource_embedded_read_state_init_0x26c26c",
                  "resource_embedded_read_state_end_0x26c2f4",
