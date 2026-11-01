@@ -125,11 +125,11 @@ OriginalActiveFramePrefixResult original_execute_active_frame_prefix(
 // The resolver must re-read the host equivalent of [shared_global+0x68]
 // EVERY time; the original can change the backend in the first call.
 using OriginalFrameBackendResolver = void* (*)(void* shared_global) noexcept;
-using OriginalFrameEventMethod = void (*)(
-    void* backend, std::uint32_t event_code,
+using OriginalFrameVtableMethod0x20 = void (*)(
+    void* backend, std::uint32_t argument_14,
     std::uint32_t zero_a, std::uint32_t zero_b,
     std::uint32_t stack_zero) noexcept;
-using OriginalFrameFollowupMethod = void (*)(void* backend) noexcept;
+using OriginalFrameVtableMethod0x38 = void (*)(void* backend) noexcept;
 enum class OriginalNonzeroVirtualSequenceResult : std::uint8_t {
     MissingOriginalTargets,
     FirstBackendUnavailable,
@@ -139,8 +139,8 @@ enum class OriginalNonzeroVirtualSequenceResult : std::uint8_t {
 OriginalNonzeroVirtualSequenceResult original_execute_nonzero_virtual_sequence(
     void* original_shared_global,
     OriginalFrameBackendResolver original_backend_resolver,
-    OriginalFrameEventMethod original_event_virtual_0x20,
-    OriginalFrameFollowupMethod original_followup_virtual_0x38) noexcept;
+    OriginalFrameVtableMethod0x20 original_slot_0x20_method,
+    OriginalFrameVtableMethod0x38 original_slot_0x38_method) noexcept;
 
 // Same verified stage-one dispatch as original_execute_active_frame_prefix,
 // with the additional two ARM-verified nonzero-path virtual calls when
@@ -152,7 +152,7 @@ OriginalActiveFramePrefixResult original_execute_active_frame_verified_branches(
     OriginalVirtualFirstMethod original_active_virtual_method,
     void** context_after_state_two_postincrement,
     OriginalFrameBackendResolver original_backend_resolver,
-    OriginalFrameEventMethod original_event_virtual_0x20,
-    OriginalFrameFollowupMethod original_followup_virtual_0x38) noexcept;
+    OriginalFrameVtableMethod0x20 original_slot_0x20_method,
+    OriginalFrameVtableMethod0x38 original_slot_0x38_method) noexcept;
 
 } // namespace ds_port::original_runtime
