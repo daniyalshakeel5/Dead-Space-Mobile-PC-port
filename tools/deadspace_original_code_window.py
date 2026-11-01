@@ -69,6 +69,8 @@ WINDOWS = {
     "resource_embedded_provider_query_0x2763ac": (0x002763ac, 576),
     "resource_embedded_provider_seek_0x273034": (0x00273034, 512),
     "resource_embedded_provider_read_0x2716f8": (0x002716f8, 384),
+    "resource_embedded_native_read_wrapper_0x35554": (0x00035554, 96),
+    "resource_embedded_native_seek_wrapper_0x35350": (0x00035350, 96),
     "resource_embedded_memory_read_0x2714c4": (0x002714c4, 640),
     "resource_embedded_read_state_init_0x26c26c": (0x0026c26c, 256),
     "resource_embedded_read_state_end_0x26c2f4": (0x0026c2f4, 256),
