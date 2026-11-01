@@ -17,6 +17,7 @@ MAGIC_CATEGORIES = {
     "ogg", "flac", "id3", "wav", "webp", "riff-other", "gif", "bmp",
     "zip", "gzip", "sqlite", "elf", "dex", "unityfs", "glb", "bink",
     "xml-text", "possible-json-text", "unrecognized",
+    "m3g_jsr184", "possible-zlib",
 }
 GROUPS = {"assets", "res", "lib", "META-INF", "other"}
 METRIC_KEYS = ("count", "declared_bytes")
@@ -75,6 +76,19 @@ def publish(audit: dict, recon: dict | None = None) -> dict:
                 key: counts_only(value)
                 for key, value in (recon.get("magic_stats") or {}).items()
                 if key in MAGIC_CATEGORIES
+            },
+            "extension_magic_stats": {
+                ext: {kind: counts_only(values)
+                      for kind, values in evidence.items()
+                      if kind in MAGIC_CATEGORIES}
+                for ext, evidence in (recon.get("extension_magic_stats") or {}).items()
+                if ext in {".m3g", ".sps", ".sph", ".sb", ".bin"}
+                and isinstance(evidence, dict)
+            },
+            "sprite_stem_stats": {
+                key: val for key, val in (recon.get("sprite_stem_stats") or {}).items()
+                if key in {"sph_count", "sps_count", "paired_count"}
+                and type(val) is int and val >= 0
             },
             # Aggregate extension labels only. Never publish complete paths or
             # unique filenames. Allow ordinary short suffixes and [none].
