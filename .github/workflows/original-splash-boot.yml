@@ -91,6 +91,8 @@ jobs:
           assert inventory["object_types"]["9"]==57
           assert len(inventory["camera_object_ids"])==1
           assert inventory["group_count"]==57
+          assert inventory["verified_group_tables"]>=56
+          assert inventory["verified_group_child_links"]>=56
           assert isinstance(inventory["candidate_reference_count"], int)
           assert isinstance(inventory["candidate_offsets"], dict)
           assert len(inventory["scene_node_payload_sizes"])==58
