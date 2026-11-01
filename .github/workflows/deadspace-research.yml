@@ -194,6 +194,8 @@ jobs:
               print("ARM_ALLOCATOR_CHAIN",name,
                     json.dumps(report["windows"][name]["instructions"][:32],
                                separators=(",",":")))
+          print("ORIGINAL_ENGINE_REGISTER_HELPER",
+                json.dumps(report["windows"]["repeated_initializer_callee_0x284178"]["instructions"][:42],separators=(",",":")))
           for name in ("post_setup_direct_callee_0x27fd7c",
                        "post_setup_direct_callee_0x2803e4"):
               print("ORIGINAL_ENGINE_INIT_CALL",
