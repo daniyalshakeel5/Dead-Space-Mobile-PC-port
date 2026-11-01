@@ -2,6 +2,8 @@
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include "ds_port/input.hpp"
+#include "ds_port/timing.hpp"
+#include <chrono>
 
 #include <cstdint>
 #include <sstream>
@@ -57,9 +59,15 @@ int main(int, char**) {
     }
 
     Input input;
+    FixedStepClock clock(60, 8); // Host diagnostic only; not original game timing.
+    auto last_time = std::chrono::steady_clock::now();
     bool running = true;
     bool capture = false;
     while (running) {
+        const auto now = std::chrono::steady_clock::now();
+        const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(now - last_time);
+        last_time = now;
+        const TickBatch tick_batch = clock.advance(elapsed);
         input.begin_frame();
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -113,6 +121,9 @@ int main(int, char**) {
                 << " melee " << frame.active(Action::Melee)
                 << " | scroll " << frame.weapon_scroll
                 << " | slot " << frame.weapon_slot
+                << " | 60Hz host ticks " << clock.total_updates()
+                << " (skipped " << clock.total_dropped_updates() << ")"
+                << " | frame updates " << tick_batch.updates
                 << " | F1 capture / F10 quit | NO GAME RUNTIME";
         const std::string title = caption.str();
         SDL_SetWindowTitle(window, title.c_str());
