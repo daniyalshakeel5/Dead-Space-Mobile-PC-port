@@ -11,10 +11,12 @@
 // prints metadata counts; never writes original content or decodes models.
 int main(int argc, char** argv) {
     if (argc != 2 && argc != 3) {
-        std::cerr << "usage: ds_m3g_probe <local .m3g file> [--diagnostic]\n";
+        std::cerr << "usage: ds_m3g_probe <local .m3g file> [--diagnostic|--decode-image]\n";
         return 2;
     }
-    const bool diagnostic = argc == 3 && std::string(argv[2]) == "--diagnostic";
+    const bool image_check = argc == 3 && std::string(argv[2]) == "--decode-image";
+    const bool diagnostic = argc == 3 &&
+        (std::string(argv[2]) == "--diagnostic" || image_check);
     if (argc == 3 && !diagnostic) return 2;
     std::ifstream file(argv[1], std::ios::binary | std::ios::ate);
     if (!file) {
@@ -67,6 +69,13 @@ int main(int argc, char** argv) {
         first = false;
         std::cout << "\"" << (i + 96) << "\":" << result.image2d_format_counts[i];
     }
-    std::cout << "}}\n";
+    std::cout << "}";
+    if (image_check) {
+        const auto image = ds_port::decode_m3g_rgba_image(data.data(), data.size());
+        std::cout << ",\"rgba_decoded\":" << (image.decoded ? "true" : "false")
+                  << ",\"rgba_width\":" << image.width
+                  << ",\"rgba_height\":" << image.height;
+    }
+    std::cout << "}\n";
     return 0; // Invalid source content is data for the research tally.
 }
