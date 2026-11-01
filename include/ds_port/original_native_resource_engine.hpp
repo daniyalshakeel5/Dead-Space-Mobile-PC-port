@@ -3,6 +3,7 @@
 #include "ds_port/original_receiver_mode.hpp"
 #include "ds_port/original_receiver_activation.hpp"
 #include "ds_port/original_receiver_prefix.hpp"
+#include "ds_port/original_resource_owner_bind.hpp"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -20,12 +21,15 @@ namespace ds_port::original_runtime {
 // Subsequent original 0x278778 binding is not yet reconstructed.
 enum class OriginalLoaderPrefixStatus0x286918:std::uint8_t {
     InvalidLoaderContext,ConstructorBlocked,ModeBlocked,
-    ReachedUnreconstructedOriginalBind
+    ReachedUnreconstructedOriginalBind,
+    ReachedOriginalNullProviderExit,OriginalBindingBlocked
 };
 struct OriginalLoaderPrefixResult0x286918 {
     OriginalLoaderPrefixStatus0x286918 status;
     OriginalOwnerConstructorStatus0x27a768 constructor_status;
     OriginalReceiverModeStatus0x26c410 mode_status;
+    OriginalOwnerBindStatus0x278778 binding_status=
+        OriginalOwnerBindStatus0x278778::InvalidOriginalOwner;
 };
 class OriginalNativeResourceEngine {
 public:
@@ -37,6 +41,9 @@ public:
         std::size_t accessible_original_loader_bytes,
         std::uint32_t original_provider_arm_va,
         const OriginalOwnerConstructorInputs0x27a768& services) noexcept;
+    OriginalOwnerBindResult0x278778 bind_original_owner_0x278778(
+        OriginalActivationTreeClear release_tree=nullptr,
+        void* context=nullptr) noexcept;
     OriginalReceiverModeResult0x26c410 set_mode(
         std::uint32_t opcode,std::uint32_t value,
         OriginalReceiverDisableReset original_reset=nullptr,
