@@ -107,17 +107,13 @@ OriginalStartupSecondTailStatus original_execute_stage_zero_tail_0x280580(
     OriginalAllocatorReturn object34{};
     if(!x.allocate(0x34u,kStartupAllocate34Descriptor,&object34))
         return x.status;
-    const auto base_provider=in.verified_singleton_memory_0x27e560
-        ? original_singleton_base_provider_0x27e560
-        : in.native_singleton_0x27e560
-          ? original_static_singleton_base_provider
-          : in.original_base_0x27e560;
-    void* base_context=in.verified_singleton_memory_0x27e560
-        ? const_cast<OriginalSingletonMemory*>(
-            in.verified_singleton_memory_0x27e560)
-        : in.native_singleton_0x27e560
-          ? const_cast<OriginalSingletonInputs*>(in.native_singleton_0x27e560)
-          : in.callback_context;
+    // Exactly one original 0x27E560 implementation remains, with
+    // verified GOT binding through original_bind_static_singleton_from_got.
+    const auto base_provider=in.native_singleton_0x27e560
+        ? original_static_singleton_base_provider:in.original_base_0x27e560;
+    void* base_context=in.native_singleton_0x27e560
+        ? const_cast<OriginalSingletonInputs*>(in.native_singleton_0x27e560)
+        : in.callback_context;
     if(!base_provider)
         return OriginalStartupSecondTailStatus::MissingOriginalBaseConstructor;
     if(!original_construct_object34_0x287a94(

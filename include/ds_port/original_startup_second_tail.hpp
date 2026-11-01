@@ -5,7 +5,6 @@
 #include "ds_port/original_startup_object34.hpp"
 #include "ds_port/original_startup_object58.hpp"
 #include "ds_port/original_static_singleton.hpp"
-#include "ds_port/original_startup_singleton.hpp"
 #include <cstddef>
 #include <cstdint>
 namespace ds_port::original_runtime {
@@ -38,9 +37,6 @@ struct OriginalStartupSecondTailInputs {
     // Use real native 0x27E560 singleton in both startup constructors.
     // Existing callback retained for older tests and unported callers.
     const OriginalSingletonInputs* native_singleton_0x27e560=nullptr;
-    // Preferred verified BSS/GOT-backed original singleton implementation,
-    // including exact __aeabi_atexit registration ABI.
-    const OriginalSingletonMemory* verified_singleton_memory_0x27e560=nullptr;
 };
 enum class OriginalStartupSecondTailStatus:std::uint8_t {
     InvalidOriginalContext,
