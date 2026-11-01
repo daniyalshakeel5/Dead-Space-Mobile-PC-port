@@ -621,6 +621,12 @@ def observe(apk: Path) -> dict:
     input_allocator_slot,input_queue_slot=input_slots["pointer"]
     if input_allocator_slot==input_queue_slot:
         raise ValueError("Input allocator and event queue slots unexpectedly alias")
+    # Original 0x2841F4 / 0x2841F8: game character mapping table
+    # loaded through the real-APK GOT pointer, not ASCII assumptions.
+    register_character_map_got=resolve_arm_got_slot_from_pc_index(
+        data,sections,0x002841f4,0x278,0x002841f8)
+    if not register_character_map_got:
+        raise ValueError("Registration character mapping GOT resolves to null")
     input_ready_slot=resolve_arm_got_slot_from_pc_index(
         data,sections,0x0027e97c,0x10,0x0027e980)
     frame_global=resolve_arm_literal_based_global(
@@ -917,6 +923,13 @@ def observe(apk: Path) -> dict:
             "allocator_owner_pointer_slot_va":f"0x{input_allocator_slot:08x}",
             "queue_owner_pointer_slot_va":f"0x{input_queue_slot:08x}",
             "verified_by_three_jni_wrappers":True,
+        },
+        "original_registration_character_map":{
+            "function_va":"0x00284178",
+            "table_got_slot_va":f"0x{register_character_map_got:08x}",
+            "character_index_scale":2,
+            "signed_16bit_table_byte_offset":2,
+            "verified":True,
         },
         "original_startup_global_service_0x37000c":{
             "entry_va":"0x0036fd38",
