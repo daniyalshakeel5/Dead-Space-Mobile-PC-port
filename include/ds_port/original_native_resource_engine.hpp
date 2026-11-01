@@ -22,7 +22,8 @@ namespace ds_port::original_runtime {
 enum class OriginalLoaderPrefixStatus0x286918:std::uint8_t {
     InvalidLoaderContext,ConstructorBlocked,ModeBlocked,
     ReachedUnreconstructedOriginalBind,
-    ReachedOriginalNullProviderExit,OriginalBindingBlocked
+    ReachedOriginalNullProviderExit,ReachedOriginalProviderRejectedExit,
+    OriginalBindingBlocked
 };
 struct OriginalLoaderPrefixResult0x286918 {
     OriginalLoaderPrefixStatus0x286918 status;
@@ -43,7 +44,8 @@ public:
         const OriginalOwnerConstructorInputs0x27a768& services) noexcept;
     OriginalOwnerBindResult0x278778 bind_original_owner_0x278778(
         OriginalActivationTreeClear release_tree=nullptr,
-        void* context=nullptr) noexcept;
+        void* context=nullptr,
+        OriginalActivationProviderMode14 query_provider_mode=nullptr) noexcept;
     OriginalReceiverModeResult0x26c410 set_mode(
         std::uint32_t opcode,std::uint32_t value,
         OriginalReceiverDisableReset original_reset=nullptr,
