@@ -56,6 +56,31 @@ int main(){
     assert(trace.acquires==1&&trace.releases==1&&trace.registrations==1);
     assert(!original_static_singleton_base_provider(
         0x0027e564u,0,&in,&from58));
+    // Guard and GOT source addresses come from actual game ELF, not
+    // arbitrary ARM VAs supplied by a test factory.
+    std::array<std::uint8_t,4> field_got{},table_got{},dtor_got{},dso_got{},source{};
+    const auto put=[](std::uint8_t* p,std::uint32_t v){
+        for(unsigned i=0;i<4;++i)p[i]=std::uint8_t(v>>(8*i));
+    };
+    put(field_got.data(),0x8800);put(table_got.data(),0x4000);
+    put(dtor_got.data(),0x8900);put(dso_got.data(),0x8a00);
+    put(source.data(),0x5000);
+    auto mapped=in;mapped.guard_arm_va=kVerifiedSingletonGuardVA;
+    mapped.original_object_vtable_arm_va=0;
+    mapped.original_component_vtable_arm_va=0;
+    OriginalSingletonOriginalGOT got{
+        field_got.data(),table_got.data(),dtor_got.data(),dso_got.data(),
+        0x8800,source.data()
+    };
+    OriginalSingletonInputs verified{};
+    assert(original_bind_static_singleton_from_got(mapped,got,&verified));
+    assert(verified.guard_arm_va==kVerifiedSingletonGuardVA);
+    assert(verified.original_object_vtable_arm_va==0x4000);
+    assert(verified.original_component_vtable_arm_va==0x5000);
+    put(table_got.data(),0);
+    assert(!original_bind_static_singleton_from_got(mapped,got,&verified));
+    mapped.guard_arm_va=0x9999;
+    assert(!original_bind_static_singleton_from_got(mapped,got,&verified));
     in.mapped_bytes=0x17;
     assert(original_initialize_static_0x27e560(in).status==
            OriginalSingletonStatus::InvalidMemory);

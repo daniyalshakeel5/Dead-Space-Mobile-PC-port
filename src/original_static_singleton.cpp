@@ -9,6 +9,32 @@ void put32(std::uint8_t* p,std::uint32_t v) noexcept {
     for(unsigned i=0;i<4;++i)p[i]=std::uint8_t(v>>(8*i));
 }
 }
+bool original_bind_static_singleton_from_got(
+    const OriginalSingletonInputs& in,
+    const OriginalSingletonOriginalGOT& got,
+    OriginalSingletonInputs* output) noexcept {
+    if(!output || in.guard_arm_va!=kVerifiedSingletonGuardVA ||
+       !in.mapped_guard_and_object || in.mapped_bytes<0x18 ||
+       !got.field_source_pointer_slot || !got.object_table_pointer_slot ||
+       !got.destructor_pointer_slot || !got.dso_pointer_slot ||
+       !got.mapped_field_source_word || !got.original_field_source_arm_va ||
+       read32(static_cast<const std::uint8_t*>(got.field_source_pointer_slot))
+          !=got.original_field_source_arm_va)
+        return false;
+    const auto table_base=read32(
+        static_cast<const std::uint8_t*>(got.object_table_pointer_slot));
+    const auto component=read32(
+        static_cast<const std::uint8_t*>(got.mapped_field_source_word));
+    if(!table_base || table_base>0xfffffff7u || !component ||
+       !read32(static_cast<const std::uint8_t*>(got.destructor_pointer_slot)) ||
+       !read32(static_cast<const std::uint8_t*>(got.dso_pointer_slot)))
+        return false;
+    OriginalSingletonInputs resolved=in;
+    resolved.original_object_vtable_arm_va=table_base;
+    resolved.original_component_vtable_arm_va=component;
+    *output=resolved;
+    return true;
+}
 OriginalSingletonResult original_initialize_static_0x27e560(
     const OriginalSingletonInputs& in) noexcept {
     const auto fail=[](OriginalSingletonStatus status) noexcept {
