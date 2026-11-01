@@ -60,6 +60,79 @@ def scan_im_objects(blob:bytes)->dict:
         "selected_fields":[item for item in records
             if item["type"]==10][:6] or records[:6]}
 
+def menu_vertex_binding_evidence(blob:bytes)->dict:
+    """Aggregate original VertexBuffer/UV/Texture/Appearance relationships.
+    All records are numeric metadata only; no game asset bytes released.
+    """
+    magic=bytes.fromhex("ab494d2d4d3347bb0d0a1a0a")
+    if len(blob)<30 or blob[:12]!=magic:return {"recognized":False}
+    objects=[]
+    at=21
+    while at<len(blob)-4 and len(objects)<20000:
+        if len(blob)-4-at<5:return {"framing_ok":False}
+        typ=blob[at];n=struct.unpack_from("<I",blob,at+1)[0]
+        if n>len(blob)-4-at-5:return {"framing_ok":False}
+        objects.append((typ,blob[at+5:at+5+n]))
+        at+=5+n
+    if at!=len(blob)-4:return {"framing_ok":False}
+    lengths={}
+    bindings=[]
+    arrays={}
+    for ix,(typ,data) in enumerate(objects,1):
+        if typ==20 and len(data)>=17:
+            arrays[ix]={"component_size":data[12],
+                        "dimensions":data[13],
+                        "encoding":data[14],
+                        "vertex_count":struct.unpack_from("<H",data,15)[0],
+                        "data_size":len(data)}
+        if typ==21:
+            lengths[len(data)]=lengths.get(len(data),0)+1
+            if len(data)>=48:
+                texnum=struct.unpack_from("<I",data,44)[0]
+                refs=[]
+                if texnum<=8 and len(data)>=48+20*texnum:
+                    for slot in range(texnum):
+                        array_id=struct.unpack_from("<I",data,48+slot*20)[0]
+                        refs.append({
+                            "array_valid":array_id in arrays or
+                                (1<=array_id<=len(objects) and
+                                 objects[array_id-1][0]==20),
+                            "layout":arrays.get(array_id,{}),
+                            "array_id":array_id,
+                        })
+                bindings.append({
+                    "vertexbuffer_id":ix,
+                    "source_bytes":len(data),
+                    "texcoord_sets":texnum,
+                    "position_array":struct.unpack_from("<I",data,16)[0],
+                    "normal_array":struct.unpack_from("<I",data,36)[0],
+                    "color_array":struct.unpack_from("<I",data,40)[0],
+                    "uv_refs":refs,
+                })
+    texcoord_counts={}
+    uv_formats={}
+    uv_valid=0
+    for v in bindings:
+        n=v["texcoord_sets"]
+        texcoord_counts[str(n)]=texcoord_counts.get(str(n),0)+1
+        for a in v["uv_refs"]:
+            if a["array_valid"]:
+                uv_valid+=1
+                f=a["layout"]
+                key=str((f.get("component_size"),f.get("dimensions"),
+                         f.get("encoding")))
+                uv_formats[key]=uv_formats.get(key,0)+1
+    scene_types={}
+    for typ,data in objects:
+        if typ in (3,5,9,17,19):
+            scene_types[str(typ)]=scene_types.get(str(typ),0)+1
+    return {"framing_ok":True,"vertexbuffer_lengths":lengths,
+        "texture_coordinate_sets":texcoord_counts,
+        "valid_coordinate_array_refs":uv_valid,
+        "texture_coordinate_formats":uv_formats,
+        "scene_object_types":scene_types,
+        "first_five_vertex_bindings":bindings[:5]}
+
 def inspect(apk:Path,probe:Path,im_probe:Path|None=None,ui_probe:Path|None=None)->dict:
     results=[]
     with ZipFile(apk) as archive, tempfile.TemporaryDirectory(prefix="ds-boot-") as root:
@@ -108,6 +181,8 @@ def inspect(apk:Path,probe:Path,im_probe:Path|None=None,ui_probe:Path|None=None)
             if path=="assets/published/models/main_menu.m3g" and im_probe:
                 checked=subprocess.run([str(im_probe),str(target)],
                     capture_output=True,text=True,timeout=60,check=False)
+                im["vertex_bindings"]=menu_vertex_binding_evidence(
+                    target.read_bytes())
                 im["native_mesh_supported"]=checked.returncode==0
                 if checked.returncode==0:
                     im["native_mesh_report"]=json.loads(checked.stdout)
