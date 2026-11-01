@@ -23,7 +23,7 @@ bool post_bridge(std::uint32_t result,void* ctx) noexcept {
         kOriginal27fa74FirstArgVA,kOriginal27fa74SecondArgVA,
         in.call_original,in.callback_context
     };
-    b.post_status=original_postprocess_0x288688_native_constructor(post);
+    b.post_status=original_postprocess_0x288688_native_constructor(post,in.embedded_service);
     return b.post_status==OriginalPostprocessStatus::Completed;
 }
 }

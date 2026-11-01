@@ -33,7 +33,8 @@ OriginalPostprocessStatus original_postprocess_0x288688_prefix(
     return OriginalPostprocessStatus::Completed;
 }
 OriginalPostprocessStatus original_postprocess_0x288688_native_constructor(
-    const OriginalPostprocessInputs& in) noexcept {
+    const OriginalPostprocessInputs& in,
+    const OriginalEmbeddedService* original_embedded_service) noexcept {
     if(!in.original_object_arm_address || !in.mapped_object_bytes ||
        in.accessible_object_bytes<0x24 ||
        in.initial_vtable_arm_address!=kOriginal288688OverrideVtableVA ||
@@ -42,7 +43,8 @@ OriginalPostprocessStatus original_postprocess_0x288688_native_constructor(
        in.third_setup_arg_arm_address!=kOriginal27fa74SecondArgVA ||
        in.original_object_arm_address>0xffffffffu-0x14u)
         return OriginalPostprocessStatus::InvalidMemory;
-    if(!in.call_original) return OriginalPostprocessStatus::MissingOriginalCallees;
+    if(!in.call_original || !original_embedded_service)
+        return OriginalPostprocessStatus::MissingOriginalCallees;
     // 0x288690 BL 0x2828AC: complete original constructor, now native.
     if(!original_construct_0x2828ac(in.mapped_object_bytes,
         in.accessible_object_bytes,kOriginal2828acConstructorVtableVA))
@@ -54,9 +56,14 @@ OriginalPostprocessStatus original_postprocess_0x288688_native_constructor(
     if(!in.call_original(0x0027fb28u,in.original_object_arm_address+0x14u,
         kOriginal27fb28FirstArgVA,0u,in.callback_context,&result))
         return OriginalPostprocessStatus::CallRefused;
-    if(!in.call_original(0x0027fa74u,in.original_object_arm_address+0x14u,
+    // The original 0x27FA74 wrapper is implemented natively: it queries
+    // original 0x27E930 and dispatches the interface's vtable slot +0x84.
+    // Only the underlying registry/service virtual targets are injected.
+    const auto native_setup=original_execute_embedded_setup_0x27fa74(
+        p+0x14,in.accessible_object_bytes-0x14,
         kOriginal27fa74FirstArgVA,kOriginal27fa74SecondArgVA,
-        in.callback_context,&result))
+        *original_embedded_service,&result);
+    if(native_setup!=OriginalEmbeddedSetupStatus::Completed)
         return OriginalPostprocessStatus::CallRefused;
     // 0x2886D0 STR r0,[r4,#0x20]
     store32(p+0x20,result);

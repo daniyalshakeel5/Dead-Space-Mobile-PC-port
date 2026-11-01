@@ -1,4 +1,5 @@
 #pragma once
+#include "ds_port/original_embedded_setup.hpp"
 #include <cstddef>
 #include <cstdint>
 namespace ds_port::original_runtime {
@@ -40,7 +41,8 @@ inline constexpr std::uint32_t kOriginal27fa74SecondArgVA=0x00430030u;
 
 // Runs original 0x2828AC directly before remaining two external methods.
 OriginalPostprocessStatus original_postprocess_0x288688_native_constructor(
-    const OriginalPostprocessInputs&) noexcept;
+    const OriginalPostprocessInputs&,
+    const OriginalEmbeddedService* original_embedded_service) noexcept;
 OriginalPostprocessStatus original_postprocess_0x288688_prefix(
     const OriginalPostprocessInputs&) noexcept;
 }
