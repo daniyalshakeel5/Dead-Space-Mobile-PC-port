@@ -30,6 +30,25 @@ int main() {
     const auto negative=static_cast<std::uint64_t>(std::int64_t(-1000001));
     for(unsigned i=0;i<8;++i)
         CHECK(bytes[64+i]==static_cast<std::uint8_t>((negative>>(8*i))&0xffu));
+    bytes.fill(0);
+    CHECK(original_seed_time_pair_if_zero(bytes.data(),bytes.size(),3,250000)
+        ==OriginalClockSeedResult::OriginalEmptySlotSeeded);
+    constexpr std::uint64_t initialized=3250000u;
+    for(unsigned i=0;i<8;++i)
+        CHECK(bytes[64+i]==static_cast<std::uint8_t>((initialized>>(8*i))&0xffu));
+    const auto old=bytes;
+    CHECK(original_seed_time_pair_if_zero(bytes.data(),bytes.size(),9,900000)
+        ==OriginalClockSeedResult::ExistingValueKept);
+    CHECK(bytes==old);
+    bytes.fill(0);
+    bytes[68]=0x01; // high word nonzero with low word zero
+    const auto before=bytes;
+    CHECK(original_seed_time_pair_if_zero(bytes.data(),bytes.size(),1,2)
+        ==OriginalClockSeedResult::ExistingValueKept);
+    CHECK(bytes==before);
+    CHECK(original_seed_time_pair_if_zero(bytes.data(),71,1,2)
+        ==OriginalClockSeedResult::InvalidContext);
+    CHECK(bytes==before);
     std::cout<<"Original ARM signed SMLAL and STRD time-value instruction subset verified\n";
     return 0;
 }
