@@ -60,7 +60,7 @@ def scan_im_objects(blob:bytes)->dict:
         "selected_fields":[item for item in records
             if item["type"]==10][:6] or records[:6]}
 
-def inspect(apk:Path,probe:Path)->dict:
+def inspect(apk:Path,probe:Path,im_probe:Path|None=None)->dict:
     results=[]
     with ZipFile(apk) as archive, tempfile.TemporaryDirectory(prefix="ds-boot-") as root:
         for number,path in enumerate(ASSETS):
@@ -103,6 +103,14 @@ def inspect(apk:Path,probe:Path)->dict:
             # IM-M3G framing for proprietary splash/UI packs.
             # Report type counts and numeric object metadata only.
             im=scan_im_objects(target.read_bytes())
+            # Verify that the existing native mesh decoder can
+            # load the REAL main-menu scene. It prints counts only.
+            if path=="assets/published/models/main_menu.m3g" and im_probe:
+                checked=subprocess.run([str(im_probe),str(target)],
+                    capture_output=True,text=True,timeout=60,check=False)
+                im["native_mesh_supported"]=checked.returncode==0
+                if checked.returncode==0:
+                    im["native_mesh_report"]=json.loads(checked.stdout)
             results.append({
                 "im_m3g":im,
                 "candidate_offset_0x60":header,
@@ -122,7 +130,8 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument("--apk",type=Path,required=True)
     parser.add_argument("--probe",type=Path,required=True)
+    parser.add_argument("--im-probe",type=Path)
     args=parser.parse_args()
     print("ORIGINAL_BOOT_NATIVE_DECODER_AUDIT",json.dumps(
-        inspect(args.apk,args.probe),separators=(",",":")))
+        inspect(args.apk,args.probe,args.im_probe),separators=(",",":")))
 if __name__=="__main__":main()
