@@ -662,6 +662,25 @@ def observe(apk: Path) -> dict:
         data,sections,0x002807a4,0x34,0x002807b0)
     input_initial_table=(event_constructor_base+8)&0xffffffff
     input_final_table=(event_constructor_base+0x20)&0xffffffff
+    # Original ELF startup 0x27F790 and nested 0x27F124: preserve all
+    # seven original ARM PC-relative descriptor addresses. Each pair
+    # has been independently instruction-decoded, not guessed from Vita.
+    startup_literals={
+        "first_query_descriptor":(0x0027f7a0,0xb4,0x0027f7ac),
+        "first_virtual_second_arg":(0x0027f7b8,0xa0,0x0027f7cc),
+        "first_virtual_third_arg":(0x0027f7bc,0xa0,0x0027f7d0),
+        "next_virtual_second_arg":(0x0027f80c,0x54,0x0027f824),
+        "next_virtual_third_arg":(0x0027f810,0x54,0x0027f81c),
+        "nested_query_descriptor":(0x0027f138,0x54,0x0027f144),
+        "nested_virtual_second_arg":(0x0027f158,0x38,0x0027f164),
+        "nested_virtual_third_arg":(0x0027f15c,0x38,0x0027f168),
+    }
+    startup_descriptor_vas={
+        name:resolve_arm_literal_based_global(data,sections,*site)
+        for name,site in startup_literals.items()
+    }
+    if not all(startup_descriptor_vas.values()):
+        raise ValueError("Original startup descriptor literal is null")
     # Original 0x2828AC LDR at +0x00 / ADD at +0x0c / ADD #8 at +0x10.
     # Original 0x288688 LDR at +0x0c / ADD at +0x18 / ADD #8 at +0x1c.
     # Both literal-derived addresses are original ARM VAs, not host pointers.
@@ -748,6 +767,16 @@ def observe(apk: Path) -> dict:
             "final_vtable_va":f"0x{input_final_table:08x}",
             "direct_helper_0x35194":"import-plt-target-still-unresolved",
             "required_event_bytes":48,
+            "verified":True,
+        },
+        "original_stage_zero_first_routine_descriptors":{
+            "literal_ARM_virtual_addresses":{
+                name:f"0x{va:08x}" for name,va in startup_descriptor_vas.items()
+            },
+            "ELF_entry":"0x0027f790",
+            "direct_callees":[
+                "0x0027e930","0x0027f124","0x002713b8","0x000f895c"
+            ],
             "verified":True,
         },
         "original_input_singleton_slots":{
