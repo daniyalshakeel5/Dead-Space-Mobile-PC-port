@@ -148,5 +148,25 @@ int main(){
     svc.original_0x2837b4=nullptr;
     assert(original_execute_resource_registration_0x284178(one,svc)==
            OriginalNativeRegistrationStatus::MissingOriginalService);
+
+    // Full 0x27FD7C -> 0x284178 path without any injected original
+    // 0x2839C8,0x283F5C,0x2837B4 callback. The native registry performs
+    // original bytewise lookup/update/insert semantics using host memory.
+    OriginalNativeResourceMap native_registry{};
+    svc.original_0x2839c8=nullptr;
+    svc.original_0x283f5c=nullptr;
+    svc.native_resource_map=&native_registry;
+    t.lookups=t.prechecks=t.inserts=t.matched=t.next_step=0;
+    assert(original_register_stage_resources_0x27fd7c(in)==
+           OriginalRegistrationStatus::CompletedOriginalSequence);
+    assert(t.lookups==27&&t.prechecks==0&&t.inserts==0&&t.matched==0);
+    assert(native_registry.count()==1);
+    assert(native_registry.successful_writes()==27);
+    assert(native_registry.replacement_count()==26);
+    OriginalNativeResourceEntry result{};
+    assert(native_registry.find("energy",&result));
+    assert(result.descriptor=="BEAM");
+    assert(result.original_descriptor_arm_va==
+           kOriginalRegistrationSequence0x27fd7c[26].descriptor_arm_va);
     return 0;
 }
