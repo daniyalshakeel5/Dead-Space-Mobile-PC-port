@@ -98,6 +98,24 @@ elseif(DS_BUILD_BOOT_SPLASH)
     message(STATUS "SDL2 missing: original splash stage disabled in this build")
 endif()
 
+# Production native menu OpenGL backend, using recovered original camera,
+# transforms and material bindings only. No synthesized game view.
+if(DS_BUILD_BOOT_SPLASH AND TARGET SDL2::SDL2)
+    find_package(OpenGL QUIET)
+    if(OpenGL_FOUND)
+        add_library(ds_original_menu_gl STATIC src/original_menu_gl.cpp)
+        target_include_directories(ds_original_menu_gl PUBLIC include)
+        target_link_libraries(ds_original_menu_gl PUBLIC ds_port_im_menu ds_port_im_ui SDL2::SDL2 OpenGL::GL)
+        target_link_libraries(deadspace_native PRIVATE ds_original_menu_gl)
+        target_compile_definitions(deadspace_native PRIVATE DS_NATIVE_ORIGINAL_MENU_GL=1)
+        if(DS_ENABLE_TESTS)
+            add_executable(ds_original_menu_gl_tests tests/original_menu_gl_tests.cpp)
+            target_link_libraries(ds_original_menu_gl_tests PRIVATE ds_original_menu_gl)
+            add_test(NAME ds_original_menu_gl_scene_contract COMMAND ds_original_menu_gl_tests)
+        endif()
+    endif()
+endif()
+
 # The installer is opt-in so the existing lightweight diagnostic build does
 # not gain extra dependencies. ZIP inflate/CRC always runs on the user's PC.
 if(DS_BUILD_ASSET_INSTALLER)
