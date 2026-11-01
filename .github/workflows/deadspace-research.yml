@@ -177,6 +177,10 @@ jobs:
           import json
           from pathlib import Path
           report=json.loads(Path("report/deadspace-original-instruction-window.json").read_text())
+          for name in ("stage_zero_setup_type2_branch_0x28cad8",):
+              item=report["windows"][name]
+              print("Original type-2 ARM branch",name,
+                    json.dumps(item["instructions"][:24], separators=(",",":")))
           for name in ("stage_zero_setup_target_0x28ca24",
                        "stage_zero_followup_target_0x281d54",
                        "stage_zero_followup_target_0x2833f4"):
