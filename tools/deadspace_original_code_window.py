@@ -43,8 +43,8 @@ WINDOWS = {
     "stage_zero_followup_target_0x2833f4": (0x002833f4, 160),
     # Direct callees independently recovered from real-APK Ghidra run 41305474129.
     # Observation only: no implementation or gameplay semantics inferred.
-    "post_setup_direct_callee_0x27fd7c": (0x0027fd7c, 160),
-    "post_setup_direct_callee_0x2803e4": (0x002803e4, 160),
+    "post_setup_direct_callee_0x27fd7c": (0x0027fd7c, 704),
+    "post_setup_direct_callee_0x2803e4": (0x002803e4, 460),
     "post_setup_direct_callee_0x287a94": (0x00287a94, 160),
     "post_setup_direct_callee_0x2849e0": (0x002849e0, 160),
     "post_setup_direct_callee_0x280a34": (0x00280a34, 160),
@@ -55,7 +55,7 @@ WINDOWS = {
     "postprocess_embedded_init_0x27fb28": (0x0027fb28, 256),
     "postprocess_embedded_helper_0x27faf4": (0x0027faf4, 160),
     "postprocess_embedded_setup_0x27fa74": (0x0027fa74, 192),
-    "repeated_initializer_callee_0x284178": (0x00284178, 160),
+    "repeated_initializer_callee_0x284178": (0x00284178, 320),
     "original_time_pair_source": (0x000357c4, 12),
     "frame_stage_one_routine": (0x0027fc68, 96),
     "frame_state_one_zero_result_tail": (0x0027eecc, 128),
@@ -575,7 +575,7 @@ def observe(apk: Path) -> dict:
                 {"offset": i.address-address,
                  "op": i.mnemonic.lower(),
                  "args": i.op_str.lower()}
-                for i in decoded[:64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" or key.startswith("stage_zero_second_tail_") or key=="startup_allocator_object_init_0x27e560" else 40]],
+                for i in decoded[:180 if key=="post_setup_direct_callee_0x27fd7c" else 120 if key in ("post_setup_direct_callee_0x2803e4","repeated_initializer_callee_0x284178") else 64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" or key.startswith("stage_zero_second_tail_") or key=="startup_allocator_object_init_0x27e560" else 40]],
         }
     # Two independently instruction-proven PC-relative literal loads.
     # Frame 0x27ef6c LDR r4,[pc,#0x90], 0x27ef74 ADD r4,pc,r4.

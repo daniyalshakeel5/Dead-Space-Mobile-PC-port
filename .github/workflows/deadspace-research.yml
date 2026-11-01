@@ -194,6 +194,10 @@ jobs:
               print("ARM_ALLOCATOR_CHAIN",name,
                     json.dumps(report["windows"][name]["instructions"][:32],
                                separators=(",",":")))
+          print("ENGINE_REGISTER_0x27FD7C_FULL",
+                json.dumps(report["windows"]["post_setup_direct_callee_0x27fd7c"]["instructions"][:180],separators=(",",":")))
+          print("ENGINE_RESOURCE_0x2803E4_FULL",
+                json.dumps(report["windows"]["post_setup_direct_callee_0x2803e4"]["instructions"][:120],separators=(",",":")))
           print("ORIGINAL_ENGINE_REGISTER_HELPER",
                 json.dumps(report["windows"]["repeated_initializer_callee_0x284178"]["instructions"][:42],separators=(",",":")))
           for name in ("post_setup_direct_callee_0x27fd7c",
