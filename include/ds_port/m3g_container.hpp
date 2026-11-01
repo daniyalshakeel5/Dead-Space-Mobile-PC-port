@@ -33,6 +33,10 @@ struct M3gContainerReport {
     std::uint32_t image2d_max_height = 0;
     std::uint64_t image2d_validated_pixel_bytes = 0;
     std::array<std::uint32_t, 5> image2d_format_counts{}; // format 96..100
+    // 0=unknown; 1=superclass; 2=metadata short; 3=format/flag;
+    // 4=dimensions; 5=stored field bounds; 6=pixel representation;
+    // 7=trailing bytes. Opaque categories, no original payload bytes.
+    std::array<std::uint32_t, 8> image2d_failure_stage_counts{};
 
     std::array<std::uint32_t, 256> object_type_count{};
 };
