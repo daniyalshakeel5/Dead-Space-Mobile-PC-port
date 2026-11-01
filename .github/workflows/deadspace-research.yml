@@ -17,6 +17,7 @@ on:
       - "include/ds_port/m3g_container.hpp"
       - "src/m3g_container.cpp"
       - "apps/m3g_probe.cpp"
+      - "apps/m3g_texture_extract.cpp"
       - "tests/m3g_container_tests.cpp"
       - "docs/private-apk-analysis.trigger"
       - ".github/workflows/deadspace-research.yml"
@@ -34,6 +35,7 @@ on:
       - "include/ds_port/m3g_container.hpp"
       - "src/m3g_container.cpp"
       - "apps/m3g_probe.cpp"
+      - "apps/m3g_texture_extract.cpp"
       - "tests/m3g_container_tests.cpp"
       - "docs/private-apk-analysis.trigger"
       - ".github/workflows/deadspace-research.yml"
@@ -110,10 +112,11 @@ jobs:
             -DDS_BUILD_INPUT_PROBE=OFF -DDS_BUILD_M3G_READER=ON \
             -DDS_ENABLE_TESTS=OFF
           cmake --build "$RUNNER_TEMP/m3g-build" \
-            --config Release --target ds_m3g_probe --parallel 2
+            --config Release --target ds_m3g_probe ds_m3g_texture_extract --parallel 2
           python tools/deadspace_m3g_native_verify.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
             --native-probe "$RUNNER_TEMP/m3g-build/ds_m3g_probe" \
+            --texture-exporter "$RUNNER_TEMP/m3g-build/ds_m3g_texture_extract" \
             --output report/deadspace-m3g-native-evidence.json
           python -c 'import json; d=json.load(open("report/deadspace-public-evidence.json",encoding="utf-8")); assert d.get("real_apk_analyzed") and d.get("resources",{}).get("valid_zip"); print("Real upstream release analyzed; redacted aggregate report ready.")'
           echo "::group::Sanitized original-APK evidence (public metadata only)"
