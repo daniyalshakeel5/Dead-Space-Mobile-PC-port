@@ -50,7 +50,18 @@ class ArmWindowTests(unittest.TestCase):
                 60:("add","r1, r1, #0x240"),
                 64:("asr","r3, r2, #0x1f"),
                 68:("smlal","r2, r3, r1, r0"),
-                72:("strd","r2, r3, [r4, #0x40]")}),
+                72:("strd","r2, r3, [r4, #0x40]"),
+                0:("push","{r4, r5, lr}"),
+                4:("mov","r1, #2"),
+                8:("mov","r4, r0"),
+                12:("sub","sp, sp, #0x14"),
+                16:("add","r0, r0, #0x40"),
+                20:("bl","#0x28ca24"),
+                76:("ldr","r0, [r4, #4]"),
+                80:("bl","#0x281d54"),
+                84:("ldr","r1, [r4, #4]"),
+                88:("add","r0, r4, #0x18"),
+                92:("bl","#0x2833f4")}),
             "frame_state_one_nonzero_continuation":decoded({
                 0:("ldr","r1, [r4, #0x68]"),
                 4:("mov","r3, #0"),
@@ -82,6 +93,14 @@ class ArmWindowTests(unittest.TestCase):
                 32:("pop","{r4, pc}")})
         }
         self.assertTrue(all(proven_original_code_helpers(windows).values()))
+        zero_steps=windows["frame_stage_zero_second_callee"]["instructions"]
+        match=lambda off: next(item for item in zero_steps if item["offset"]==off)
+        match(84)["args"]="r1, [r4, #8]"
+        self.assertFalse(proven_original_code_helpers(windows)[
+            "stage_zero_setup_and_two_followup_calls"])
+        match(84)["args"]="r1, [r4, #4]"
+        self.assertTrue(proven_original_code_helpers(windows)[
+            "stage_zero_setup_and_two_followup_calls"])
         windows["game_entry_direct_callee"]["instructions"][0]["args"]="r0, #1"
         results=proven_original_code_helpers(windows)
         self.assertFalse(results["jni_run_entrypoint_always_returns_zero"])
