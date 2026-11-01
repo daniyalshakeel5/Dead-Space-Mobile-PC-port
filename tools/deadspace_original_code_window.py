@@ -33,6 +33,13 @@ WINDOWS = {
     "stage_zero_setup_type2_branch_0x28cad8": (0x0028cad8, 96),
     "stage_zero_followup_target_0x281d54": (0x00281d54, 160),
     "stage_zero_followup_target_0x2833f4": (0x002833f4, 160),
+    # Direct callees independently recovered from real-APK Ghidra run 41305474129.
+    # Observation only: no implementation or gameplay semantics inferred.
+    "post_setup_direct_callee_0x27fd7c": (0x0027fd7c, 160),
+    "post_setup_direct_callee_0x2803e4": (0x002803e4, 160),
+    "post_setup_direct_callee_0x287a94": (0x00287a94, 160),
+    "post_setup_direct_callee_0x2849e0": (0x002849e0, 160),
+    "post_setup_direct_callee_0x280a34": (0x00280a34, 160),
     "original_time_pair_source": (0x000357c4, 12),
     "frame_stage_one_routine": (0x0027fc68, 96),
     "frame_state_one_zero_result_tail": (0x0027eecc, 128),
