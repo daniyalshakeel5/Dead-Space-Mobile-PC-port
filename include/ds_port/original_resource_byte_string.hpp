@@ -23,4 +23,12 @@ OriginalResourceAppendStatus original_append_bytes_0x285918(
     OriginalResourceByteString& target,
     const std::uint8_t* bytes, std::size_t byte_count,
     std::size_t maximum_content_bytes=16u*1024u*1024u) noexcept;
+// Instruction-verified 0x28650C..0x2865B4 parser staging branches:
+// compare source range length with the existing temporary string length;
+// only append the as-yet uncopied suffix using original 0x285918.
+// A corresponding branch repeats for the second parser string.
+OriginalResourceAppendStatus original_complete_parser_range_0x2863ec(
+    OriginalResourceByteString& target,
+    const std::uint8_t* mapped_begin, std::size_t original_range_bytes,
+    std::size_t maximum_content_bytes=16u*1024u*1024u) noexcept;
 }
