@@ -25,6 +25,11 @@ Source: GitHub Actions push runs `41285804108`, `41286597401`,
 - 265 files with extension `.m3g`, totaling 195,942,656 declared bytes.
 - **174** use the exact JSR-184 12-byte identifier (125,907,703 bytes).
 - **91** use `IM-M3G` identifier (70,034,953 bytes); neither IM2 nor IM3.
+- The 91 IM-M3G first sections are **not** directly interpretable using
+  standard JSR-184 framing. A bounded 1 MiB first-section probe saw 56 with
+  standard-layout checksum/length inconsistencies, while 35 declared a
+  section beyond that probe limit; those 35 are **not proven invalid**.
+  These are research constraints, not evidence that the game data is corrupt.
 - Of 174 standard-header candidates: 167 passed our strict *first-section*
   Adler32, header-size, version 1.0 and total-length checks. 7 need format
   investigation (length/checksum mismatch).
