@@ -70,7 +70,7 @@ int main(){
     broken=one;broken.back()=5; // proprietary checksum unverified
     assert(decode_im_ui_rgba_images(broken.data(),broken.size()).decoded);
     broken=one;
-    broken[26]=11; // change type 10 to unsupported
+    broken[38]=11; // change type 10 to unsupported
     assert(!decode_im_ui_rgba_images(broken.data(),broken.size()).decoded);
     broken=one;
     // Image2D format field at first object's payload:
