@@ -74,6 +74,10 @@ class Format116Tests(unittest.TestCase):
             self.assertEqual(result["compressed_block_size_hypotheses"]["etc1_exact"], 1)
             self.assertNotIn("DO_NOT_PUBLISH", str(result))
             self.assertEqual(result["parsing_status"]["mutable_no_data"], 1)
+            self.assertEqual(result["palette_presence"]["empty"], 1)
+            self.assertEqual(result["pixel_start_offset_class"]["variable"], 1)
+            self.assertEqual(result["etc1_base_length_ratio_pct"]["100"], 1)
+            self.assertEqual(result["etc1_full_mip_length_ratio_pct"]["100"], 1)
 
 
 if __name__ == "__main__":
