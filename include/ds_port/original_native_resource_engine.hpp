@@ -2,6 +2,7 @@
 #include "ds_port/original_resource_owner.hpp"
 #include "ds_port/original_owner_byte_line.hpp"
 #include "ds_port/original_owner_line_utf8.hpp"
+#include "ds_port/original_owner_file_line.hpp"
 #include "ds_port/original_receiver_mode.hpp"
 #include "ds_port/original_receiver_activation.hpp"
 #include "ds_port/original_receiver_prefix.hpp"
@@ -67,6 +68,13 @@ public:
     OriginalOwnerWideLineResult read_resource_wide_line_0x276d18(
         OriginalNativeByteSource& source,
         OriginalNativeUtf16String& output) const noexcept;
+    // Explicit native Windows/Linux HOST file adapter. The original
+    // 0x27A4F0 embedded provider must be constructed and selected.
+    // Callers own their fd. This is not the original game's file-open
+    // subroutine, and cannot boot or register assets by itself.
+    bool bind_user_asset_fd(int native_host_fd) noexcept;
+    OriginalOwnerWideLineResult read_bound_asset_line_0x276d18(
+        int native_host_fd,OriginalNativeUtf16String& output) noexcept;
     OriginalReceiverPrefixResult0x278018 process_receiver_prefix(
         std::u16string_view record,
         OriginalRegistrationCharacterTable character_table,
