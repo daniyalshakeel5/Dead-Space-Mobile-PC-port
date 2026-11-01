@@ -60,7 +60,7 @@ def scan_im_objects(blob:bytes)->dict:
         "selected_fields":[item for item in records
             if item["type"]==10][:6] or records[:6]}
 
-def inspect(apk:Path,probe:Path,im_probe:Path|None=None)->dict:
+def inspect(apk:Path,probe:Path,im_probe:Path|None=None,ui_probe:Path|None=None)->dict:
     results=[]
     with ZipFile(apk) as archive, tempfile.TemporaryDirectory(prefix="ds-boot-") as root:
         for number,path in enumerate(ASSETS):
@@ -111,7 +111,16 @@ def inspect(apk:Path,probe:Path,im_probe:Path|None=None)->dict:
                 im["native_mesh_supported"]=checked.returncode==0
                 if checked.returncode==0:
                     im["native_mesh_report"]=json.loads(checked.stdout)
+            ui_decoded={}
+            if (path.startswith("assets/published/texturepacks_ui/") and ui_probe):
+                checked=subprocess.run([str(ui_probe),str(target)],
+                    capture_output=True,text=True,timeout=60,check=False)
+                ui_decoded={"verified":checked.returncode==0}
+                if checked.returncode==0:
+                    ui_decoded["original_images"]=json.loads(
+                        checked.stdout).get("images",[])
             results.append({
+                "native_im_ui_decoder":ui_decoded,
                 "im_m3g":im,
                 "candidate_offset_0x60":header,
                 "path":path,"present":True,"size":info.file_size,
@@ -131,7 +140,8 @@ def main():
     parser.add_argument("--apk",type=Path,required=True)
     parser.add_argument("--probe",type=Path,required=True)
     parser.add_argument("--im-probe",type=Path)
+    parser.add_argument("--ui-probe",type=Path)
     args=parser.parse_args()
     print("ORIGINAL_BOOT_NATIVE_DECODER_AUDIT",json.dumps(
-        inspect(args.apk,args.probe,args.im_probe),separators=(",",":")))
+        inspect(args.apk,args.probe,args.im_probe,args.ui_probe),separators=(",",":")))
 if __name__=="__main__":main()
