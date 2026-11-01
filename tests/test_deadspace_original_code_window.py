@@ -4,7 +4,8 @@ import unittest
 from tools.deadspace_original_code_window import (
     elf32_load_ranges, bounded_virtual_read, resolve_arm_literal_based_global,
     proven_frame_dispatch_prefix,
-    proven_original_code_helpers,prove_runtime_global_layout)
+    proven_original_code_helpers,prove_runtime_global_layout,
+    resolve_arm_got_slot_from_pc_index)
 
 
 class ArmWindowTests(unittest.TestCase):
@@ -17,6 +18,21 @@ class ArmWindowTests(unittest.TestCase):
                          1,128,0x1000,0,16,16,5,4096)
         data[128:144]=bytes(range(16))
         return bytes(data)
+
+    def test_original_registry_pc_indexed_got_address(self):
+        binary=bytearray(96)
+        spans=[(0x1000,0x1060,0)]
+        # LDR at 0x1000, #0x24 -> literal at 0x102c.
+        # LDR [PC,r3] at 0x1008 has PC=0x1010.
+        struct.pack_into("<i",binary,0x2c,0x38)
+        self.assertEqual(resolve_arm_got_slot_from_pc_index(
+            binary,spans,0x1000,0x24,0x1008),0x1048)
+        struct.pack_into("<i",binary,0x2c,-0x10)
+        self.assertEqual(resolve_arm_got_slot_from_pc_index(
+            binary,spans,0x1000,0x24,0x1008),0x1000)
+        with self.assertRaises(ValueError):
+            resolve_arm_got_slot_from_pc_index(
+                binary,spans,0x1000,0x250,0x1008)
 
     def test_global_layout_requires_all_original_elf_addresses(self):
         layout=prove_runtime_global_layout(
@@ -49,6 +65,23 @@ class ArmWindowTests(unittest.TestCase):
                 0:("push","{r4, lr}"),4:("mov","r4, r0"),
                 8:("bl","#0x27f790"),12:("mov","r0, r4"),
                 16:("pop","{r4, lr}"),20:("b","#0x280520")}),
+            "stage_zero_owner_provider_0x27e930":decoded({
+                0:("str","lr, [sp, #-4]!"),
+                4:("sub","sp, sp, #0xc"),
+                8:("add","r1, sp, #8"),
+                12:("mov","r3, #0"),
+                16:("str","r3, [r1, #-4]!"),
+                20:("ldr","r3, [pc, #0x24]"),
+                24:("mov","r2, #0x10000"),
+                28:("add","r2, r2, #4"),
+                32:("ldr","r3, [pc, r3]"),
+                36:("mov","r0, r3"),
+                40:("ldr","r3, [r3]"),
+                44:("mov","lr, pc"),
+                48:("ldr","pc, [r3, #0x18]"),
+                52:("ldr","r0, [sp, #4]"),
+                56:("add","sp, sp, #0xc"),
+                60:("ldm","sp!, {pc}")}),
             "stage_zero_followup_target_0x281d54":decoded({
                 0:("push","{r4, r5, lr}"),
                 4:("ldr","r2, [pc, #0x64]"),
@@ -186,6 +219,17 @@ class ArmWindowTests(unittest.TestCase):
             obj["args"]=bad
             self.assertFalse(proven_original_code_helpers(windows)[abi_key])
             obj["args"]=before
+        query_key="stage_zero_0x27e930_original_registry_interface_query"
+        self.assertTrue(proven_original_code_helpers(windows)[query_key])
+        query=windows["stage_zero_owner_provider_0x27e930"]["instructions"]
+        for off,bad in ((28,"r2, r2, #8"),
+                        (48,"pc, [r3, #0x1c]"),
+                        (52,"r0, [sp, #8]")):
+            instruction=next(x for x in query if x["offset"]==off)
+            original=instruction["args"]
+            instruction["args"]=bad
+            self.assertFalse(proven_original_code_helpers(windows)[query_key])
+            instruction["args"]=original
         post_key="stage_zero_0x281d54_allocator_post_return_and_global_store"
         self.assertTrue(proven_original_code_helpers(windows)[post_key])
         allocator=windows["stage_zero_followup_target_0x281d54"]["instructions"]
