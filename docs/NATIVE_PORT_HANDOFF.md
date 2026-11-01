@@ -34,6 +34,25 @@ game assets or native libraries to the public repository or workflow artifacts.
 Avoid exposing URLs in logs. If no URL is configured, the job performs a
 repository-only scan.
 
+## Current verified desktop infrastructure (November 1, 2026)
+
+- GitHub Actions C++17 compilation and CTest passed on Windows 2022 and
+  Ubuntu 24.04 runners (four matrix jobs in run 41281887711).
+- `ds_port_input` implements *provisional PC-style* keyboard/mouse events,
+  not verified Android game input mappings.
+- `ds_port_timing` implements bounded, nanosecond-accounted host update
+  scheduling; 60Hz is a configurable host policy, **not a verified mobile
+  simulation rate**.
+- `ds_apk_probe` reads local user-supplied ZIP32 APK central-directory
+  metadata, without unpacking or shipping game assets. Synthetic archive tests
+  passed. **It has not been exercised against the user's actual APK**.
+- Diagnostic artifact ZIPs are produced by the cross-platform workflow.
+  They are utilities, not a playable game.
+- The user requested that `dspc_milestone4.zip` be ignored. Do not consult
+  or integrate it as an evidence source.
+
+See `docs/NATIVE_HOST_AND_APK_PREFLIGHT.md` for tested interfaces and limits.
+
 ## Next engineering milestones (each needs evidence)
 
 1. **Native dependency inventory:** Confirm ABI, imports, library
@@ -42,11 +61,13 @@ repository-only scan.
 2. **Architecture map:** Identify actual game entrypoints, asset format readers,
    scene/update loop, renderer hooks, sound, and input from verified evidence.
    Label conjectures as unverified.
-3. **Portable core:** Implement CMake C/C++17 desktop scaffolding, with SDL2
-   for window/event plumbing and platform-neutral data/logic modules. No
-   claim of gameplay fidelity until tested.
-4. **Asset importer:** Require the *user's own* APK at first launch and extract
-   necessary game data locally. Never distribute the original assets.
+3. **Portable core:** The CMake/SDL2 input diagnostic and host timing core
+   are now built and tested. Next integrate into a real reconstructed runtime
+   only after the original engine's behavior has been established.
+4. **Asset importer:** The new native APK CLI currently validates ZIP32
+   archive metadata and prompts for a user-supplied package. Actual private
+   asset extraction, format parsing, and loader integration remain undone.
+   Never distribute original game assets.
 5. **Keyboard/mouse:** Map Dead Space PC-style aiming, movement, weapon
    controls, and pause/menu behavior. Preserve original behavior first.
 6. **Behavior tests:** Cross-check original game state, timings, collision,
