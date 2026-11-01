@@ -77,6 +77,14 @@ int main(int argc, char** argv) {
         first = false;
         std::cout << "\"" << i << "\":" << result.image2d_failure_stage_counts[i];
     }
+    std::cout << "},\"image2d_unknown_format_counts\":{";
+    first = true;
+    for (std::size_t i = 0; i < result.image2d_unknown_format_counts.size(); ++i) {
+        if (!result.image2d_unknown_format_counts[i]) continue;
+        if (!first) std::cout << ",";
+        first = false;
+        std::cout << "\"" << i << "\":" << result.image2d_unknown_format_counts[i];
+    }
     std::cout << "}";
     if (image_check) {
         const auto image = ds_port::decode_m3g_rgba_image(data.data(), data.size());
