@@ -50,8 +50,36 @@ original_execute_receiver_activation_0x278e58(
     // the state stores and branch are considered reconstructed.
     if(!provider)
         return fail(S::CompletedEmptyProviderReset,root,provider);
-    // The nonzero provider branch invokes original virtual +0x14,
-    // the owner's +0x24, and +0x70, plus more allocations.
-    return fail(S::UnreconstructedProviderActivation,root,provider);
+    // Original 0x278EAC..0x278EBC invokes provider virtual +0x14,
+    // then compares the returned mode against the incoming r1.
+    // Missing native provider methods NEVER imply loaded resources.
+    if(!in.query_provider_mode_0x14)
+        return fail(S::UnreconstructedProviderActivation,root,provider);
+    std::uint32_t original_mode=0;
+    if(!in.query_provider_mode_0x14(
+        provider,0x14u,in.context,&original_mode))
+        return fail(S::ProviderModeQueryRefused,root,provider);
+    if(original_mode==in.requested_mode)
+        return fail(S::ReachedUnreconstructedStreamInitialization,
+                    root,provider);
+
+    // ARM 0x278EC4..0x278ED4 invokes owner vtable +0x24,
+    // resolved in the APK to 0x2733E8. Its fast rejection path is
+    // instruction-verified: it queries provider +0x14 a SECOND time,
+    // accepts direct equality or the special (request=1,mode=3)
+    // case only after owner vtable+0x60, then checks whether the
+    // provider is the owner's embedded object (owner+0x804).
+    // For an external provider with a persistently mismatched
+    // mode, 0x273478 returns r0=0, and 0x278EDC returns r0=0.
+    std::uint32_t retry_mode=0;
+    if(!in.query_provider_mode_0x14(
+        provider,0x14u,in.context,&retry_mode))
+        return fail(S::ProviderModeQueryRefused,root,provider);
+    const std::uint32_t owner_embedded=in.owner_arm_va+0x804u;
+    const bool special_mode=(in.requested_mode==1u && retry_mode==3u);
+    if(retry_mode==in.requested_mode || special_mode ||
+       provider==owner_embedded)
+        return fail(S::UnreconstructedOwnerApproval,root,provider);
+    return fail(S::CompletedProviderRejected,root,provider);
 }
 } // namespace ds_port::original_runtime
