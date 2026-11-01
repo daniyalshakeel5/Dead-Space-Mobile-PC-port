@@ -338,7 +338,7 @@ public class GhidraGameCodeMap extends GhidraScript {
             // a full proprietary source listing or exported library bytes.
             result.append(",\"operands\":")
                 .append(escape(frameInstruction.toString().replaceFirst(
-                    "^\\\\S+\\\\s*", "")));
+                    "^[^ ]+ *", ""))));
             result.append(",\"flows\":[");
             ghidra.program.model.address.Address[] flows=frameInstruction.getFlows();
             for(int k=0;k<Math.min(flows.length,5);k++) {
