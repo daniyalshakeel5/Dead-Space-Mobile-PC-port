@@ -582,6 +582,31 @@ def observe(apk: Path) -> dict:
         ("cmp","r0, #1"),("movne","r0, #0"),
         ("moveq","r0, #1"),("bx","lr")]:
         raise ValueError("Original input readiness ARM guard proof changed")
+    # Independently resolve allocation and event-queue owner slots from
+    # all three original ARM JNI handlers (pointer/key-down/key-up).
+    input_slots={
+        "pointer":(
+            resolve_arm_got_slot_from_pc_index(
+                data,sections,0x0027f9d8,0x8c,0x0027f9e4),
+            resolve_arm_got_slot_from_pc_index(
+                data,sections,0x0027fa40,0x28,0x0027fa48)),
+        "key_down":(
+            resolve_arm_got_slot_from_pc_index(
+                data,sections,0x0028484c,0x84,0x00284858),
+            resolve_arm_got_slot_from_pc_index(
+                data,sections,0x002848a8,0x2c,0x002848b4)),
+        "key_up":(
+            resolve_arm_got_slot_from_pc_index(
+                data,sections,0x00284794,0x84,0x002847a0),
+            resolve_arm_got_slot_from_pc_index(
+                data,sections,0x002847f0,0x2c,0x002847fc)),
+    }
+    if len({v[0] for v in input_slots.values()})!=1 or (
+        len({v[1] for v in input_slots.values()})!=1):
+        raise ValueError("Three original input JNI singleton slots disagree")
+    input_allocator_slot,input_queue_slot=input_slots["pointer"]
+    if input_allocator_slot==input_queue_slot:
+        raise ValueError("Input allocator and event queue slots unexpectedly alias")
     input_ready_slot=resolve_arm_got_slot_from_pc_index(
         data,sections,0x0027e97c,0x10,0x0027e980)
     frame_global=resolve_arm_literal_based_global(
@@ -720,6 +745,11 @@ def observe(apk: Path) -> dict:
             "direct_helper_0x35194":"import-plt-target-still-unresolved",
             "required_event_bytes":48,
             "verified":True,
+        },
+        "original_input_singleton_slots":{
+            "allocator_owner_pointer_slot_va":f"0x{input_allocator_slot:08x}",
+            "queue_owner_pointer_slot_va":f"0x{input_queue_slot:08x}",
+            "verified_by_three_jni_wrappers":True,
         },
         "original_input_ready_guard":{
             "guard_function_va":"0x0027e97c",
