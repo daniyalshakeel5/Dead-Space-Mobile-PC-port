@@ -1,4 +1,5 @@
 #include "ds_port/m3g_container.hpp"
+#include "ds_port/etc1.hpp"
 
 #include <algorithm>
 #include <array>
@@ -301,6 +302,86 @@ M3gRgbaImage decode_m3g_rgba_image(const std::uint8_t* data, std::size_t size) {
     image.pixels_rgba.assign(start, start + evidence.pixel_bytes);
     image.width = evidence.width;
     image.height = evidence.height;
+    image.decoded = true;
+    return image;
+}
+
+
+M3gRgbaImage decode_m3g_etc1_image(const std::uint8_t* data, std::size_t size) {
+    M3gRgbaImage image;
+    const auto fail = [&](const char* reason) {
+        image.error = reason;
+        image.decoded = false;
+        image.pixels_rgba.clear();
+        return image;
+    };
+    // The original game places a second type-0 object in this resource.
+    // This is a *separate* IronMonkey-specific structure gate. Strict JSR184
+    // scanning remains unchanged.
+    const auto report = scan_m3g_container(
+        data, size, 64u * 1024u * 1024u, M3gScanMode::DiagnosticOpaqueVariant);
+    if (!report.valid || report.section_count != 2 || report.object_count != 3 ||
+        report.nonstandard_header_objects != 1 ||
+        report.object_type_count[0] != 2 || report.object_type_count[10] != 1)
+        return fail("unexpected IronMonkey texture container structure");
+    const std::size_t first_size = le32(data + 13);
+    const std::size_t second = 12 + first_size;
+    if (second > size || size - second < 13 || data[second] != 0)
+        return fail("unsupported compressed texture section");
+    const std::size_t total = le32(data + second + 1);
+    if (total < 13 || total != size - second)
+        return fail("texture section must occupy the file tail");
+    const auto* section = data + second + 9;
+    const std::size_t stored = total - 13;
+    if (stored < 10 || section[0] != 0)
+        return fail("missing secondary Header object");
+    const std::size_t secondary_length = le32(section + 1);
+    if (secondary_length > stored - 10)
+        return fail("secondary object exceeds texture section");
+    const std::size_t image_at = 5 + secondary_length;
+    if (section[image_at] != 10)
+        return fail("expected Image2D after secondary Header");
+    const auto object_size = le32(section + image_at + 1);
+    if (object_size != stored - image_at - 5)
+        return fail("Image2D payload length mismatches section");
+    const auto* object = section + image_at + 5;
+    std::size_t at = 0;
+    const auto take32 = [&](std::uint32_t& value) {
+        if (at > object_size || object_size - at < 4) return false;
+        value = le32(object + at);
+        at += 4;
+        return true;
+    };
+    std::uint32_t user_id = 0, count = 0;
+    if (!take32(user_id) || !take32(count) || count > (object_size-at)/4)
+        return fail("invalid Image2D Object3D animation data");
+    at += std::size_t(count)*4;
+    if (!take32(count) || count > (object_size-at)/8)
+        return fail("invalid Object3D user parameter table");
+    for (std::uint32_t i=0; i<count; ++i) {
+        std::uint32_t parameter=0, bytes=0;
+        if (!take32(parameter) || !take32(bytes) || bytes > object_size-at)
+            return fail("invalid Object3D user parameter");
+        at += bytes;
+    }
+    if (object_size-at < 10 || object[at++] != 116 || object[at++] != 0)
+        return fail("not an immutable format-116 Image2D");
+    const std::uint32_t width = le32(object + at); at += 4;
+    const std::uint32_t height = le32(object + at); at += 4;
+    const std::uint64_t whole_mip_bytes = etc1_full_mip_chain_bytes(width,height);
+    const std::uint64_t base_bytes = etc1_base_level_bytes(width,height);
+    if (!base_bytes || whole_mip_bytes > 64ull*1024*1024)
+        return fail("invalid or excessive ETC1 dimensions");
+    std::uint32_t palette_bytes=0, stored_bytes=0;
+    if (!take32(palette_bytes) || palette_bytes != 0 ||
+        !take32(stored_bytes) || stored_bytes != whole_mip_bytes ||
+        stored_bytes > object_size-at || object_size-at != stored_bytes)
+        return fail("format-116 bytes do not match verified ETC1 mip chain");
+    if (!decode_etc1_rgb_level(object + at, static_cast<std::size_t>(base_bytes),
+                               width, height, image.pixels_rgba))
+        return fail("unsupported or malformed ETC1 block");
+    image.width = width;
+    image.height = height;
     image.decoded = true;
     return image;
 }
