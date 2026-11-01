@@ -1,5 +1,6 @@
 #include "ds_port/original_secondary_postprocess.hpp"
 #include "ds_port/original_object_constructor.hpp"
+#include "ds_port/original_embedded_initializer.hpp"
 namespace ds_port::original_runtime {
 namespace {
 void store32(std::uint8_t* p,std::uint32_t v) noexcept {
@@ -43,7 +44,7 @@ OriginalPostprocessStatus original_postprocess_0x288688_native_constructor(
        in.third_setup_arg_arm_address!=kOriginal27fa74SecondArgVA ||
        in.original_object_arm_address>0xffffffffu-0x14u)
         return OriginalPostprocessStatus::InvalidMemory;
-    if(!in.call_original || !original_embedded_service)
+    if(!original_embedded_service)
         return OriginalPostprocessStatus::MissingOriginalCallees;
     // 0x288690 BL 0x2828AC: complete original constructor, now native.
     if(!original_construct_0x2828ac(in.mapped_object_bytes,
@@ -53,8 +54,12 @@ OriginalPostprocessStatus original_postprocess_0x288688_native_constructor(
     // 0x2886A8: original ARM overrides the initial constructor's vtable.
     store32(p,kOriginal288688OverrideVtableVA);
     std::uint32_t result=0;
-    if(!in.call_original(0x0027fb28u,in.original_object_arm_address+0x14u,
-        kOriginal27fb28FirstArgVA,0u,in.callback_context,&result))
+    // Whole original 0x27FB28 is now native, including its five virtual
+    // calls. Their implementations remain explicit original-code callbacks.
+    const auto initialized=original_initialize_embedded_0x27fb28(
+        p+0x14,in.accessible_object_bytes-0x14,
+        in.original_object_arm_address+0x14u,*original_embedded_service,&result);
+    if(initialized!=OriginalEmbeddedInitStatus::Completed)
         return OriginalPostprocessStatus::CallRefused;
     // The original 0x27FA74 wrapper is implemented natively: it queries
     // original 0x27E930 and dispatches the interface's vtable slot +0x84.

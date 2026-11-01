@@ -14,7 +14,6 @@ struct OriginalSecondaryPipeline {
     void* allocated_object_bytes;
     std::size_t allocated_object_size;
     OriginalSecondaryDispatch allocator;
-    OriginalPostprocessStep call_original;
     void* callback_context;
     // Original 0x27FA74 registry and virtual service implementation.
     const OriginalEmbeddedService* embedded_service;

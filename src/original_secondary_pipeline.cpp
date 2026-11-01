@@ -21,7 +21,7 @@ bool post_bridge(std::uint32_t result,void* ctx) noexcept {
         result,in.allocated_object_bytes,in.allocated_object_size,
         kOriginal288688OverrideVtableVA,kOriginal27fb28FirstArgVA,
         kOriginal27fa74FirstArgVA,kOriginal27fa74SecondArgVA,
-        in.call_original,in.callback_context
+        nullptr,in.callback_context
     };
     b.post_status=original_postprocess_0x288688_native_constructor(post,in.embedded_service);
     return b.post_status==OriginalPostprocessStatus::Completed;
@@ -33,7 +33,7 @@ OriginalSecondaryPipelineResult original_run_secondary_pipeline(
         OriginalSecondaryStatus::InvalidMemory,
         OriginalPostprocessStatus::MissingOriginalCallees,0u
     };
-    if(!in.allocator || !in.call_original) {
+    if(!in.allocator || !in.embedded_service) {
         result.allocation_status=OriginalSecondaryStatus::MissingAllocator;
         return result;
     }

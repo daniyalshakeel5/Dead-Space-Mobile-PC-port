@@ -21,6 +21,25 @@ using OriginalEmbeddedMethod84Dispatch = bool (*)(
     const OriginalEmbeddedMethod84Call&, void* context,
     std::uint32_t* out_original_return) noexcept;
 
+// Native contract for the five virtual-method calls in original 0x27FB28.
+// Only arguments actually defined by ARM instructions are marked known.
+struct OriginalEmbeddedVirtualCall {
+    std::uint32_t slot_offset;
+    std::uint32_t original_method_arm_va;
+    std::uint32_t original_interface_arm_va;
+    std::uint32_t r1, r2, r3;
+    std::uint8_t known_registers_mask;
+    // For 0x27FAF4's +0x74 call, this maps the ARM stack-saved r3 word.
+    std::uint32_t* saved_r3_stack_word;
+};
+struct OriginalEmbeddedVirtualResult {
+    std::uint32_t r0;
+    std::uint32_t r3_after;
+};
+using OriginalEmbeddedVirtualDispatch=bool (*)(
+    const OriginalEmbeddedVirtualCall&, void* context,
+    OriginalEmbeddedVirtualResult*) noexcept;
+
 struct OriginalEmbeddedService {
     const void* registry_bss_slot;
     std::size_t registry_bss_slot_bytes;
@@ -41,6 +60,7 @@ struct OriginalEmbeddedService {
     OriginalRegistryQueryDispatch query_registry;
     OriginalEmbeddedMethod84Dispatch call_method84;
     void* callback_context;
+    OriginalEmbeddedVirtualDispatch call_full_virtual = nullptr;
 };
 
 enum class OriginalEmbeddedSetupStatus : std::uint8_t {
