@@ -31,6 +31,12 @@ static bool loader(unsigned va,unsigned first,unsigned second,
     ++static_cast<F*>(p)->calls;return va==0x1018&&first==1&&second==2;
 }
 static bool clean(void* p) noexcept {++static_cast<F*>(p)->calls;return true;}
+static bool mode1_missing(unsigned owner,std::string_view name,void* p,
+                          unsigned* out) noexcept {
+    auto& f=*static_cast<F*>(p);++f.calls;
+    if(owner!=0x2000||name!="a")return false;
+    *out=0;return true;
+}
 static bool mode1(unsigned owner,std::string_view name,void* p,
                   unsigned* out) noexcept {
     auto& f=*static_cast<F*>(p);++f.calls;
@@ -77,4 +83,15 @@ int main(){
     assert(read(f.h.data()+4)==1u);
     assert(read(f.h.data()+8)==0x5000u);
     assert(read(f.h.data()+12)==0x2000u);
+    // Missing native resource: original 0x28A4F8 cleanup runs without
+    // the generic unresolved failure callback (mode 1, handle +8 null).
+    f.calls=0;
+    native.original_0x28a718=mode1_missing;
+    in.original_0x28a4f8_failure_path=nullptr;
+    r=original_execute_resource_query_0x2803e4(in,0x4000);
+    assert(r.status==OriginalResourceQueryStatus::Completed);
+    assert(r.original_r0==0u);
+    assert(f.calls==1);
+    assert(read(f.h.data())==kOriginalMode1HandleVtable);
+    assert(read(f.h.data()+8)==0u);
 }
