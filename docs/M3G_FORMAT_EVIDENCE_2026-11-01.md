@@ -60,6 +60,15 @@ Source: GitHub Actions push runs `41285804108`, `41286597401`,
 - Reports are aggregate JSON metadata only; real game resource bytes are never
   part of builds, commits, releases, or published artifacts.
 
+## Native texture decoder milestone — actual APK verified
+
+- [GitHub Actions run 41289939920](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41289939920) confirmed that **all 167** JSR184-like assets pass bounded *diagnostic* section framing (not strict JSR184): 334 type-0 chunks and 167 type-10 (Image2D) chunks, exactly 2 sections per file. Strict parsing still rejects the extra type-0 header.
+- **67 of 167** Image2D payloads pass the standard superclass/metadata/palette/pixel-byte checks, all immutable RGBA (format 100), maximum dimensions 1024×1024.
+- The independent native C++ in-memory RGBA decoder succeeded for **all 67** genuine APK textures, returning **98,480,128 RGBA pixel bytes** in aggregate. The other **100** image payloads are still unsupported, not assumed to be broken.
+- [GitHub Actions run 41290357084](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41290357084) compiled the new native PNG extractor, used it on **three** real textures, and validated PNG headers, CRC32s, dimensions, zlib decompression and scanline lengths. The PNG files were ephemeral and deleted; no copyrighted data entered artifacts.
+- Local user-owned workflow: run `ds_asset_install` on the user's APK, then `ds_m3g_probe "<local texture.m3g>" --decode-image` and `ds_m3g_texture_extract "<local texture.m3g>" "<new output.png>"`. The extractor refuses to overwrite existing output.
+- Code: `src/m3g_container.cpp` / `include/ds_port/m3g_container.hpp` decoder, `apps/m3g_texture_extract.cpp` PNG output, `tools/deadspace_m3g_native_verify.py` private APK checks, synthetic CTest fixtures. Windows and Linux builds use existing GitHub Actions, with no bundled game content.
+- **Not yet achieved:** decoding the 100 other Image2D payloads, 91 IronMonkey meshes, renderer integration, gameplay engine, collision, AI, animation, audio, mission logic. No playable native PC build.
 ## Next format gate (do not bypass)
 
 1. Compare `IM-M3G` first-section layout and compression/checksum with
