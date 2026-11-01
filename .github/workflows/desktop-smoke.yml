@@ -79,12 +79,13 @@ jobs:
       - name: Stage Linux input diagnostic
         if: runner.os == 'Linux'
         shell: bash
-        run: mkdir -p dist && cp build/ds_input_probe build/ds_apk_probe dist/
+        run: mkdir -p dist && cp build/deadspace_native build/ds_input_probe build/ds_apk_probe dist/
       - name: Stage Windows input diagnostic
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item build/Release/deadspace_native.exe dist/
           Copy-Item build/Release/ds_input_probe.exe dist/
           Copy-Item build/Release/ds_apk_probe.exe dist/
           # Package SDL2.dll only if the setup-sdl package linked dynamically.
@@ -93,7 +94,7 @@ jobs:
       - name: Upload diagnostic only - NO GAME CONTENT
         uses: actions/upload-artifact@v4
         with:
-          name: deadspace-input-probe-${{ runner.os }}
+          name: deadspace-native-splash-stage-${{ runner.os }}
           path: dist/
           if-no-files-found: error
           retention-days: 7
