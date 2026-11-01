@@ -3,6 +3,7 @@
 #include <limits>
 #include <new>
 #include <string>
+#include <stdexcept>
 #include <utility>
 
 namespace ds_port::original_runtime {
