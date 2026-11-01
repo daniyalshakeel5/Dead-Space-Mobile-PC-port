@@ -66,12 +66,14 @@ ImMenuGeometry decode_im_menu_geometry(const std::uint8_t* data,
         out.decoded=false;out.error=why;out.mesh_count=0;
         out.vertices.clear();out.indices.clear();out.surfaces.clear();
         out.mesh_bounds.clear();
+        out.original_object_type_counts.fill(0);
         return out;
     };
     std::vector<Chunk> chunks;
     if(!read_chunks(data,bytes,chunks))
         return fail("malformed original menu IM-M3G framing");
     try{
+        for(const auto& obj:chunks)++out.original_object_type_counts[obj.type];
         for(std::size_t i=0;i<chunks.size();++i){
             const auto& mesh=chunks[i];
             if(mesh.type!=14)continue;
