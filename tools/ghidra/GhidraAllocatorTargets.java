@@ -21,7 +21,7 @@ public class GhidraAllocatorTargets extends GhidraScript {
     }
     private String inspect(long elfVA) throws Exception {
         Address start = toAddr(elfVA + BIAS);
-        Function fn = currentProgram.getFunctionManager().getFunctionContaining(start);
+        Function fn = currentProgram.getFunctionManager().getFunctionAt(start);
         if (fn == null) return "{\"elf_entry\":\"0x"+Long.toHexString(elfVA)+"\",\"found\":false}";
         List<String> calls = new ArrayList<>();
         List<String> indirects = new ArrayList<>();
