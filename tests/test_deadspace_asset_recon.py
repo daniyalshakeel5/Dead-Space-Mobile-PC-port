@@ -1,5 +1,7 @@
 """Only synthetic fixture data. Never uses original Dead Space game resources."""
 import json
+import gzip
+import struct
 from pathlib import Path
 import tempfile
 import unittest
@@ -29,6 +31,7 @@ class AssetReconTests(unittest.TestCase):
             bytes.fromhex("ab4a5352313834bb0d0a1a0a") + b"xx": "m3g_jsr184",
             bytes.fromhex("ab494d324d3347bb0d0a1a0a"): "m3g_im2",
             bytes.fromhex("ab494d334d3347bb0d0a1a0a"): "m3g_im3",
+            b"\x1f\x8c" + struct.pack("<I", 36) + b"\x1f\x8b": "m3g_gzip_wrapper",
             b"\x78\x9c\x03\x00": "possible-zlib",
         }
         for data, expected in cases.items():
@@ -108,10 +111,15 @@ class AssetReconTests(unittest.TestCase):
                 z.writestr("assets/UNMATCHED.sph", b"\x00" * 8)
                 z.writestr("assets/PRIVATE_MODEL.m3g",
                            bytes.fromhex("ab4a5352313834bb0d0a1a0a") + b"\x00")
+                inner = bytes.fromhex("ab494d334d3347bb0d0a1a0a") + b"\x00" * 24
+                wrapper = b"\x1f\x8c" + struct.pack("<I", len(inner)) + gzip.compress(inner)
+                z.writestr("assets/PRIVATE_WRAPPED.m3g", wrapper)
             report = investigate(apk)
             self.assertEqual(report["sprite_stem_stats"]["paired_count"], 1)
             self.assertEqual(report["sprite_stem_stats"]["sph_count"], 2)
             self.assertEqual(report["extension_magic_stats"][".m3g"]["m3g_jsr184"]["count"], 1)
+            self.assertEqual(report["extension_magic_stats"][".m3g"]["m3g_gzip_wrapper"]["count"], 1)
+            self.assertEqual(report["m3g_inner_magic_stats"]["m3g_im3"]["count"], 1)
             self.assertEqual(report["extension_magic_stats"][".sps"]["possible-zlib"]["count"], 1)
             public_text = json.dumps(report)
             self.assertNotIn("PRIVATE_SPRITE", public_text)
