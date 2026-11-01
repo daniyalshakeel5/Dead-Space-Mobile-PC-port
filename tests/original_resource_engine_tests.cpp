@@ -5,6 +5,7 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <string>
 
 using namespace ds_port::original_runtime;
 namespace {
@@ -160,6 +161,35 @@ int main() {
     assert(started.status==
            OriginalReceiverActivationStatus0x278e58::UnreconstructedProviderActivation);
     assert(started.original_provider_arm_va==0x51000u);
+    // The constructed native owner consumes real mapped resource
+    // bytes in original mode 8, but does not falsely mark its
+    // unreconstructed +0x70 postprocessing as complete.
+    const std::string asset_text="RESOURCE=YES\r\nNEXT=2\n";
+    OriginalNativeByteSource resource_bytes{
+        reinterpret_cast<const std::uint8_t*>(asset_text.data()),
+        asset_text.size(),0
+    };
+    OriginalResourceByteString resource_line{};
+    auto stream=with_provider.read_resource_text_line_0x276d18(
+        resource_bytes,resource_line);
+    assert(stream.status==
+           OriginalNativeOwnerStreamStatus::LineReadyAwaitingOwnerPostprocess);
+    assert(resource_line.contents=="RESOURCE=YES");
+    stream=with_provider.read_resource_text_line_0x276d18(
+        resource_bytes,resource_line);
+    assert(stream.status==
+           OriginalNativeOwnerStreamStatus::LineReadyAwaitingOwnerPostprocess);
+    assert(resource_line.contents=="NEXT=2");
+    assert(resource_bytes.position==asset_text.size());
+    stream=with_provider.read_resource_text_line_0x276d18(
+        resource_bytes,resource_line);
+    assert(stream.status==OriginalNativeOwnerStreamStatus::EndOfStream);
+    resource_bytes.position=0;
+    stream=engine.read_resource_text_line_0x276d18(
+        resource_bytes,resource_line);
+    assert(stream.status==
+           OriginalNativeOwnerStreamStatus::MissingOriginalProvider);
+    assert(resource_bytes.position==0);
     // Verify the actual first two original calls from 0x286918,
     // not an invented "engine ready" state.
     std::array<std::uint8_t,12> loader{};
