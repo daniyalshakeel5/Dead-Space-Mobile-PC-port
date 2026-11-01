@@ -77,7 +77,7 @@ class Format116Tests(unittest.TestCase):
             self.assertEqual(result["palette_presence"]["empty"], 1)
             self.assertEqual(result["pixel_start_offset_class"]["variable"], 1)
             self.assertEqual(result["etc1_base_length_ratio_pct"]["100"], 1)
-            self.assertEqual(result["etc1_full_mip_length_ratio_pct"]["100"], 1)
+            self.assertEqual(result["etc1_full_mip_length_ratio_pct"]["33"], 1)
 
 
 if __name__ == "__main__":
