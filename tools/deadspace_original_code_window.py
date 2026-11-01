@@ -118,6 +118,21 @@ def resolve_arm_literal_based_global(raw: bytes, sections: list[tuple[int,int,in
     return (add_addr+8+displacement)&0xffffffff
 
 
+def prove_runtime_global_layout(frame_global: int, record_slot: int,
+                                type2_float: int) -> dict:
+    """Verify the three exact original ELF addresses before host mapping."""
+    if (frame_global != 0x0049caa8 or
+        record_slot-frame_global != 0xec or
+        type2_float-frame_global != 0x274):
+        raise ValueError("Original ARM globals do not match native port offsets")
+    return {
+        "base":f"0x{frame_global:08x}",
+        "record_slot_relative_offset":0xec,
+        "type2_float_relative_offset":0x274,
+        "minimum_consecutive_span":0x278,
+    }
+
+
 def elf32_jni_symbols(raw: bytes, names: set[str]) -> dict[str, tuple[int, int, bool]]:
     """Use original ELF dynamic symbols, not Ghidra's inferred function starts."""
     shoff=struct.unpack_from("<I",raw,32)[0]
@@ -482,6 +497,8 @@ def observe(apk: Path) -> dict:
         data,sections,0x0028cb20,4))[0]
     type2_source_base=resolve_arm_literal_based_global(
         data,sections,0x0028cad8,0x50,0x0028cadc)
+    original_global_layout=prove_runtime_global_layout(
+        frame_global,original_record_slot,(type2_source_base+0x1c)&0xffffffff)
     type2_info={
         "entry_default_float_bits":f"0x{initial_float_bits:08x}",
         "original_runtime_field_address":f"0x{(type2_source_base+0x1c)&0xffffffff:08x}",
@@ -502,6 +519,7 @@ def observe(apk: Path) -> dict:
         "frame_transition_global_address_proof":shared_original_global,
         "stage_zero_type2_runtime_float_evidence":type2_info,
         "stage_zero_0x281d54_record_global_slot":f"0x{original_record_slot:08x}",
+        "verified_original_global_relative_layout":original_global_layout,
         "reconstructed_native_helper_proof": helpers,
         "windows": out,
         "original_elf_jni_symbols":symbol_windows,
