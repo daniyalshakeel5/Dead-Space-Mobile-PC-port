@@ -37,6 +37,12 @@ class ArmWindowTests(unittest.TestCase):
                 0:("push","{r4, lr}"),4:("mov","r4, r0"),
                 8:("bl","#0x27f790"),12:("mov","r0, r4"),
                 16:("pop","{r4, lr}"),20:("b","#0x280520")}),
+            "stage_zero_followup_target_0x2833f4":decoded({
+                0:("mov","r3, #0"),
+                4:("str","r3, [r0, #0x20]"),
+                8:("str","r1, [r0, #0x1c]"),
+                12:("str","r1, [r0, #0x24]"),
+                16:("bx","lr")}),
             "frame_stage_zero_second_callee":decoded({
                 24:("ldr","r1, [r4, #0x40]"),
                 28:("ldr","r3, [r4, #0x44]"),
@@ -93,6 +99,19 @@ class ArmWindowTests(unittest.TestCase):
                 32:("pop","{r4, pc}")})
         }
         self.assertTrue(all(proven_original_code_helpers(windows).values()))
+        # Mutation-based ARM instruction proof: any offset, register or
+        # return opcode change invalidates this complete recovered routine.
+        result_key="stage_zero_followup_0x2833f4_complete_three_word_store"
+        stores=windows["stage_zero_followup_target_0x2833f4"]["instructions"]
+        for index, changed in ((1,"r3, [r0, #0x24]"),
+                               (2,"r0, [r0, #0x1c]"),
+                               (3,"r1, [r0, #0x20]"),
+                               (4,"r0")):
+            old=stores[index]["args"]
+            stores[index]["args"]=changed
+            self.assertFalse(proven_original_code_helpers(windows)[result_key])
+            stores[index]["args"]=old
+        self.assertTrue(proven_original_code_helpers(windows)[result_key])
         zero_steps=windows["frame_stage_zero_second_callee"]["instructions"]
         match=lambda off: next(item for item in zero_steps if item["offset"]==off)
         match(84)["args"]="r1, [r4, #8]"
