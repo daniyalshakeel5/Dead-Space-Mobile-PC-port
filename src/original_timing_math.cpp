@@ -21,4 +21,28 @@ bool original_store_time_pair_at_offset_0x40(
         bytes[0x40+i] = static_cast<std::uint8_t>((result>>(i*8))&0xffu);
     return true;
 }
+OriginalClockSeedResult original_seed_time_pair_if_zero(
+    void* state, std::size_t accessible_bytes,
+    std::int32_t original_large_units,
+    std::int32_t original_small_units) noexcept {
+    if (!state || accessible_bytes < 0x48)
+        return OriginalClockSeedResult::InvalidContext;
+    const auto* bytes=static_cast<const std::uint8_t*>(state);
+    // ARM LDR r1,[r4,#0x40]; LDR r3,[r4,#0x44]; ORRS r1,r1,r3;
+    // BNE skip. Little-endian original object has two adjacent 32-bit
+    // words, so either nonzero word forbids overwriting the slot.
+    for (std::size_t i=0x40;i<0x48;++i)
+        if (bytes[i]!=0)
+            return OriginalClockSeedResult::ExistingValueKept;
+
+    // The original native time provider returned this signed pair.
+    // Its instruction behavior is not yet ported; we accept only the pair
+    // from an actual caller, never manufacture clock values.
+    if(!original_store_time_pair_at_offset_0x40(
+           state, accessible_bytes, original_large_units,
+           original_small_units))
+        return OriginalClockSeedResult::InvalidContext;
+    return OriginalClockSeedResult::OriginalEmptySlotSeeded;
+}
+
 } // namespace ds_port::original_runtime
