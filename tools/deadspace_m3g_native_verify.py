@@ -206,7 +206,7 @@ def analyze(apk: Path, native_probe: Path,
                                             decoded_rgba_bytes += (
                                                 int(payload["rgba_width"]) *
                                                 int(payload["rgba_height"]) * 4)
-                                            if (texture_exporter is not None and (
+                                            if (texture_exporter is not None and
                                                     png_smoke_counts["tested"] < 3):
                                                 png_smoke_counts["tested"] += 1
                                                 target = Path(directory) / "temporary-owned-image.png"
