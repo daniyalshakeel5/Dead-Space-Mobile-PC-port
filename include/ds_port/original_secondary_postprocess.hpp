@@ -33,6 +33,10 @@ enum class OriginalPostprocessStatus:std::uint8_t {
 // Both vtables verified against original ARM ELF on hosted runner.
 inline constexpr std::uint32_t kOriginal2828acConstructorVtableVA=0x004898e8u;
 inline constexpr std::uint32_t kOriginal288688OverrideVtableVA=0x00489a98u;
+// Full argument literals independently recovered from actual 0x288688 ARM.
+inline constexpr std::uint32_t kOriginal27fb28FirstArgVA=0x0042fff8u;
+inline constexpr std::uint32_t kOriginal27fa74FirstArgVA=0x00430020u;
+inline constexpr std::uint32_t kOriginal27fa74SecondArgVA=0x00430030u;
 
 // Runs original 0x2828AC directly before remaining two external methods.
 OriginalPostprocessStatus original_postprocess_0x288688_native_constructor(

@@ -23,8 +23,8 @@ bool step(std::uint32_t target,std::uint32_t address,std::uint32_t a1,
     const std::uint32_t targets[]={0x27fb28u,0x27fa74u};
     assert(s.steps<2&&target==targets[s.steps]);
     assert(address==0x5014u);
-    assert(a1==(s.steps==0?1u:2u));
-    assert(a2==(s.steps==1?3u:0u));
+    assert(a1==(s.steps==0?kOriginal27fb28FirstArgVA:kOriginal27fa74FirstArgVA));
+    assert(a2==(s.steps==1?kOriginal27fa74SecondArgVA:0u));
     ++s.steps;*out=0x6000u;return true;
 }
 }
@@ -36,7 +36,7 @@ int main() {
     State s;
     OriginalSecondaryPipeline inputs{0x3000,owner.data(),owner.size(),
         table.data(),table.size(),0x5000,object.data(),object.size(),
-        kOriginal288688OverrideVtableVA,1,2,3,alloc,step,&s};
+        alloc,step,&s};
     auto r=original_run_secondary_pipeline(inputs);
     assert(r.allocation_status==OriginalSecondaryStatus::Completed);
     assert(r.postprocess_status==OriginalPostprocessStatus::Completed);

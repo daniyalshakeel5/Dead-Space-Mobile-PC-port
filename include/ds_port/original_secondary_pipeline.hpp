@@ -13,10 +13,6 @@ struct OriginalSecondaryPipeline {
     std::uint32_t allocated_object_arm_address;
     void* allocated_object_bytes;
     std::size_t allocated_object_size;
-    std::uint32_t initial_vtable_arm_address;
-    std::uint32_t first_setup_arg_arm_address;
-    std::uint32_t second_setup_arg_arm_address;
-    std::uint32_t third_setup_arg_arm_address;
     OriginalSecondaryDispatch allocator;
     OriginalPostprocessStep call_original;
     void* callback_context;

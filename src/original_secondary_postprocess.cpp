@@ -37,8 +37,9 @@ OriginalPostprocessStatus original_postprocess_0x288688_native_constructor(
     if(!in.original_object_arm_address || !in.mapped_object_bytes ||
        in.accessible_object_bytes<0x24 ||
        in.initial_vtable_arm_address!=kOriginal288688OverrideVtableVA ||
-       !in.first_setup_arg_arm_address || !in.second_setup_arg_arm_address ||
-       !in.third_setup_arg_arm_address ||
+       in.first_setup_arg_arm_address!=kOriginal27fb28FirstArgVA ||
+       in.second_setup_arg_arm_address!=kOriginal27fa74FirstArgVA ||
+       in.third_setup_arg_arm_address!=kOriginal27fa74SecondArgVA ||
        in.original_object_arm_address>0xffffffffu-0x14u)
         return OriginalPostprocessStatus::InvalidMemory;
     if(!in.call_original) return OriginalPostprocessStatus::MissingOriginalCallees;
@@ -51,10 +52,10 @@ OriginalPostprocessStatus original_postprocess_0x288688_native_constructor(
     store32(p,kOriginal288688OverrideVtableVA);
     std::uint32_t result=0;
     if(!in.call_original(0x0027fb28u,in.original_object_arm_address+0x14u,
-        in.first_setup_arg_arm_address,0u,in.callback_context,&result))
+        kOriginal27fb28FirstArgVA,0u,in.callback_context,&result))
         return OriginalPostprocessStatus::CallRefused;
     if(!in.call_original(0x0027fa74u,in.original_object_arm_address+0x14u,
-        in.second_setup_arg_arm_address,in.third_setup_arg_arm_address,
+        kOriginal27fa74FirstArgVA,kOriginal27fa74SecondArgVA,
         in.callback_context,&result))
         return OriginalPostprocessStatus::CallRefused;
     // 0x2886D0 STR r0,[r4,#0x20]

@@ -19,8 +19,8 @@ bool post_bridge(std::uint32_t result,void* ctx) noexcept {
     }
     const OriginalPostprocessInputs post{
         result,in.allocated_object_bytes,in.allocated_object_size,
-        in.initial_vtable_arm_address,in.first_setup_arg_arm_address,
-        in.second_setup_arg_arm_address,in.third_setup_arg_arm_address,
+        kOriginal288688OverrideVtableVA,kOriginal27fb28FirstArgVA,
+        kOriginal27fa74FirstArgVA,kOriginal27fa74SecondArgVA,
         in.call_original,in.callback_context
     };
     b.post_status=original_postprocess_0x288688_native_constructor(post);
