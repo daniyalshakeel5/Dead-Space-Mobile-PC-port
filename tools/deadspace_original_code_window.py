@@ -174,6 +174,56 @@ def proven_frame_dispatch_prefix(insns: list[dict]) -> dict[str, bool]:
     }
 
 
+def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
+    """Accept specific original ABI/control-flow semantics only on exact ARM."""
+    def matched(name: str, expected: dict[int, tuple[str,str]]) -> bool:
+        entries=windows.get(name,{}).get("instructions",[])
+        got={e["offset"]:(e["op"],e["args"]) for e in entries}
+        return all(got.get(k)==v for k,v in expected.items())
+    zero_return=matched("game_entry_direct_callee",{
+        0:("mov","r0, #0"),
+        4:("bx","lr"),
+    })
+    entry_wrapper=matched("original_game_entry_jni",{
+        0:("push","{fp, lr}"),
+        4:("add","fp, sp, #4"),
+        8:("sub","sp, sp, #8"),
+        12:("str","r0, [fp, #-8]"),
+        16:("str","r1, [fp, #-0xc]"),
+        20:("mov","r0, #0"),
+        24:("mov","r1, #0"),
+        28:("bl","#0x27e974"),
+        32:("mov","r3, r0"),
+        36:("mov","r0, r3"),
+        40:("sub","sp, fp, #4"),
+        44:("pop","{fp, pc}"),
+    })
+    zero_chain=matched("frame_stage_zero_routine",{
+        0:("push","{r4, lr}"),
+        4:("mov","r4, r0"),
+        8:("bl","#0x27f790"),
+        12:("mov","r0, r4"),
+        16:("pop","{r4, lr}"),
+        20:("b","#0x280520"),
+    })
+    stage_one=matched("frame_stage_one_routine",{
+        0:("push","{r4, lr}"),
+        4:("ldr","r3, [r0, #0xc]"),
+        8:("mov","r0, r3"),
+        12:("ldr","r3, [r3]"),
+        16:("mov","lr, pc"),
+        20:("ldr","pc, [r3]"),
+        24:("subs","r0, r0, #1"),
+        28:("movne","r0, #1"),
+        32:("pop","{r4, pc}"),
+    })
+    return {
+        "jni_run_entrypoint_always_returns_zero":zero_return and entry_wrapper,
+        "stage_zero_calls_both_native_routines_in_order":zero_chain,
+        "stage_one_normalizes_virtual_return_to_zero_or_one":stage_one,
+    }
+
+
 def observe(apk: Path) -> dict:
     try:
         from capstone import Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB
@@ -244,10 +294,14 @@ def observe(apk: Path) -> dict:
         out["native_frame_state_dispatch"]["instructions"])
     if not all(contract.values()):
         raise ValueError("Original ARM frame dispatch instruction contract changed")
+    helpers=proven_original_code_helpers(out)
+    if not all(helpers.values()):
+        raise ValueError("Original ARM native helper instruction contract changed")
     return {
         "schema": 1,
         "kind": "original-ARM-targeted-instruction-evidence",
         "frame_dispatch_instruction_proof": contract,
+        "reconstructed_native_helper_proof": helpers,
         "windows": out,
         "original_elf_jni_symbols":symbol_windows,
         "limitations": (
