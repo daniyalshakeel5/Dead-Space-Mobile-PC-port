@@ -51,4 +51,24 @@ OriginalResourceAppendStatus original_append_bytes_0x285918(
         return S::AllocationFailed;
     }
 }
+OriginalResourceAppendStatus original_complete_parser_range_0x2863ec(
+    OriginalResourceByteString& target,
+    const std::uint8_t* begin,std::size_t range_size,
+    std::size_t maximum_content_bytes) noexcept {
+    using S=OriginalResourceAppendStatus;
+    if(range_size>maximum_content_bytes)
+        return S::ExceedsLimit;
+    if(range_size && !begin)
+        return S::InvalidRange;
+    const auto copied=target.contents.size();
+    // ARM 0x286524 and 0x28656C: BHS skips copying if the
+    // temporary string already has at least the source range length.
+    if(copied>=range_size)return S::Completed;
+    // ARM 0x28653C and 0x2865A0:
+    // r1=original_begin+(temporary_end-temporary_begin);
+    // r2=original_end; BL 0x285918. Preserve bytes, including NUL.
+    return original_append_bytes_0x285918(target,begin+copied,
+                                         range_size-copied,
+                                         maximum_content_bytes);
+}
 } // namespace ds_port::original_runtime
