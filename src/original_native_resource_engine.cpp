@@ -132,6 +132,45 @@ OriginalNativeResourceEngine::read_resource_wide_line_0x276d18(
     return original_read_wide_line_0x276d18(
         load32(bytes_.data()+0x8b0u),source,output);
 }
+bool OriginalNativeResourceEngine::bind_user_asset_fd(
+    int native_host_fd) noexcept {
+    if(!constructed_ || native_host_fd<0)return false;
+    auto load32=[](const std::uint8_t* p) noexcept -> std::uint32_t {
+        return std::uint32_t(p[0])|(std::uint32_t(p[1])<<8)|
+               (std::uint32_t(p[2])<<16)|(std::uint32_t(p[3])<<24);
+    };
+    if(load32(bytes_.data()+0x8acu)!=owner_va_+0x804u ||
+       load32(bytes_.data()+0x804u)!=kOriginalEmbeddedProviderVtable)
+        return false;
+    // Explicit PC host adapter only. Original 0x27A4F0 creates
+    // the embedded provider, but its actual file-open routine
+    // remains unported. This connection never claims original
+    // game source creation or ownership of the file descriptor.
+    auto store32=[](std::uint8_t* p,std::uint32_t x) noexcept {
+        for(unsigned k=0;k<4;++k)p[k]=std::uint8_t(x>>(8u*k));
+    };
+    store32(bytes_.data()+0x804u+0x10u,
+            static_cast<std::uint32_t>(native_host_fd));
+    store32(bytes_.data()+0x804u+0xa4u,0u);
+    return true;
+}
+OriginalOwnerWideLineResult
+OriginalNativeResourceEngine::read_bound_asset_line_0x276d18(
+    int native_host_fd,OriginalNativeUtf16String& output) noexcept {
+    using S=OriginalOwnerWideLineStatus;
+    if(!constructed_||native_host_fd<0)
+        return {S::InvalidInput,0,0};
+    auto load32=[](const std::uint8_t* p) noexcept -> std::uint32_t {
+        return std::uint32_t(p[0])|(std::uint32_t(p[1])<<8)|
+               (std::uint32_t(p[2])<<16)|(std::uint32_t(p[3])<<24);
+    };
+    if(load32(bytes_.data()+0x8acu)!=owner_va_+0x804u)
+        return {S::InvalidInput,0,0};
+    return original_read_native_file_line_0x276d18(
+        load32(bytes_.data()+0x8b0u),
+        {bytes_.data()+0x804u,bytes_.size()-0x804u,native_host_fd},
+        output);
+}
 OriginalReceiverPrefixResult0x278018
 OriginalNativeResourceEngine::process_receiver_prefix(
     std::u16string_view record,
