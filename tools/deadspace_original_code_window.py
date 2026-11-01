@@ -61,6 +61,7 @@ WINDOWS = {
     "resource_parser_receiver_0x278018": (0x00278018, 768),
     "resource_receiver_activation_0x278e58": (0x00278e58, 480),
     "resource_owner_activation_check_0x2733e8": (0x002733e8, 640),
+    "resource_owner_virtual60_0x26c4cc": (0x0026c4cc, 360),
     "resource_receiver_activation_tree_clear_0x273570": (0x00273570, 384),
     "resource_receiver_activation_tail_0x279038": (0x00279038, 384),
     "resource_receiver_tree_lookup_0x2710a8": (0x002710a8, 768),
