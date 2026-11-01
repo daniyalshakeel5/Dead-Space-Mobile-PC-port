@@ -83,7 +83,8 @@ jobs:
           # Exit 20 is intentional: original menu code is NOT ready.
           test "$actual_exit" = 20
           grep -F "Original menu stage resource load:" \
-            "$RUNNER_TEMP/native-splash-exit.txt"\n          grep -F "Original EA and Dead Space splash images displayed." \
+            "$RUNNER_TEMP/native-splash-exit.txt"
+          grep -F "Original EA and Dead Space splash images displayed." \
             "$RUNNER_TEMP/native-splash-exit.txt"
           grep -F "Native main-menu renderer still incomplete." \
             "$RUNNER_TEMP/native-splash-exit.txt"
