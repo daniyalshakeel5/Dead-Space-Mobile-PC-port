@@ -37,6 +37,12 @@ int main(int argc,char** argv){
         first=false;
         std::cout<<"\""<<i<<"\":"<<count;
     }
-    std::cout<<"}}\n";
+    std::cout<<"},\"camera_object_ids\":[";
+    for(std::size_t i=0;i<scene.camera_object_indices.size();++i) {
+        if(i)std::cout<<",";
+        std::cout<<scene.camera_object_indices[i];
+    }
+    std::cout<<"],\"group_count\":"<<scene.group_object_indices.size()
+             <<"}\n";
     return 0;
 }
