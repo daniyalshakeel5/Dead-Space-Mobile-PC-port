@@ -6,6 +6,7 @@
 #include "ds_port/original_menu_draw_stream.hpp"
 #ifdef DS_NATIVE_ORIGINAL_MENU_GL
 #include "ds_port/original_menu_gl.hpp"
+#include "ds_port/original_menu_scene_graph.hpp"
 #endif
 #include "ds_port/im_ui_image.hpp"
 #include <filesystem>
@@ -57,11 +58,19 @@ bool load_original_menu_stage(const std::string& root) {
 #ifdef DS_NATIVE_ORIGINAL_MENU_GL
     // The GPU backend is linked to this native game; do not draw until
     // original camera, world matrices and material links are recovered.
-    ds_port::OriginalMenuGpuFrame original_frame{};
-    std::string missing_original;
-    if(ds_port::validate_original_menu_gpu_frame(scene,draw,ui.images,
-        original_frame,missing_original))return false;
-    std::cerr<<"Original GPU menu blocked: "<<missing_original<<"\\n";
+    const auto resolved=ds_port::resolve_original_menu_scene(
+        scene,draw,ui.images,{}, {}, {});
+    if(!resolved.valid) {
+        std::cerr<<"Original GPU menu blocked: "<<resolved.error<<"\\n";
+    } else {
+        std::string renderer_error;
+        const auto result=ds_port::run_original_menu_gl(
+            scene,draw,ui.images,resolved.frame,renderer_error);
+        if(result==ds_port::OriginalMenuGpuStatus::GraphicsUnavailable) {
+            std::cerr<<"Native renderer failed: "<<renderer_error<<"\\n";
+            return false;
+        }
+    }
 #endif
     for(const auto& img:ui.images)
         if(!img.decoded || img.width!=1024 || img.height!=1024 ||
