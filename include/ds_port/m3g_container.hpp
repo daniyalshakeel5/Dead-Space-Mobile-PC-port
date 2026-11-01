@@ -24,6 +24,15 @@ struct M3gContainerReport {
     bool diagnostic_mode = false;
     std::uint32_t nonstandard_header_objects = 0;
     std::uint32_t reserved_type_objects = 0;
+    // JSR-184 Image2D payload subparser evidence, never raw pixel bytes.
+    std::uint32_t image2d_objects = 0;
+    std::uint32_t image2d_standard_payloads = 0;
+    std::uint32_t image2d_unrecognized_payloads = 0;
+    std::uint32_t image2d_max_width = 0;
+    std::uint32_t image2d_max_height = 0;
+    std::uint64_t image2d_validated_pixel_bytes = 0;
+    std::array<std::uint32_t, 5> image2d_format_counts{}; // format 96..100
+
     std::array<std::uint32_t, 256> object_type_count{};
 };
 
