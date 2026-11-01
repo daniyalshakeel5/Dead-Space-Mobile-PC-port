@@ -19,7 +19,8 @@ def elf_fixture():
     struct.pack_into("<III",raw,0x100,0xe28fc000,0xe28cc000,0xe5bcf000)
     struct.pack_into("<II",raw,0x120,0x1008,(1<<8)|22)
     struct.pack_into("<IIIBBH",raw,0x150,1,0,0,0,0,0)
-    raw[0x180:0x180+19]=b"\\x00__aeabi_memclr4\\x00"
+    symbol=b"\\x00__aeabi_memclr4\\x00"
+    raw[0x180:0x180+len(symbol)]=symbol
     return raw
 
 class ArmPltImportTests(unittest.TestCase):
