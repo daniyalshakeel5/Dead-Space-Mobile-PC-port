@@ -27,6 +27,8 @@ static bool map_key(SDL_Scancode scancode, Key& key) {
         case SDL_SCANCODE_TAB: key=Key::Tab; break;
         case SDL_SCANCODE_C: key=Key::C; break;
         case SDL_SCANCODE_F: key=Key::F; break;
+        case SDL_SCANCODE_G: key=Key::G; break;
+        case SDL_SCANCODE_V: key=Key::V; break;
         case SDL_SCANCODE_ESCAPE: key=Key::Escape; break;
         case SDL_SCANCODE_1: key=Key::Num1; break;
         case SDL_SCANCODE_2: key=Key::Num2; break;

@@ -92,6 +92,20 @@ int main() {
     CHECK(input.current().started(Action::Interact));
     CHECK(input.current().stopped(Action::Interact));
 
-    std::cout << "All deterministic input checks passed.\n";
+    input.begin_frame();
+    input.key(Key::G, true);
+    CHECK(input.current().active(Action::ZeroGJump));
+    CHECK(input.current().started(Action::ZeroGJump));
+    input.key(Key::V, true);
+    CHECK(input.current().active(Action::RotateWeapon));
+    input.begin_frame();
+    CHECK(!input.current().started(Action::RotateWeapon));
+    input.key(Key::G, false);
+    CHECK(input.current().stopped(Action::ZeroGJump));
+    input.focus_lost();
+    CHECK(!input.current().active(Action::RotateWeapon));
+    input.focus_gained();
+
+    std::cout << "All deterministic input checks passed.\\n";
     return 0;
 }

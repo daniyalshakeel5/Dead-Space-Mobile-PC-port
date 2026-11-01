@@ -10,13 +10,13 @@ namespace ds_port {
 // The mapping targets original PC keyboard/mouse behavior and can change.
 enum class Key : std::uint8_t {
     W, A, S, D, LeftShift, RightShift, E, R, Space, Q, B, Tab,
-    C, F, Escape, Num1, Num2, Num3, Num4, Count
+    C, F, Escape, Num1, Num2, Num3, Num4, G, V, Count
 };
 enum class Mouse : std::uint8_t { Left, Right, Middle, Count };
 enum class Action : std::uint8_t {
     Forward, Backward, Left, Right, Sprint, Aim, Fire, Melee,
     Stomp, AltFire, Reload, Interact, Heal, Locator,
-    Inventory, Stasis, Kinesis, Pause, Count
+    Inventory, Stasis, Kinesis, Pause, ZeroGJump, RotateWeapon, Count
 };
 
 constexpr std::size_t to_index(Key value) { return static_cast<std::size_t>(value); }

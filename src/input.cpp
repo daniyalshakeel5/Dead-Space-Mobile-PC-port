@@ -37,6 +37,12 @@ void Input::recompute() {
     set(Action::Stasis, held(Key::C));
     set(Action::Kinesis, held(Key::F));
     set(Action::Pause, held(Key::Escape));
+    // Vita research confirms original game expects motion gestures for
+    // Zero-G jumping and weapon rotation. Desktop uses explicit key actions:
+    // G = Zero-G jump, V = rotate/alternate weapon orientation.
+    // These are host input intentions, not an emulated accelerometer.
+    set(Action::ZeroGJump, held(Key::G));
+    set(Action::RotateWeapon, held(Key::V));
 
     for (std::size_t i = 0; i != action_count; ++i) {
         frame_.pressed[i] = frame_.pressed[i] || (next[i] && !frame_.down[i]);
