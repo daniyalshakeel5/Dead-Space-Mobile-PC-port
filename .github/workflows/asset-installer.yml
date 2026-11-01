@@ -15,6 +15,7 @@ on:
       - "src/m3g_container.cpp"
       - "include/ds_port/m3g_container.hpp"
       - "tests/m3g_container_tests.cpp"
+      - "apps/m3g_texture_extract.cpp"
       - ".github/workflows/asset-installer.yml"
   pull_request:
     paths:
@@ -28,6 +29,7 @@ on:
       - "src/m3g_container.cpp"
       - "include/ds_port/m3g_container.hpp"
       - "tests/m3g_container_tests.cpp"
+      - "apps/m3g_texture_extract.cpp"
       - ".github/workflows/asset-installer.yml"
   workflow_dispatch:
 
@@ -84,6 +86,7 @@ jobs:
           cp build/ds_asset_install dist/
           cp build/ds_apk_probe dist/
           cp build/ds_m3g_probe dist/
+          cp build/ds_m3g_texture_extract dist/
 
       - name: Stage Windows native installer
         if: runner.os == 'Windows'
@@ -93,6 +96,7 @@ jobs:
           Copy-Item build/Release/ds_asset_install.exe dist/
           Copy-Item build/Release/ds_apk_probe.exe dist/
           Copy-Item build/Release/ds_m3g_probe.exe dist/
+          Copy-Item build/Release/ds_m3g_texture_extract.exe dist/
 
       - name: Upload new-code-only executables (no game data)
         uses: actions/upload-artifact@v4
