@@ -12,6 +12,9 @@ on:
       - "include/ds_port/asset_install.hpp"
       - "apps/asset_install.cpp"
       - "tests/asset_install_tests.cpp"
+      - "src/m3g_container.cpp"
+      - "include/ds_port/m3g_container.hpp"
+      - "tests/m3g_container_tests.cpp"
       - ".github/workflows/asset-installer.yml"
   pull_request:
     paths:
@@ -22,6 +25,9 @@ on:
       - "include/ds_port/asset_install.hpp"
       - "apps/asset_install.cpp"
       - "tests/asset_install_tests.cpp"
+      - "src/m3g_container.cpp"
+      - "include/ds_port/m3g_container.hpp"
+      - "tests/m3g_container_tests.cpp"
       - ".github/workflows/asset-installer.yml"
   workflow_dispatch:
 
@@ -54,14 +60,14 @@ jobs:
 
       - name: Configure Linux build (zlib, no SDL dependency)
         if: runner.os == 'Linux'
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=OFF -DDS_BUILD_ASSET_INSTALLER=ON
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=OFF -DDS_BUILD_ASSET_INSTALLER=ON -DDS_BUILD_M3G_READER=ON
 
       - name: Configure Windows build (static zlib)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $vcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { "C:\vcpkg" }
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=OFF -DDS_BUILD_ASSET_INSTALLER=ON -DVCPKG_TARGET_TRIPLET=x64-windows-static-md "-DCMAKE_TOOLCHAIN_FILE=$vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=OFF -DDS_BUILD_ASSET_INSTALLER=ON -DDS_BUILD_M3G_READER=ON -DVCPKG_TARGET_TRIPLET=x64-windows-static-md "-DCMAKE_TOOLCHAIN_FILE=$vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build native test/installer
