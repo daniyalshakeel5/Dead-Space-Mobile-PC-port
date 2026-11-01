@@ -92,25 +92,37 @@
   EOF and size limits. The in-memory codec,
   complete resource registration, scene renderer
   and gameplay engine remain incomplete.
-- **68/68 synthetic native CTests passed on Windows and Linux** at
-  [verification run 41343352738](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41343352738).
+- Original **EA** and **Dead Space** IM-M3G splash packs
+  now decode in native C++ to 256×256 and 512×128 RGBA8.
+  The original frontend pack decodes to two 1024×1024
+  RGBA atlases. `deadspace_native --boot-splash --assets-dir
+  INSTALLED_DIR` displays both real splash images in a
+  native SDL2 window, then explicitly stops at the
+  unrecovered menu renderer (exit 20). The actual-APK
+  headless boot CI passed: [run 41345686409](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41345686409).
+- The original menu scene now decodes to **52 meshes,
+  55 Appearance-linked surfaces, 18,211 XYZ+UV vertices
+  and 9,750 triangles**, including all original
+  signed-int16 two-component texture-coordinate arrays.
+  Real-APK C++ verification: [run 41346451467](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41346451467).
+- **70/70 synthetic native CTests passed on Windows and Linux** at
+  [verification run 41346451474](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41346451474).
   These tests do not prove real game-engine boot or scene rendering.
   [Latest detailed handoff](docs/HANDOFF_2026-11-01.md).
 
 ## Immediate integration target: original splash → original main menu
 
-The next milestone is **not another standalone model viewer**.
-We are building the actual startup vertical slice: original EA splash,
-original Dead Space splash, the 3D main-menu scene with original UI
-graphics, and interactive menu input on native Windows/Linux.
+The native executable now displays the **actual original EA and
+Dead Space splash images**, decoded locally from the user's
+installed APK, in an SDL2 graphics window. The original
+frontend atlas also decodes, and the true main-menu meshes
+have all vertex positions, texture coordinates, triangles
+and Appearance references recovered in C++. The native
+**interactive main menu is not yet rendered**: it still
+needs scene transforms, camera, materials and input code.
 
-Real APK evidence confirms two proprietary IM-M3G splash image objects,
-a two-image frontend UI pack, **52 menu meshes (18,211 vertices,
-9,750 triangles) decoded by native C++**, and all four menu-environment
-textures decoded to 1024×1024 RGBA. Rendering is **not yet implemented**,
-and the proprietary splash/UI image payloads still require
-reverse-engineering. See [verified boot/menu milestone](docs/BOOT_MENU_VERTICAL_SLICE_2026-11-02.md)
-and [actual-APK boot asset run 41344354016](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41344354016).
+The verified boot/menu checklist and local test instructions
+are in [BOOT_MENU_VERTICAL_SLICE_2026-11-02.md](docs/BOOT_MENU_VERTICAL_SLICE_2026-11-02.md).
 
 ## Goal
 
@@ -160,6 +172,29 @@ contain aggregate counts, not original contents.
 Open [GitHub Actions — Native asset installer](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/workflows/asset-installer.yml)
 and download the Windows or Linux artifact from a successful CI run.
 Only independently written diagnostic programs are packaged, never the game.
+
+## Run the first authentic splash stage
+
+In [GitHub Actions — Desktop foundation run 41346451474](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41346451474)
+download **deadspace-native-splash-stage-Windows** or
+**deadspace-native-splash-stage-Linux**. The binaries never
+include original game assets. Install your own APK assets
+first with `ds_asset_install`, then run:
+
+```sh
+./deadspace_native --boot-splash --assets-dir "/path/to/DeadSpaceAssets"
+```
+
+Windows: `deadspace_native.exe --boot-splash --assets-dir
+"D:\\Games\\DeadSpaceAssets"` (SDL2.dll is in the artifact).
+Linux needs its SDL2 runtime package installed.
+
+The window shows original EA and Dead Space artwork,
+with Enter/Space/click advancing and Escape exiting.
+After both images the executable returns **20** because
+the actual main-menu engine has not been implemented.
+The original-asset headless SDL2 boot test has passed;
+normal-desktop visual alignment remains unverified.
 
 ## Use with your own APK assets
 
