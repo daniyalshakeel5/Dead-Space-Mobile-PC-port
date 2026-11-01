@@ -31,6 +31,9 @@ bool valid_object_type(std::uint8_t t) {
 struct Image2dEvidence {
     std::uint8_t format = 0;
     std::uint32_t width = 0, height = 0, pixel_bytes = 0;
+    std::uint32_t palette_bytes = 0;
+    std::size_t pixel_offset = 0;
+    bool is_mutable = false;
 };
 
 bool parse_image2d_payload(const std::uint8_t* bytes,
@@ -61,11 +64,15 @@ bool parse_image2d_payload(const std::uint8_t* bytes,
     const std::uint32_t height = le32(bytes + at); at += 4;
     if (!width || !height || width > 8192 || height > 8192) return false;
     std::uint32_t pixel_bytes = 0;
+    std::uint32_t palette_bytes = 0;
+    std::size_t pixel_offset = 0;
     if (mutable_flag == 0) {
         std::uint32_t palette_len = 0, pixel_len = 0;
         if (!take32(palette_len) || palette_len > size - at) return false;
         at += palette_len;
         if (!take32(pixel_len) || pixel_len > size - at) return false;
+        pixel_offset = at;
+        palette_bytes = palette_len;
         at += pixel_len;
         // Validate counts against JSR-184 encodings, not an arbitrary guessed
         // pixel format. Palette consists of at most 256 component entries.
@@ -81,7 +88,8 @@ bool parse_image2d_payload(const std::uint8_t* bytes,
         pixel_bytes = pixel_len;
     }
     if (at != size) return false;
-    evidence = Image2dEvidence{format, width, height, pixel_bytes};
+    evidence = Image2dEvidence{format, width, height, pixel_bytes, palette_bytes,
+                               pixel_offset, mutable_flag != 0};
     return true;
 }
 
@@ -228,4 +236,63 @@ M3gContainerReport scan_m3g_container(const std::uint8_t* data,
     report.valid = true;
     return report;
 }
+M3gRgbaImage decode_m3g_rgba_image(const std::uint8_t* data, std::size_t size) {
+    M3gRgbaImage image;
+    const auto fail = [&](const char* reason) {
+        image.error = reason;
+        image.decoded = false;
+        image.pixels_rgba.clear();
+        return image;
+    };
+    const auto report = scan_m3g_container(
+        data, size, 64u * 1024u * 1024u, M3gScanMode::DiagnosticOpaqueVariant);
+    if (!report.valid)
+        return fail("invalid M3G section framing or checksum");
+    if (report.section_count != 2 || report.object_count != 3 ||
+        report.nonstandard_header_objects != 1 ||
+        report.object_type_count[0] != 2 || report.object_type_count[10] != 1 ||
+        report.image2d_standard_payloads != 1)
+        return fail("unsupported object grouping or Image2D payload");
+    const std::size_t section0_size = le32(data + 13);
+    const std::size_t second = kSignature.size() + section0_size;
+    // scan_m3g_container already validated section sizes and checksum.
+    if (second > size || size - second < 13 || data[second] != 0)
+        return fail("unsupported compressed texture section");
+    const std::size_t total = le32(data + second + 1);
+    if (total < 13 || total > size - second)
+        return fail("invalid texture section size");
+    const std::uint8_t* content = data + second + 9;
+    const std::size_t stored = total - 13;
+    if (stored < 10 || content[0] != 0)
+        return fail("missing IronMonkey secondary header");
+    const std::size_t secondary_length = le32(content + 1);
+    if (secondary_length > stored - 10)
+        return fail("secondary header length exceeds section");
+    const std::size_t type_offset = 5 + secondary_length;
+    if (content[type_offset] != 10)
+        return fail("not an Image2D resource");
+    const std::size_t data_length = le32(content + type_offset + 1);
+    if (data_length != stored - (type_offset + 5))
+        return fail("unexpected trailing image object data");
+    const auto* pixels_object = content + type_offset + 5;
+    Image2dEvidence evidence;
+    if (!parse_image2d_payload(pixels_object, data_length, evidence))
+        return fail("Image2D metadata failed JSR-184 bounds validation");
+    if (evidence.format != 100 || evidence.is_mutable ||
+        evidence.palette_bytes != 0 ||
+        std::uint64_t(evidence.width) * evidence.height * 4 >
+            64ull * 1024ull * 1024ull)
+        return fail("only non-paletted immutable RGBA is supported");
+    if (evidence.pixel_bytes != std::uint64_t(evidence.width) * evidence.height * 4 ||
+        evidence.pixel_offset > data_length ||
+        evidence.pixel_bytes > data_length - evidence.pixel_offset)
+        return fail("RGBA pixel span invalid");
+    const auto* start = pixels_object + evidence.pixel_offset;
+    image.pixels_rgba.assign(start, start + evidence.pixel_bytes);
+    image.width = evidence.width;
+    image.height = evidence.height;
+    image.decoded = true;
+    return image;
+}
+
 }  // namespace ds_port
