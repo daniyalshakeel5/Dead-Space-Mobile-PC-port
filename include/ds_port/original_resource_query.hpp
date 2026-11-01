@@ -1,5 +1,6 @@
 #pragma once
 #include "ds_port/original_resource_handle.hpp"
+#include "ds_port/original_mode1_resource_factory.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
@@ -45,6 +46,9 @@ struct OriginalResourceQueryInputs {
     OriginalResourceQueryCleanup original_0x28a644=nullptr;
     OriginalResourceQueryCleanup original_0x284f00=nullptr;
     void* context=nullptr;
+    // When set, replaces generic factory callback with original native
+    // 16-byte mode-1 constructor; resolver 0x28A718 remains mandatory.
+    const OriginalMode1FactoryInputs* native_factory_0x28b3a4=nullptr;
 };
 enum class OriginalResourceQueryStatus:std::uint8_t {
     InvalidContext,UnmappedName,UnterminatedName,MissingOriginalService,
