@@ -1,4 +1,5 @@
 #include "ds_port/original_startup_second_tail.hpp"
+#include "ds_port/original_resource_registration.hpp"
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
