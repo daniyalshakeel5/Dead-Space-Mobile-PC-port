@@ -70,6 +70,9 @@ jobs:
                   dst.parent.mkdir(parents=True,exist_ok=True)
                   dst.write_bytes(source.read(source_name))
           PY
+      - name: Recover original scene record structure in private runner
+        shell: bash
+        run: python tools/research_original_scene_records.py "$RUNNER_TEMP/boot-assets/assets/published/models/main_menu.m3g"
       - name: Inventory original 3D menu scene objects (no game data exported)
         shell: bash
         run: |
