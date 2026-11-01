@@ -91,7 +91,7 @@ endif()
 # The original interactive menu remains gated until its code is native.
 if(DS_BUILD_BOOT_SPLASH AND TARGET SDL2::SDL2)
     target_sources(deadspace_native PRIVATE src/original_splash_host.cpp)
-    target_link_libraries(deadspace_native PRIVATE ds_port_im_ui SDL2::SDL2)
+    target_link_libraries(deadspace_native PRIVATE ds_port_im_ui ds_port_im_menu SDL2::SDL2)
     target_compile_definitions(deadspace_native PRIVATE DS_NATIVE_SPLASH_PRESENTATION=1)
     message(STATUS "Original EA and Dead Space native splash stage enabled")
 elseif(DS_BUILD_BOOT_SPLASH)
