@@ -1,6 +1,7 @@
 #pragma once
 #include "ds_port/original_resource_owner.hpp"
 #include "ds_port/original_owner_byte_line.hpp"
+#include "ds_port/original_owner_line_utf8.hpp"
 #include "ds_port/original_receiver_mode.hpp"
 #include "ds_port/original_receiver_activation.hpp"
 #include "ds_port/original_receiver_prefix.hpp"
@@ -61,6 +62,11 @@ public:
     OriginalNativeOwnerStreamResult read_resource_text_line_0x276d18(
         OriginalNativeByteSource& source,
         OriginalResourceByteString& output) const noexcept;
+    // Recover mode-8 resource text as owned UTF-16, using the game's
+    // distinct 0x26D5FC byte decoder. Does not imply a loaded scene.
+    OriginalOwnerWideLineResult read_resource_wide_line_0x276d18(
+        OriginalNativeByteSource& source,
+        OriginalNativeUtf16String& output) const noexcept;
     OriginalReceiverPrefixResult0x278018 process_receiver_prefix(
         std::u16string_view record,
         OriginalRegistrationCharacterTable character_table,
