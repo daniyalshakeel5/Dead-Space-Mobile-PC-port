@@ -168,6 +168,9 @@ jobs:
                 info["proven_constant_functions"])
           print("Instruction-proven raw pointer event constants:",
                 json.dumps(selected,sort_keys=True))
+          # JNI exports are public ABI metadata; only instruction-proven constants.
+          print("Verified JNI native return implementations:",
+                json.dumps(original,sort_keys=True))
           PY
           python tools/deadspace_m3g_preflight.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
