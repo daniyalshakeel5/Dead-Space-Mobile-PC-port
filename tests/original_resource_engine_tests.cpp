@@ -75,7 +75,7 @@ int main() {
     assert(word(p+0x824u)==0x0049c544u);
     assert(word(p+0x828u)==0);
     assert(word(p+0x82cu)==0x2830u);
-    assert(word(p+0x830u)==0x2830u);
+    assert(word(p+0x830u)==0u); // embedded+0x2c stores a NUL byte
     assert(p[0x830u]==0u);
     assert(word(p+0x890u)==0);
     assert(word(p+0x894u)==0);
