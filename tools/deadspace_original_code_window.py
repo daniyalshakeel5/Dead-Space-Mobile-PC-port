@@ -325,6 +325,24 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
     # Original ELF 0x281D54: allocator via original owner's virtual
     # slot 0x0C, conditional returned-record memory init, and global
     # pointer publication. The virtual allocator must NOT be fabricated.
+    original_registry_query=matched("stage_zero_owner_provider_0x27e930",{
+        0:("str","lr, [sp, #-4]!"),
+        4:("sub","sp, sp, #0xc"),
+        8:("add","r1, sp, #8"),
+        12:("mov","r3, #0"),
+        16:("str","r3, [r1, #-4]!"),
+        20:("ldr","r3, [pc, #0x24]"),
+        24:("mov","r2, #0x10000"),
+        28:("add","r2, r2, #4"),
+        32:("ldr","r3, [pc, r3]"),
+        36:("mov","r0, r3"),
+        40:("ldr","r3, [r3]"),
+        44:("mov","lr, pc"),
+        48:("ldr","pc, [r3, #0x18]"),
+        52:("ldr","r0, [sp, #4]"),
+        56:("add","sp, sp, #0xc"),
+        60:("ldm","sp!, {pc}"),
+    })
     stage_zero_allocator_call_abi=matched("record_allocator_virtual_call_0x281d54",{
         0:("push","{r4, r5, lr}"),
         4:("ldr","r2, [pc, #0x64]"),
@@ -429,6 +447,8 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
             stage_zero_setup and stage_zero_type2),
         "stage_zero_0x281d54_allocator_post_return_and_global_store":(
             stage_zero_setup and stage_zero_allocator_post_return),
+        "stage_zero_0x27e930_original_registry_interface_query":(
+            original_registry_query),
         "stage_zero_0x281d54_virtual_allocator_call_abi":(
             stage_zero_allocator_call_abi and stage_zero_allocator_post_return),
         "original_gettimeofday_stack_arg_and_bl":conditional_clock and gettimeofday_call,
