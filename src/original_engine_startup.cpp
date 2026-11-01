@@ -5,7 +5,8 @@ OriginalEngineStartupResult original_execute_known_engine_startup(
     OriginalEngineStartupResult out{
         OriginalEngineStartupStatus::InvalidOriginalContext,
         OriginalStartupFirstStatus::InvalidOriginalObject,
-        OriginalStageZeroAllocatingResult::InvalidOriginalMemory
+        OriginalStageZeroAllocatingResult::InvalidOriginalMemory,
+        OriginalStartupSecondTailStatus::InvalidOriginalContext
     };
     if(!in.frame_global_0x0049caa8 || in.frame_global_bytes<0x60)
         return out;
@@ -41,7 +42,28 @@ OriginalEngineStartupResult original_execute_known_engine_startup(
     // 0x27FD7C -> virtual+0x54 -> 0x2803E4 -> more allocations
     // and constructors. Do not store 1 prematurely, even though this
     // prefix has genuinely run the original mapped-memory operations.
-    out.status=OriginalEngineStartupStatus::ReachedUnreconstructedOriginalTail;
+    if(!in.original_second_tail_0x280580) {
+        out.status=OriginalEngineStartupStatus::ReachedUnreconstructedOriginalTail;
+        return out;
+    }
+    const auto& tail=*in.original_second_tail_0x280580;
+    if(tail.original_context!=state+8 ||
+       tail.context_bytes<0x58 ||
+       tail.context_bytes>in.frame_global_bytes-8) {
+        out.status=OriginalEngineStartupStatus::OriginalSecondTailBlocked;
+        return out;
+    }
+    out.tail_status=original_execute_stage_zero_tail_0x280580(tail);
+    if(out.tail_status!=OriginalStartupSecondTailStatus::CompletedOriginalSecondRoutine) {
+        out.status=OriginalEngineStartupStatus::OriginalSecondTailBlocked;
+        return out;
+    }
+    // Original NativeOnDrawFrame at 0x27EF98: stage advances to 1
+    // only after the actual full 0x27F870 -> 0x27F790 -> 0x280520
+    // chain returned successfully. The callbacks used for unresolved
+    // virtual targets must themselves implement original game behavior.
+    state[0]=1;state[1]=state[2]=state[3]=0;
+    out.status=OriginalEngineStartupStatus::OriginalStageOneEntered;
     return out;
 }
 }

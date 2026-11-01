@@ -108,6 +108,19 @@ int main(){
     assert(read(s.frame.data()+8+0x50)==2);
     assert(read(s.published.data())==0x9000);
 
+    // A present but incomplete tail may NEVER advance the original stage.
+    State tail_missing{};prepare(tail_missing);
+    auto blocked_input=make_inputs(tail_missing);
+    OriginalStartupSecondTailInputs missing_tail{};
+    missing_tail.original_context=tail_missing.frame.data()+8;
+    missing_tail.context_bytes=tail_missing.frame.size()-8;
+    missing_tail.original_context_arm_va=0x0049cab0u;
+    blocked_input.original_second_tail_0x280580=&missing_tail;
+    const auto blocked=original_execute_known_engine_startup(blocked_input);
+    assert(blocked.status==OriginalEngineStartupStatus::OriginalSecondTailBlocked);
+    assert(blocked.tail_status==OriginalStartupSecondTailStatus::MissingOriginalDirect);
+    assert(read(tail_missing.frame.data())==0);
+
     State fail{};prepare(fail);fail.fail_first=true;
     auto p=make_inputs(fail);
     auto f=original_execute_known_engine_startup(p);

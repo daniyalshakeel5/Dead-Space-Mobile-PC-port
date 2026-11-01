@@ -1,6 +1,7 @@
 #pragma once
 #include "ds_port/original_startup_first.hpp"
 #include "ds_port/original_stage_zero_allocating.hpp"
+#include "ds_port/original_startup_second_tail.hpp"
 #include <cstddef>
 #include <cstdint>
 namespace ds_port::original_runtime {
@@ -15,18 +16,22 @@ struct OriginalEngineStartupInputs {
     std::size_t frame_global_bytes;
     OriginalStartupFirstInputs original_first_0x27f790;
     OriginalStageZeroAllocatingInputs original_second_0x280520;
+    const OriginalStartupSecondTailInputs* original_second_tail_0x280580=nullptr;
 };
 enum class OriginalEngineStartupStatus:std::uint8_t {
     InvalidOriginalContext,
     OriginalStageNotZero,
     FirstStartupRoutineBlocked,
     SecondStartupRoutineBlocked,
-    ReachedUnreconstructedOriginalTail
+    ReachedUnreconstructedOriginalTail,
+    OriginalSecondTailBlocked,
+    OriginalStageOneEntered
 };
 struct OriginalEngineStartupResult {
     OriginalEngineStartupStatus status;
     OriginalStartupFirstStatus first_status;
     OriginalStageZeroAllocatingResult second_status;
+    OriginalStartupSecondTailStatus tail_status;
 };
 // Runs both verified native call chains in strict original sequence,
 // without advancing frame state or pretending engine startup completed.
