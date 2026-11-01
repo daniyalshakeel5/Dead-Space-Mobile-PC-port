@@ -83,7 +83,7 @@ def publish(audit: dict, recon: dict | None = None) -> dict:
                 for key, value in (recon.get("extension_stats") or {}).items()
                 if (key == "[none]" or
                     (isinstance(key, str) and
-                     re.fullmatch(r"\\.[a-z0-9]{1,12}", key)))
+                     re.fullmatch(r"\.[a-z0-9]{1,12}", key)))
                 and isinstance(value, dict) and value.get("count", 0) >= 2
             },
             "group_stats": {
