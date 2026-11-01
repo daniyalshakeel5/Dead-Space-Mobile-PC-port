@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace ds_port {
 
@@ -43,4 +44,16 @@ M3gContainerReport scan_m3g_container(const std::uint8_t* data,
                                      std::size_t size,
                                      std::size_t max_section_bytes = 64u * 1024u * 1024u,
                                      M3gScanMode mode = M3gScanMode::StrictJsr184);
+// Supported subset: verified JSR-184 Image2D immutable non-paletted RGBA
+// in a structurally validated two-section Dead Space texture resource.
+// Caller owns the APK; decoded pixels remain in caller memory.
+struct M3gRgbaImage {
+    bool decoded = false;
+    std::string error;
+    std::uint32_t width = 0;
+    std::uint32_t height = 0;
+    std::vector<std::uint8_t> pixels_rgba;
+};
+M3gRgbaImage decode_m3g_rgba_image(const std::uint8_t* data, std::size_t size);
+
 }  // namespace ds_port
