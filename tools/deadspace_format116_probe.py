@@ -180,12 +180,13 @@ def analyze(apk: Path) -> dict:
                      else "other"] += 1
                 if "size_class" in fields:
                     sizes[fields["size_class"]] += 1
-                    # Ratios only; never output individual original pixel lengths.
+                    # Aggregate ratios only; never publish per-file payload sizes.
                     ratios[str(fields["etc1_ratio_pct"])] += 1
                     mip_ratios[str(fields["mip_ratio_pct"])] += 1
                     palettes["empty" if fields["palette_len"] == 0 else "nonempty"] += 1
-                    offsets["exact_noesis_fixed_0x74" if fields[
-                        "matches_noesis_offset_0x74"] else "variable"] += 1
+                    key = ("exact_noesis_fixed_0x74"
+                           if fields["matches_noesis_offset_0x74"] else "variable")
+                    offsets[key] += 1
     return {
         "schema": 1, "kind": "public-format116-structure-evidence",
         "m3g_candidates": candidate_count,
