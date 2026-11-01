@@ -6,7 +6,9 @@ namespace ds_port::original_runtime {
 // Callback inputs are ARM32 address tokens, never host pointers.
 inline constexpr std::uint32_t kSecondaryAllocatorOriginalDescriptorVA=0x0042ffb0u;
 using OriginalPostprocessStep=bool (*)(std::uint32_t original_target_va,
-    std::uint32_t original_argument_arm_address,\n    std::uint32_t original_arg1_arm_address,\n    std::uint32_t original_arg2_arm_address,void* context,
+    std::uint32_t original_argument_arm_address,
+    std::uint32_t original_arg1_arm_address,
+    std::uint32_t original_arg2_arm_address,void* context,
     std::uint32_t* original_result) noexcept;
 struct OriginalPostprocessInputs {
     std::uint32_t original_object_arm_address;
