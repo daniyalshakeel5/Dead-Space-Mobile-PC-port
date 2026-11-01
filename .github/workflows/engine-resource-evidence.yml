@@ -40,6 +40,10 @@ jobs:
           raw=json.loads((Path(os.environ["RUNNER_TEMP"])/"full-instruction-windows.json").read_text())
           names=("post_setup_direct_callee_0x2803e4",
                  "resource_lookup_0x28b3a4",
+                 "resource_factory_mode1_0x28a718",
+                 "resource_factory_parse_0x28aab4",
+                 "resource_factory_copy_0x28b1e8",
+                 "resource_factory_string_0x1a76d0",
                  "resource_lookup_0x28a5f4",
                  "resource_lookup_0x28a4f8",
                  "resource_lookup_0x283cb4",
