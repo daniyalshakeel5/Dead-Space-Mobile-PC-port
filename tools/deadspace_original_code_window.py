@@ -7,6 +7,7 @@ Never publishes ELF bytes, strings, decompiled C or a complete disassembly.
 """
 from __future__ import annotations
 import argparse
+import os
 import json
 import struct
 from pathlib import Path
@@ -926,7 +927,10 @@ def main() -> int:
     args.output.parent.mkdir(parents=True,exist_ok=True)
     args.output.write_text(json.dumps(report,indent=2,sort_keys=True)+"\n")
     print("Instruction windows recovered from real ARM library; no original bytes written.")
-    print(json.dumps(report,sort_keys=True))
+    if os.environ.get("DS_EMIT_FULL_ARM_REPORT")=="1":
+        print(json.dumps(report,sort_keys=True))
+    else:
+        print("Full ARM instruction report saved to bounded GitHub artifact; stdout disabled.")
     return 0
 
 if __name__=="__main__":
