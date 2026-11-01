@@ -236,6 +236,8 @@ jobs:
               j=s[0];k=shstr.find(b"\\x00",j)
               return shstr[j:k].decode("ascii","replace")
           named={sectname(s):s for s in sections}
+          print("ORIGINAL_ELF_IO_IMPORT_SECTION_NAMES",sorted(
+              n for n in named if n.startswith((".plt",".rel",".rela",".dyn"))))
           plt=named.get(".plt")
           rel=named.get(".rel.plt")
           dynsym=named.get(".dynsym")
