@@ -145,6 +145,14 @@ int main() {
         REQUIRE(diagnostic.image2d_max_width == 2);
         REQUIRE(diagnostic.image2d_max_height == 2);
         REQUIRE(diagnostic.image2d_validated_pixel_bytes == 16);
+        const auto decoded = ds_port::decode_m3g_rgba_image(
+            valid_image.data(), valid_image.size());
+        REQUIRE(decoded.decoded);
+        REQUIRE(decoded.width == 2);
+        REQUIRE(decoded.height == 2);
+        REQUIRE(decoded.pixels_rgba.size() == 16);
+        REQUIRE(decoded.pixels_rgba.front() == 0x7f);
+
         REQUIRE(!ds_port::scan_m3g_container(
             valid_image.data(), valid_image.size()).valid);
         auto malformed = make_image_file(true);
@@ -155,6 +163,8 @@ int main() {
         REQUIRE(negative.image2d_objects == 1);
         REQUIRE(negative.image2d_standard_payloads == 0);
         REQUIRE(negative.image2d_unrecognized_payloads == 1);
+        REQUIRE(!ds_port::decode_m3g_rgba_image(
+            malformed.data(), malformed.size()).decoded);
     }
     for (bool compressed : {false,true}) {
         Bytes file = make_file(compressed);
