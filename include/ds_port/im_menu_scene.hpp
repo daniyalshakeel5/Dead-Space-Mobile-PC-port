@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -32,6 +33,8 @@ struct ImMenuGeometry {
     std::vector<std::uint32_t> indices;
     std::vector<ImMenuSurface> surfaces;
     std::vector<ImMenuMeshBounds> mesh_bounds;
+    // Raw original IM-M3G object-type histogram; type semantics unverified.
+    std::array<std::uint32_t,256> original_object_type_counts{};
 };
 ImMenuGeometry decode_im_menu_geometry(
     const std::uint8_t* original_im_m3g,std::size_t bytes);
