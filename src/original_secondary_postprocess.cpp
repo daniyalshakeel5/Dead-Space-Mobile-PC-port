@@ -15,15 +15,17 @@ OriginalPostprocessStatus original_postprocess_0x288688_prefix(
         return OriginalPostprocessStatus::InvalidMemory;
     if(!in.call_original)return OriginalPostprocessStatus::MissingOriginalCallees;
     std::uint32_t result=0;
-    if(!in.call_original(0x002828acu,in.original_object_arm_address,
+    if(!in.call_original(0x002828acu,in.original_object_arm_address,0u,0u,
                          in.callback_context,&result))
         return OriginalPostprocessStatus::CallRefused;
     auto* p=static_cast<std::uint8_t*>(in.mapped_object_bytes);
     store32(p,in.initial_vtable_arm_address);
     if(!in.call_original(0x0027fb28u,in.original_object_arm_address+0x14u,
+                         in.first_setup_arg_arm_address,0u,
                          in.callback_context,&result))
         return OriginalPostprocessStatus::CallRefused;
     if(!in.call_original(0x0027fa74u,in.original_object_arm_address+0x14u,
+                         in.second_setup_arg_arm_address,in.third_setup_arg_arm_address,
                          in.callback_context,&result))
         return OriginalPostprocessStatus::CallRefused;
     store32(p+0x20,result);
