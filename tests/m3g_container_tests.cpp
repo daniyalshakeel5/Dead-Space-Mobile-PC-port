@@ -72,6 +72,39 @@ Bytes replace_scene_type(std::uint8_t scene_type) {
     set32(file, next + n - 4, static_cast<std::uint32_t>(sum));
     return file;
 }
+Bytes make_image_file(bool bad_length) {
+    const Bytes magic{0xab,'J','S','R','1','8','4',0xbb,13,10,26,10};
+    Bytes payload;
+    put32(payload, 0); // Object3D userID
+    put32(payload, 0); // animation track count
+    put32(payload, 0); // user parameter count
+    payload.push_back(100); // RGBA
+    payload.push_back(0);   // immutable
+    put32(payload, 2); put32(payload, 2);
+    put32(payload, 0); // empty palette
+    put32(payload, bad_length ? 15 : 16);
+    payload.insert(payload.end(), bad_length ? 15 : 16, 0x7f);
+    Bytes objects{0};
+    put32(objects, 0); // nonstandard second header, diagnostic only
+    objects.push_back(10);
+    put32(objects, static_cast<std::uint32_t>(payload.size()));
+    objects.insert(objects.end(), payload.begin(), payload.end());
+    Bytes second = make_section(objects, false);
+    Bytes header{0}; put32(header, 12);
+    header.insert(header.end(), {1, 0, 0});
+    put32(header, 0); put32(header, 0); header.push_back(0);
+    Bytes first = make_section(header, false);
+    const auto total = static_cast<std::uint32_t>(
+        magic.size() + first.size() + second.size());
+    set32(header, 8, total);
+    set32(header, 12, total);
+    first = make_section(header, false);
+    Bytes result = magic;
+    result.insert(result.end(), first.begin(), first.end());
+    result.insert(result.end(), second.begin(), second.end());
+    return result;
+}
+
 int main() {
     {
         const auto hybrid = replace_scene_type(0);
@@ -98,6 +131,30 @@ int main() {
         REQUIRE(diag.valid);
         REQUIRE(diag.reserved_type_objects == 1);
         REQUIRE(diag.object_type_count[23] == 1);
+    }
+    {
+        auto valid_image = make_image_file(false);
+        auto diagnostic = ds_port::scan_m3g_container(
+            valid_image.data(), valid_image.size(),
+            64u * 1024u * 1024u, ds_port::M3gScanMode::DiagnosticOpaqueVariant);
+        REQUIRE(diagnostic.valid);
+        REQUIRE(diagnostic.image2d_objects == 1);
+        REQUIRE(diagnostic.image2d_standard_payloads == 1);
+        REQUIRE(diagnostic.image2d_unrecognized_payloads == 0);
+        REQUIRE(diagnostic.image2d_format_counts[4] == 1);
+        REQUIRE(diagnostic.image2d_max_width == 2);
+        REQUIRE(diagnostic.image2d_max_height == 2);
+        REQUIRE(diagnostic.image2d_validated_pixel_bytes == 16);
+        REQUIRE(!ds_port::scan_m3g_container(
+            valid_image.data(), valid_image.size()).valid);
+        auto malformed = make_image_file(true);
+        auto negative = ds_port::scan_m3g_container(
+            malformed.data(), malformed.size(),
+            64u * 1024u * 1024u, ds_port::M3gScanMode::DiagnosticOpaqueVariant);
+        REQUIRE(negative.valid);
+        REQUIRE(negative.image2d_objects == 1);
+        REQUIRE(negative.image2d_standard_payloads == 0);
+        REQUIRE(negative.image2d_unrecognized_payloads == 1);
     }
     for (bool compressed : {false,true}) {
         Bytes file = make_file(compressed);
