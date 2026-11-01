@@ -4,7 +4,7 @@ import unittest
 from tools.deadspace_original_code_window import (
     elf32_load_ranges, bounded_virtual_read, resolve_arm_literal_based_global,
     proven_frame_dispatch_prefix,
-    proven_original_code_helpers)
+    proven_original_code_helpers,prove_runtime_global_layout)
 
 
 class ArmWindowTests(unittest.TestCase):
@@ -17,6 +17,18 @@ class ArmWindowTests(unittest.TestCase):
                          1,128,0x1000,0,16,16,5,4096)
         data[128:144]=bytes(range(16))
         return bytes(data)
+
+    def test_global_layout_requires_all_original_elf_addresses(self):
+        layout=prove_runtime_global_layout(
+            0x0049caa8,0x0049cb94,0x0049cd1c)
+        self.assertEqual(layout["record_slot_relative_offset"],0xec)
+        self.assertEqual(layout["type2_float_relative_offset"],0x274)
+        self.assertEqual(layout["minimum_consecutive_span"],0x278)
+        for a,b,c in ((0x0049caa8,0x0049cb98,0x0049cd1c),
+                      (0x0049caa8,0x0049cb94,0x0049cd18),
+                      (0x0049caa4,0x0049cb94,0x0049cd1c)):
+            with self.assertRaises(ValueError):
+                prove_runtime_global_layout(a,b,c)
 
     def test_exact_original_native_helper_proofs(self):
         def decoded(spec):
