@@ -89,6 +89,7 @@ int main(){
     auto missing=in;missing.direct_0x2068a8=nullptr;
     assert(original_execute_startup_first_0x27f790(missing)==
            OriginalStartupFirstStatus::MissingOriginalDirectCall);
+    c.calls=c.queries=c.directs=0;
     put(c.service_table.data()+0x238,0);
     assert(original_execute_startup_first_0x27f790(in)==
            OriginalStartupFirstStatus::MissingOriginalVirtualMethod);
