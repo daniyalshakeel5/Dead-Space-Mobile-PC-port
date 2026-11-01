@@ -58,7 +58,47 @@ Bytes make_file(bool compressed_scene) {
     file.insert(file.end(), scene_section.begin(), scene_section.end());
     return file;
 }
+std::uint32_t get32(const Bytes& v, std::size_t at) {
+    return std::uint32_t(v[at]) | (std::uint32_t(v[at+1]) << 8) |
+           (std::uint32_t(v[at+2]) << 16) | (std::uint32_t(v[at+3]) << 24);
+}
+Bytes replace_scene_type(std::uint8_t scene_type) {
+    Bytes file = make_file(false);
+    const auto next = std::size_t(12) + get32(file, 13);
+    file[next + 9] = scene_type;
+    const auto n = get32(file, next + 1);
+    const auto sum = adler32(adler32(0L, Z_NULL, 0),
+                             file.data() + next, static_cast<uInt>(n - 4));
+    set32(file, next + n - 4, static_cast<std::uint32_t>(sum));
+    return file;
+}
 int main() {
+    {
+        const auto hybrid = replace_scene_type(0);
+        const auto strict = ds_port::scan_m3g_container(hybrid.data(), hybrid.size());
+        REQUIRE(!strict.valid);
+        REQUIRE(strict.error == "unexpected second M3G header object");
+        const auto diag = ds_port::scan_m3g_container(
+            hybrid.data(), hybrid.size(), 64u * 1024u * 1024u,
+            ds_port::M3gScanMode::DiagnosticOpaqueVariant);
+        REQUIRE(diag.valid);
+        REQUIRE(diag.diagnostic_mode);
+        REQUIRE(diag.nonstandard_header_objects == 1);
+        REQUIRE(diag.object_type_count[0] == 2);
+        REQUIRE(diag.section_count == 2);
+    }
+    {
+        const auto extended = replace_scene_type(23);
+        const auto strict = ds_port::scan_m3g_container(extended.data(), extended.size());
+        REQUIRE(!strict.valid);
+        REQUIRE(strict.error == "reserved M3G object type");
+        const auto diag = ds_port::scan_m3g_container(
+            extended.data(), extended.size(), 64u * 1024u * 1024u,
+            ds_port::M3gScanMode::DiagnosticOpaqueVariant);
+        REQUIRE(diag.valid);
+        REQUIRE(diag.reserved_type_objects == 1);
+        REQUIRE(diag.object_type_count[23] == 1);
+    }
     for (bool compressed : {false,true}) {
         Bytes file = make_file(compressed);
         auto result = ds_port::scan_m3g_container(file.data(), file.size());
