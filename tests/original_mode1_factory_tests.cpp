@@ -44,6 +44,8 @@ int main() {
     auto ready=original_resource_ready_0x28a5f4(result.handle,nullptr,nullptr);
     assert(ready.status==OriginalResourceHandleStatus::Completed);
     assert(ready.original_r0==1u);
+    assert(original_cleanup_unready_mode1_0x28a4f8(result.handle)==
+           OriginalUnreadyHandleStatus::UnreconstructedNonNullResource);
     f.next=0;
     result=original_construct_mode1_handle_0x28b3a4(
         inputs,0x3000u,"fixture");
@@ -52,6 +54,10 @@ int main() {
     ready=original_resource_ready_0x28a5f4(result.handle,nullptr,nullptr);
     assert(ready.status==OriginalResourceHandleStatus::Completed);
     assert(ready.original_r0==0u);
+    assert(original_cleanup_unready_mode1_0x28a4f8(result.handle)==
+           OriginalUnreadyHandleStatus::CompletedNullResourceCleanup);
+    assert(load32(handle.data())==kOriginalMode1HandleVtable);
+    assert(load32(handle.data()+8)==0u);
     f.refuse=true;
     result=original_construct_mode1_handle_0x28b3a4(
         inputs,0x3000u,"fixture");
