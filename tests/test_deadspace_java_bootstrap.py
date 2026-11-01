@@ -39,7 +39,7 @@ public class GameActivity extends android.app.Activity {
         with TemporaryDirectory() as tmp:
             base = Path(tmp)
             (base / "Idle.java").write_text(
-                "public class Idle { void run() { consume(); } }")
+                "public class Idle {\n  public void run() { consume(); }\n}")
             (base / "Entry.java").write_text(
                 'public class Entry { static { System.loadLibrary("core"); } '
                 'private native int bootstrap(); void onCreate() { finish(); } }')
