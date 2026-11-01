@@ -33,6 +33,7 @@ SIGNATURES = (
     # IronMonkey M3G variants documented in RaduMC/M3G2FBX.
     ("m3g_im2", bytes.fromhex("ab494d324d3347bb0d0a1a0a")),
     ("m3g_im3", bytes.fromhex("ab494d334d3347bb0d0a1a0a")),
+    ("m3g_im_dash", bytes.fromhex("ab494d2d4d3347bb0d0a1a0a")),
     ("png", b"\x89PNG\r\n\x1a\n"),
     ("jpeg", b"\xff\xd8\xff"),
     ("dds", b"DDS "),
@@ -172,6 +173,7 @@ def investigate(apk: Path) -> dict:
             by_magic: dict = {}
             by_extension_magic: dict = {}
             m3g_inner_magic: dict = {}
+            unknown_m3g_prefix_families: dict = {}
             # Pair count, not the underlying names; a useful clue as to
             # whether .sph and .sps form two components of each sprite.
             asset_sph = {entry.filename[:-4] for entry in entries
@@ -194,6 +196,16 @@ def investigate(apk: Path) -> dict:
                     continue
                 kind = sniff(prefix)
                 stat_record(by_magic, kind, info.file_size)
+                if info.filename.lower().endswith(".m3g") and kind == "unrecognized":
+                    if prefix.startswith(b"\xab"):
+                        label = "extended_m3g_like"
+                    elif prefix.startswith(b"\x1f\x8c"):
+                        label = "possible_ironmonkey_wrapper"
+                    elif prefix.startswith(b"\x1f\x8b"):
+                        label = "standard_gzip"
+                    else:
+                        label = "other_unknown_prefix"
+                    stat_record(unknown_m3g_prefix_families, label, info.file_size)
                 if kind == "m3g_gzip_wrapper" and info.filename.lower().endswith(".m3g"):
                     try:
                         with archive.open(info) as raw:
@@ -219,6 +231,8 @@ def investigate(apk: Path) -> dict:
                     key=lambda pair: (-pair[1]["declared_bytes"], pair[0]))[:80]),
                 "magic_stats": dict(sorted(by_magic.items())),
                 "m3g_inner_magic_stats": dict(sorted(m3g_inner_magic.items())),
+                "unknown_m3g_prefix_family_stats": dict(
+                    sorted(unknown_m3g_prefix_families.items())),
                 "extension_magic_stats": {ext: dict(sorted(stats.items()))
                                           for ext, stats in
                                           sorted(by_extension_magic.items())},
