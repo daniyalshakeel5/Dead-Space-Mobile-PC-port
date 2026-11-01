@@ -6,6 +6,7 @@ on:
     paths:
       - "apps/deadspace_native.cpp"
       - "tools/research_original_scene_records.py"
+      - "tools/research_four_native_subsystems.py"
       - "src/original_splash_host.cpp"
       - "src/im_ui_image.cpp"
       - "src/im_menu_scene.cpp"
@@ -51,6 +52,19 @@ jobs:
             --output "$RUNNER_TEMP/deadspace.apk" \
             https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes/releases/download/dead_space_mobile_fixes/Deas.Space.Mobile.Fixes.apk
           test "$(wc -c < "$RUNNER_TEMP/deadspace.apk" | tr -d ' ')" = 325769461
+      - name: Analyze all four original engine subsystems in parallel
+        shell: bash
+        run: |
+          set -euo pipefail
+          for area in transforms materials animation input_audio; do
+            python tools/research_four_native_subsystems.py \
+              "$RUNNER_TEMP/deadspace.apk" "$area" > "$RUNNER_TEMP/research-$area.log" 2>&1 &
+          done
+          wait
+          for area in transforms materials animation input_audio; do
+            test -s "$RUNNER_TEMP/research-$area.log"
+            cat "$RUNNER_TEMP/research-$area.log"
+          done
       - name: Stage original splash screens and main-menu resources
         shell: bash
         run: |
@@ -141,4 +155,5 @@ jobs:
       - name: Remove original game bytes from runner
         if: always()
         shell: bash
-        run: rm -rf "$RUNNER_TEMP/native-installed" "$RUNNER_TEMP/native-boot-apk.txt" "$RUNNER_TEMP/boot-assets" "$RUNNER_TEMP/deadspace.apk" "$RUNNER_TEMP/native-splash-exit.txt" "$RUNNER_TEMP/menu-inventory.json"
+        run: rm -f "$RUNNER_TEMP"/research-*.log
+        rm -rf "$RUNNER_TEMP/native-installed" "$RUNNER_TEMP/native-boot-apk.txt" "$RUNNER_TEMP/boot-assets" "$RUNNER_TEMP/deadspace.apk" "$RUNNER_TEMP/native-splash-exit.txt" "$RUNNER_TEMP/menu-inventory.json"
