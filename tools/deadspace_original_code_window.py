@@ -309,6 +309,21 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
     # Original ELF 0x281D54: allocator via original owner's virtual
     # slot 0x0C, conditional returned-record memory init, and global
     # pointer publication. The virtual allocator must NOT be fabricated.
+    stage_zero_allocator_call_abi=matched("record_allocator_virtual_call_0x281d54",{
+        0:("push","{r4, r5, lr}"),
+        4:("ldr","r2, [pc, #0x64]"),
+        8:("sub","sp, sp, #0xc"),
+        12:("mov","r3, #4"),
+        16:("mov","r4, #0"),
+        20:("stm","sp, {r3, r4}"),
+        24:("add","r2, pc, r2"),
+        28:("ldr","ip, [r0]"),
+        32:("mov","r1, #0x20"),
+        36:("mov","r3, #1"),
+        40:("mov","r5, r0"),
+        44:("mov","lr, pc"),
+        48:("ldr","pc, [ip, #0xc]"),
+    })
     stage_zero_allocator_post_return=matched("stage_zero_followup_target_0x281d54",{
         0:("push","{r4, r5, lr}"),
         4:("ldr","r2, [pc, #0x64]"),
@@ -398,6 +413,8 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
             stage_zero_setup and stage_zero_type2),
         "stage_zero_0x281d54_allocator_post_return_and_global_store":(
             stage_zero_setup and stage_zero_allocator_post_return),
+        "stage_zero_0x281d54_virtual_allocator_call_abi":(
+            stage_zero_allocator_call_abi and stage_zero_allocator_post_return),
         "original_gettimeofday_stack_arg_and_bl":conditional_clock and gettimeofday_call,
         "original_state_one_transition_stores_two_first":transition_state_two,
         "original_state_one_nonzero_two_vtable_calls":nonzero_calls,
@@ -488,6 +505,10 @@ def observe(apk: Path) -> dict:
     # LDR r3,[PC,#0x10] at 0x281DB0 and ADD r3,PC,r3 at 0x281DB4.
     original_record_slot=resolve_arm_literal_based_global(
         data,sections,0x00281db0,0x10,0x00281db4)
+    allocator_descriptor_va=resolve_arm_literal_based_global(
+        data,sections,0x00281d58,0x64,0x00281d6c)
+    if allocator_descriptor_va==0:
+        raise ValueError("Original ARM allocator type descriptor resolves to null")
     type2_proof=proven_original_code_helpers(out).get(
         "stage_zero_type2_0x28ca24_complete_case")
     if not type2_proof:
@@ -521,6 +542,16 @@ def observe(apk: Path) -> dict:
         "frame_transition_global_address_proof":shared_original_global,
         "stage_zero_type2_runtime_float_evidence":type2_info,
         "stage_zero_0x281d54_record_global_slot":f"0x{original_record_slot:08x}",
+        "stage_zero_0x281d54_allocator_abi":{
+            "callsite":"0x00281d84",
+            "vtable_offset":12,
+            "allocation_size":32,
+            "original_type_descriptor_va":f"0x{allocator_descriptor_va:08x}",
+            "register_flag":1,
+            "stack_arg0":4,
+            "stack_arg1":0,
+            "verified":True,
+        },
         "verified_original_global_relative_layout":original_global_layout,
         "reconstructed_native_helper_proof": helpers,
         "windows": out,
