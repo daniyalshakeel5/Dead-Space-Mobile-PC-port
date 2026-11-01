@@ -9,7 +9,7 @@ namespace ds_port::original_runtime {
 inline constexpr std::uint32_t kOriginalEmbeddedProviderVtable=0x004896f8u;
 enum class OriginalEmbeddedProviderStatus : std::uint8_t {
     Completed, InvalidMappedProvider, NeedsOriginalFileService,
-    NeedsOriginalMemoryService
+    NeedsOriginalMemoryService, InvalidHostFileBinding, InvalidHostBuffer
 };
 struct OriginalEmbeddedProviderResult {
     OriginalEmbeddedProviderStatus status;
@@ -42,4 +42,23 @@ OriginalEmbeddedProviderResult original_embedded_provider_seek_0x273034(
 OriginalEmbeddedProviderResult original_embedded_provider_position_0x271794(
     const void* mapped_provider,std::size_t accessible_bytes,
     std::uint32_t original_selector) noexcept;
+// Original ARM 0x2716F8 file-backed branch invokes its PLT at
+// 0x35554, confirmed by the user's exact APK to be libc read.
+// Call these explicit HOST-bound variants only when the user-owned
+// asset file has actually been opened by the native PC application.
+// The supplied native_fd MUST match provider+0x10. This avoids
+// treating arbitrary original ARM32 fd tokens as live host fds.
+OriginalEmbeddedProviderResult original_embedded_provider_read_file_0x2716f8(
+    const void* mapped_provider,std::size_t accessible_bytes,
+    int native_fd,void* destination,std::size_t requested_bytes) noexcept;
+// Original ARM 0x273034 mode=0 file seek invokes PLT 0x35350
+// (confirmed libc lseek), with SEEK_SET and original signed offset.
+// On failure the original stores errno into provider+0xA0.
+// Modes 1 and 2 require the still-untranslated original seek
+// dispatch table, so are not executed through this entry point.
+OriginalEmbeddedProviderResult original_embedded_provider_seek_file_0x273034(
+    void* mapped_provider,std::size_t accessible_bytes,
+    int native_fd,std::int32_t original_offset,
+    std::uint32_t original_origin) noexcept;
+
 } // namespace ds_port::original_runtime
