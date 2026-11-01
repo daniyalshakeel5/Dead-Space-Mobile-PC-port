@@ -50,6 +50,20 @@ int main(int argc,char** argv){
         std::cout<<"["<<node.object_index<<","<<unsigned(node.object_type)
                  <<","<<node.payload_bytes<<"]";
     }
-    std::cout<<"]}\n";
+    std::cout<<"],\"candidate_reference_count\":"
+             <<scene.scene_reference_candidates.size()
+             <<",\"candidate_offsets\":{";
+    std::array<unsigned,64> counts{};
+    for(const auto& candidate:scene.scene_reference_candidates)
+        if(candidate.payload_offset/4<counts.size())
+            ++counts[candidate.payload_offset/4];
+    bool first_offset=true;
+    for(unsigned i=0;i<counts.size();++i) {
+        if(!counts[i])continue;
+        if(!first_offset)std::cout<<",";
+        first_offset=false;
+        std::cout<<"\""<<i*4<<"\":"<<counts[i];
+    }
+    std::cout<<"}}\n";
     return 0;
 }
