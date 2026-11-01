@@ -40,6 +40,8 @@ WINDOWS = {
     "post_setup_direct_callee_0x287a94": (0x00287a94, 160),
     "post_setup_direct_callee_0x2849e0": (0x002849e0, 160),
     "post_setup_direct_callee_0x280a34": (0x00280a34, 160),
+    "secondary_allocator_postprocess_0x288688": (0x00288688, 160),
+    "repeated_initializer_callee_0x284178": (0x00284178, 160),
     "original_time_pair_source": (0x000357c4, 12),
     "frame_stage_one_routine": (0x0027fc68, 96),
     "frame_state_one_zero_result_tail": (0x0027eecc, 128),
@@ -568,6 +570,14 @@ def observe(apk: Path) -> dict:
         data,sections,0x00281d58,0x64,0x00281d6c)
     if allocator_descriptor_va==0:
         raise ValueError("Original ARM allocator type descriptor resolves to null")
+    # Original secondary allocator at 0x2849E0 uses ADD r2,PC,r2
+    # at +0x20, paired with LDR r2,[PC,#0x40] at +0x04.
+    # Resolve descriptor VA from the real ELF literal, never assume
+    # it is equal to the primary 0x281D54 descriptor.
+    secondary_descriptor_va=resolve_arm_literal_based_global(
+        data,sections,0x002849e4,0x40,0x00284a00)
+    if secondary_descriptor_va==0:
+        raise ValueError("Secondary allocation descriptor resolves to null")
     type2_proof=proven_original_code_helpers(out).get(
         "stage_zero_type2_0x28ca24_complete_case")
     if not type2_proof:
@@ -609,6 +619,13 @@ def observe(apk: Path) -> dict:
                 if registry_got_initial is not None else None),
             "requested_interface_id":0x10004,
             "vtable_offset":0x18,
+        },
+        "secondary_allocator_0x2849e0":{
+            "descriptor_arm_address":f"0x{secondary_descriptor_va:08x}",
+            "request_bytes":36,
+            "vtable_offset":12,
+            "postprocess_direct_callee":"0x00288688",
+            "evidence":"ELF literal resolution and original instruction window",
         },
         "stage_zero_0x281d54_allocator_abi":{
             "callsite":"0x00281d84",
