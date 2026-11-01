@@ -1,4 +1,5 @@
 #include "ds_port/im_menu_scene.hpp"
+#include <array>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
