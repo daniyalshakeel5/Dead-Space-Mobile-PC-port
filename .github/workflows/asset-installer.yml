@@ -18,6 +18,10 @@ on:
       - "include/ds_port/etc1.hpp"
       - "src/etc1.cpp"
       - "tests/etc1_tests.cpp"
+      - "src/im_mesh.cpp"
+      - "include/ds_port/im_mesh.hpp"
+      - "apps/im_mesh_extract.cpp"
+      - "tests/im_mesh_tests.cpp"
       - "apps/m3g_texture_extract.cpp"
       - ".github/workflows/asset-installer.yml"
   pull_request:
@@ -35,6 +39,10 @@ on:
       - "include/ds_port/etc1.hpp"
       - "src/etc1.cpp"
       - "tests/etc1_tests.cpp"
+      - "src/im_mesh.cpp"
+      - "include/ds_port/im_mesh.hpp"
+      - "apps/im_mesh_extract.cpp"
+      - "tests/im_mesh_tests.cpp"
       - "apps/m3g_texture_extract.cpp"
       - ".github/workflows/asset-installer.yml"
   workflow_dispatch:
@@ -68,14 +76,14 @@ jobs:
 
       - name: Configure Linux build (zlib, no SDL dependency)
         if: runner.os == 'Linux'
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=OFF -DDS_BUILD_ASSET_INSTALLER=ON -DDS_BUILD_M3G_READER=ON
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=OFF -DDS_BUILD_ASSET_INSTALLER=ON -DDS_BUILD_M3G_READER=ON -DDS_BUILD_IM_MESH_READER=ON
 
       - name: Configure Windows build (static zlib)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $vcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { "C:\vcpkg" }
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=OFF -DDS_BUILD_ASSET_INSTALLER=ON -DDS_BUILD_M3G_READER=ON -DVCPKG_TARGET_TRIPLET=x64-windows-static-md "-DCMAKE_TOOLCHAIN_FILE=$vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=OFF -DDS_BUILD_ASSET_INSTALLER=ON -DDS_BUILD_M3G_READER=ON -DDS_BUILD_IM_MESH_READER=ON -DVCPKG_TARGET_TRIPLET=x64-windows-static-md "-DCMAKE_TOOLCHAIN_FILE=$vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build native test/installer
@@ -93,6 +101,7 @@ jobs:
           cp build/ds_apk_probe dist/
           cp build/ds_m3g_probe dist/
           cp build/ds_m3g_texture_extract dist/
+          cp build/ds_im_mesh_extract dist/
 
       - name: Stage Windows native installer
         if: runner.os == 'Windows'
@@ -103,6 +112,7 @@ jobs:
           Copy-Item build/Release/ds_apk_probe.exe dist/
           Copy-Item build/Release/ds_m3g_probe.exe dist/
           Copy-Item build/Release/ds_m3g_texture_extract.exe dist/
+          Copy-Item build/Release/ds_im_mesh_extract.exe dist/
 
       - name: Upload new-code-only executables (no game data)
         uses: actions/upload-artifact@v4
