@@ -34,11 +34,16 @@ struct Image2dEvidence {
     std::uint32_t palette_bytes = 0;
     std::size_t pixel_offset = 0;
     bool is_mutable = false;
+    std::uint8_t failure_stage = 0;
 };
 
 bool parse_image2d_payload(const std::uint8_t* bytes,
                            std::size_t size, Image2dEvidence& evidence) {
     std::size_t at = 0;
+    const auto fail = [&](std::uint8_t stage) {
+        evidence.failure_stage = stage;
+        return false;
+    };
     const auto take32 = [&](std::uint32_t& out) -> bool {
         if (at > size || size - at < 4) return false;
         out = le32(bytes + at);
@@ -46,31 +51,31 @@ bool parse_image2d_payload(const std::uint8_t* bytes,
         return true;
     };
     std::uint32_t user_id = 0, count = 0;
-    if (!take32(user_id) || !take32(count)) return false;
-    if (count > (size - at) / 4) return false;
+    if (!take32(user_id) || !take32(count)) return fail(1);
+    if (count > (size - at) / 4) return fail(1);
     at += std::size_t(count) * 4; // ObjectIndex[] animationTracks
-    if (!take32(count) || count > (size - at) / 8) return false;
+    if (!take32(count) || count > (size - at) / 8) return fail(1);
     for (std::uint32_t i = 0; i < count; ++i) {
         std::uint32_t parameter_id = 0, length = 0;
-        if (!take32(parameter_id) || !take32(length)) return false;
-        if (length > size - at) return false;
+        if (!take32(parameter_id) || !take32(length)) return fail(1);
+        if (length > size - at) return fail(1);
         at += length;
     }
-    if (size - at < 10) return false;
+    if (size - at < 10) return fail(2);
     const std::uint8_t format = bytes[at++];
     const std::uint8_t mutable_flag = bytes[at++];
-    if (format < 96 || format > 100 || mutable_flag > 1) return false;
+    if (format < 96 || format > 100 || mutable_flag > 1) return fail(3);
     const std::uint32_t width = le32(bytes + at); at += 4;
     const std::uint32_t height = le32(bytes + at); at += 4;
-    if (!width || !height || width > 8192 || height > 8192) return false;
+    if (!width || !height || width > 8192 || height > 8192) return fail(4);
     std::uint32_t pixel_bytes = 0;
     std::uint32_t palette_bytes = 0;
     std::size_t pixel_offset = 0;
     if (mutable_flag == 0) {
         std::uint32_t palette_len = 0, pixel_len = 0;
-        if (!take32(palette_len) || palette_len > size - at) return false;
+        if (!take32(palette_len) || palette_len > size - at) return fail(5);
         at += palette_len;
-        if (!take32(pixel_len) || pixel_len > size - at) return false;
+        if (!take32(pixel_len) || pixel_len > size - at) return fail(5);
         pixel_offset = at;
         palette_bytes = palette_len;
         at += pixel_len;
@@ -81,13 +86,13 @@ bool parse_image2d_payload(const std::uint8_t* bytes,
         const std::uint64_t pixels = std::uint64_t(width) * height;
         if (palette_len > 0) {
             if (palette_len % channels || palette_len > 256u * channels ||
-                pixel_len != pixels) return false;
+                pixel_len != pixels) return fail(6);
         } else if (std::uint64_t(pixel_len) != pixels * channels) {
-            return false;
+            return fail(6);
         }
         pixel_bytes = pixel_len;
     }
-    if (at != size) return false;
+    if (at != size) return fail(7);
     evidence = Image2dEvidence{format, width, height, pixel_bytes, palette_bytes,
                                pixel_offset, mutable_flag != 0};
     return true;
@@ -215,6 +220,7 @@ M3gContainerReport scan_m3g_container(const std::uint8_t* data,
                     report.image2d_validated_pixel_bytes += evidence.pixel_bytes;
                 } else {
                     ++report.image2d_unrecognized_payloads;
+                    ++report.image2d_failure_stage_counts[evidence.failure_stage];
                 }
             }
             ++objects_in_section;
