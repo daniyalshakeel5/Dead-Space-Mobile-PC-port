@@ -87,4 +87,28 @@ OriginalStateTwoPrefixResult original_write_state_two_transition_prefix(
     void* original_global_state, std::size_t accessible_bytes,
     void** original_context_after_postincrement) noexcept;
 
+// Verified contiguous ARM state-1 prefix on the SHARED original global
+// (original ELF VA 0x0049caa8, confirmed by independent PC-relative
+// literal-pool resolution for BOTH 0x0027ef68 and 0x0027eecc).
+//
+// Stage==1 -> 0x0027fc68 first virtual target -> normalize result.
+// A return of 1 from that virtual target normalizes to 0, so the
+// dispatcher branches to 0x0027eecc and stores state=2. Only this
+// prefix is reconstructed. Original transition's subsequent calls
+// and active nonzero branch remain UNIMPLEMENTED and never faked.
+// Caller supplies the original object's host-native pointer and method;
+// ARM32 vtable pointers cannot be directly reinterpreted on x86-64.
+enum class OriginalActiveFramePrefixResult : std::uint8_t {
+    InvalidOriginalContext,
+    OriginalStateWasNotOne,
+    MissingOriginalVirtualTarget,
+    OriginalNonzeroBranchUnimplemented,
+    OriginalStateTwoTransitionPrefixExecuted
+};
+OriginalActiveFramePrefixResult original_execute_active_frame_prefix(
+    void* original_shared_state, std::size_t accessible_bytes,
+    void* original_virtual_object,
+    OriginalVirtualFirstMethod original_virtual_method,
+    void** context_after_state_two_postincrement) noexcept;
+
 } // namespace ds_port::original_runtime
