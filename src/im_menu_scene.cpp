@@ -70,6 +70,7 @@ ImMenuGeometry decode_im_menu_geometry(const std::uint8_t* data,
         out.camera_object_indices.clear();
         out.group_object_indices.clear();
         out.scene_node_records.clear();
+        out.validated_group_children.clear();
         out.scene_reference_candidates.clear();
         return out;
     };
@@ -87,6 +88,38 @@ ImMenuGeometry decode_im_menu_geometry(const std::uint8_t* data,
                 static_cast<std::uint32_t>(i+1));
             if(type==9)out.group_object_indices.push_back(
                 static_cast<std::uint32_t>(i+1));
+        }
+        // A genuine group tail contains a little-endian count followed
+        // by exactly count one-based node/mesh object references. The
+        // count can be unaligned because preceding names are variable size.
+        for(std::size_t i=0;i<chunks.size();++i) {
+            const auto& group=chunks[i];
+            if(group.type!=9)continue;
+            std::vector<std::uint32_t> accepted;
+            bool ambiguous=false;
+            for(std::size_t offset=0;offset+4<=group.size;++offset) {
+                const auto count=le32(group.p+offset);
+                if(count==0 || count>128 ||
+                   std::size_t(count)>(group.size-offset-4)/4 ||
+                   offset+4+std::size_t(count)*4!=group.size)continue;
+                std::vector<std::uint32_t> children;
+                bool valid=true;
+                for(std::uint32_t j=0;j<count;++j) {
+                    const auto child=le32(group.p+offset+4+4*j);
+                    if(!child || child>chunks.size() ||
+                       (chunks[child-1].type!=5 &&
+                        chunks[child-1].type!=9 &&
+                        chunks[child-1].type!=14) ||
+                       child==i+1) {valid=false;break;}
+                    children.push_back(child);
+                }
+                if(!valid)continue;
+                if(!accepted.empty()) {ambiguous=true;break;}
+                accepted=std::move(children);
+            }
+            if(!ambiguous && !accepted.empty())
+                out.validated_group_children.push_back({
+                    static_cast<std::uint32_t>(i+1),std::move(accepted)});
         }
         // Inventory aligned raw index candidates only. This deliberately
         // does not assert which bytes represent parent/child relationships.
