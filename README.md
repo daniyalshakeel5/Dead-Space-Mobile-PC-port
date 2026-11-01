@@ -77,8 +77,23 @@
   Owners that supply their actual embedded provider no longer
   require an invented callback to query its mode. External
   provider seek/read methods and full game boot remain incomplete.
-- **65/65 synthetic native CTests passed on Windows and Linux** at
-  [verification run 41341415738](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41341415738).
+- Original provider +0x18 error state, +0x20 cached size,
+  +0x28 memory/file position, and +0x2C verified seek
+  operations are now native. Actual original ELF import
+  symbols confirm that file-mode +0x34 uses libc `read`
+  and +0x2C uses `lseek`; both have portable
+  Windows/Linux native implementations.
+- The original owner can now consume a **real opened
+  user-owned asset file** in its default mode 8,
+  producing UTF-16 resource text via the original
+  `0x276FE4`/ `0x26D5FC` path. The native host
+  adapter requires an explicitly matching file
+  descriptor and preserves CRLF, chunk boundaries,
+  EOF and size limits. The in-memory codec,
+  complete resource registration, scene renderer
+  and gameplay engine remain incomplete.
+- **68/68 synthetic native CTests passed on Windows and Linux** at
+  [verification run 41343352738](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41343352738).
   These tests do not prove real game-engine boot or scene rendering.
   [Latest detailed handoff](docs/HANDOFF_2026-11-01.md).
 
@@ -181,11 +196,16 @@ the assistant's local VM has been unstable during archive work.
 
 ## Next engineering gate
 
-Investigate authentic UV, normal, Appearance and Texture2D object references
-in the IronMonkey meshes, then integrate the verified triangle and texture
-decoders into a native **SDL2/OpenGL diagnostic viewer**. After visual
-comparison against original resources and loader behavior, start the
-actual game engine reconstruction. A decoded OBJ is not a playable port.
+Continue reconstructing the **actual original engine**, not additional
+standalone model viewers. The immediate dependency is the original
+provider-backed resource/parser bridge: finish original mode-8
+`0x276D18` postprocessing and the non-null `0x278E58` receiver
+object creation; connect original-asset text and resource entries
+to real native scene entities. Then implement native rendering
+of the game scene and the original input, frame scheduling,
+physics, animation and gameplay loop. Current binary still
+stops when an unrecovered original engine routine is needed.
+A passing resource test is not a playable game.
 
 ## Upstream attribution and licensing
 
