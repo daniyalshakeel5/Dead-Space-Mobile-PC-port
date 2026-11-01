@@ -43,11 +43,19 @@ OriginalResourceQueryResult original_execute_resource_query_0x2803e4(
     const std::uint32_t owner=load32(ctx+4);
     if(!owner)
         return fail(OriginalResourceQueryStatus::InvalidContext);
-    if(!in.original_0x28b3a4)
+    if(!in.original_0x28b3a4 && !in.native_factory_0x28b3a4)
         return fail(OriginalResourceQueryStatus::MissingOriginalService);
     OriginalResourceHandleInput handle{};
-    if(!in.original_0x28b3a4(owner,name,in.context,&handle))
+    if(in.native_factory_0x28b3a4) {
+        const auto created=original_construct_mode1_handle_0x28b3a4(
+            *in.native_factory_0x28b3a4,owner,name);
+        if(created.status!=
+           OriginalMode1FactoryStatus::CompletedOriginalMode1Constructor)
+            return fail(OriginalResourceQueryStatus::HandleCreationRefused);
+        handle=created.handle;
+    } else if(!in.original_0x28b3a4(owner,name,in.context,&handle)) {
         return fail(OriginalResourceQueryStatus::HandleCreationRefused);
+    }
     // This method is an actual reconstructed original 0x28A5F4.
     const auto ready=original_resource_ready_0x28a5f4(
         handle,in.provider_method_0x50,in.context);
