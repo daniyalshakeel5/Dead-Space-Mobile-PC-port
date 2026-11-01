@@ -56,15 +56,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          declare -a pids=()
           for area in transforms materials animation input_audio; do
             python tools/research_four_native_subsystems.py \
               "$RUNNER_TEMP/deadspace.apk" "$area" > "$RUNNER_TEMP/research-$area.log" 2>&1 &
+            pids+=("$!")
           done
-          wait
+          status=0
+          for pid in "${pids[@]}"; do
+            wait "$pid" || status=1
+          done
           for area in transforms materials animation input_audio; do
             test -s "$RUNNER_TEMP/research-$area.log"
             cat "$RUNNER_TEMP/research-$area.log"
           done
+          test "$status" = 0
+          grep -F "TRANSFORMS_CAMERA" "$RUNNER_TEMP/research-transforms.log"
+          grep -F "MATERIALS appearances" "$RUNNER_TEMP/research-materials.log"
+          grep -F "ANIMATION tracks" "$RUNNER_TEMP/research-animation.log"
+          grep -F "INPUT_AUDIO native ELF" "$RUNNER_TEMP/research-input_audio.log"
       - name: Stage original splash screens and main-menu resources
         shell: bash
         run: |
