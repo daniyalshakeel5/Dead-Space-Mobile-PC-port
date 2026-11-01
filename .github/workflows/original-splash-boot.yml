@@ -5,6 +5,7 @@ on:
       - work/deadspace-remote-preflight-2026-11-01
     paths:
       - "apps/deadspace_native.cpp"
+      - "tools/research_original_scene_records.py"
       - "src/original_splash_host.cpp"
       - "src/im_ui_image.cpp"
       - "src/im_menu_scene.cpp"
