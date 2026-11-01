@@ -16,7 +16,7 @@ option(DS_BUILD_IM_MESH_READER "Build native IronMonkey geometry-only mesh expor
 # The original 29 enum JNI returns, three machine-code-verified pointer
 # constants, and event-record dispatch (pointer/key JNI) are linked here.
 # Virtual allocator/queue targets still require original-game recovery.
-add_library(ds_original_native_abi STATIC src/original_native_abi.cpp src/original_jni_exports.cpp src/original_frame_dispatch.cpp src/original_game_entry.cpp src/original_timing_math.cpp src/original_clock_source.cpp src/original_stage_zero_setup.cpp src/original_stage_zero_followup.cpp src/original_stage_zero_type_two.cpp src/original_record_postalloc.cpp src/original_runtime_globals.cpp src/original_allocator_call.cpp src/original_stage_zero_allocating.cpp src/original_registry_lookup.cpp src/original_secondary_allocator.cpp src/original_secondary_postprocess.cpp src/original_secondary_pipeline.cpp src/original_object_constructor.cpp src/original_embedded_setup.cpp src/original_embedded_initializer.cpp src/original_input_events.cpp src/original_input_jni_bridge.cpp src/original_pointer_jni_exports.cpp src/original_startup_first.cpp src/original_engine_startup.cpp src/original_static_singleton.cpp src/original_startup_object34.cpp src/original_startup_object58.cpp src/original_startup_second_tail.cpp src/original_startup_singleton.cpp)
+add_library(ds_original_native_abi STATIC src/original_native_abi.cpp src/original_jni_exports.cpp src/original_frame_dispatch.cpp src/original_game_entry.cpp src/original_timing_math.cpp src/original_clock_source.cpp src/original_stage_zero_setup.cpp src/original_stage_zero_followup.cpp src/original_stage_zero_type_two.cpp src/original_record_postalloc.cpp src/original_runtime_globals.cpp src/original_allocator_call.cpp src/original_stage_zero_allocating.cpp src/original_registry_lookup.cpp src/original_secondary_allocator.cpp src/original_secondary_postprocess.cpp src/original_secondary_pipeline.cpp src/original_object_constructor.cpp src/original_embedded_setup.cpp src/original_embedded_initializer.cpp src/original_input_events.cpp src/original_input_jni_bridge.cpp src/original_pointer_jni_exports.cpp src/original_startup_first.cpp src/original_engine_startup.cpp src/original_static_singleton.cpp src/original_startup_object34.cpp src/original_startup_object58.cpp src/original_startup_second_tail.cpp)
 target_include_directories(ds_original_native_abi PUBLIC include)
 
 # Native executable must report missing original game code rather than run
@@ -164,9 +164,6 @@ if(DS_ENABLE_TESTS)
     add_executable(ds_original_pointer_jni_exports_tests tests/original_pointer_jni_exports_tests.cpp)
     target_link_libraries(ds_original_pointer_jni_exports_tests PRIVATE ds_original_native_abi)
     add_test(NAME ds_original_arm_pointer_jni_constants COMMAND ds_original_pointer_jni_exports_tests)
-    add_executable(ds_original_startup_singleton_tests tests/original_startup_singleton_tests.cpp)
-    target_link_libraries(ds_original_startup_singleton_tests PRIVATE ds_original_native_abi)
-    add_test(NAME ds_original_arm_singleton_guard_release_0x27e560 COMMAND ds_original_startup_singleton_tests)
     add_executable(ds_original_startup_second_tail_tests tests/original_startup_second_tail_tests.cpp)
     target_link_libraries(ds_original_startup_second_tail_tests PRIVATE ds_original_native_abi)
     add_test(NAME ds_original_arm_second_startup_tail_full COMMAND ds_original_startup_second_tail_tests)
