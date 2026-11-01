@@ -4,9 +4,18 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <utility>
 namespace ds_port {
 // Hierarchy links, local matrices and camera projection must come from
 // verified original scene decoding or actual native render traces.
+// Validated topology recovered from original IM-M3G group child tables.
+struct OriginalSceneTopology {
+    bool valid=false;
+    std::string error;
+    std::vector<std::pair<std::uint32_t,std::uint32_t>> child_parent;
+    std::size_t unresolved_groups=0;
+};
+OriginalSceneTopology recover_original_menu_topology(const ImMenuGeometry& geometry);
 struct OriginalSceneNode {
     std::uint32_t object_id=0;
     std::uint32_t parent_id=0; // zero = root
