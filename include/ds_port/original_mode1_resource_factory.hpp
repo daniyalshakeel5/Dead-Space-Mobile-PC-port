@@ -38,4 +38,13 @@ OriginalMode1FactoryResult original_construct_mode1_handle_0x28b3a4(
     const OriginalMode1FactoryInputs&,
     std::uint32_t original_owner_arm_va,
     std::string_view original_name) noexcept;
+// Original 0x28A4F8 destructor when +8 is already null. In this exact
+// mode-1 case no virtual provider release is invoked; vtable resets to
+// the same 0x00489B20 and resource pointer remains zero.
+enum class OriginalUnreadyHandleStatus:std::uint8_t {
+    InvalidMemory,WrongOriginalMode,UnreconstructedNonNullResource,
+    CompletedNullResourceCleanup
+};
+OriginalUnreadyHandleStatus original_cleanup_unready_mode1_0x28a4f8(
+    const OriginalResourceHandleInput&) noexcept;
 } // namespace ds_port::original_runtime
