@@ -46,8 +46,8 @@ WINDOWS = {
     "post_setup_direct_callee_0x27fd7c": (0x0027fd7c, 704),
     "post_setup_direct_callee_0x2803e4": (0x002803e4, 460),
     "resource_lookup_0x28b3a4": (0x0028b3a4, 384),
-    "resource_factory_mode1_0x28a718": (0x0028a718, 320),
-    "resource_factory_parse_0x28aab4": (0x0028aab4, 384),
+    "resource_factory_mode1_0x28a718": (0x0028a718, 768),
+    "resource_factory_parse_0x28aab4": (0x0028aab4, 768),
     "resource_factory_copy_0x28b1e8": (0x0028b1e8, 256),
     "resource_factory_string_0x1a76d0": (0x001a76d0, 256),
     "resource_lookup_0x28a5f4": (0x0028a5f4, 384),
@@ -599,7 +599,7 @@ def observe(apk: Path) -> dict:
                 {"offset": i.address-address,
                  "op": i.mnemonic.lower(),
                  "args": i.op_str.lower()}
-                for i in decoded[:96 if key.startswith("resource_lookup_") else 192 if key=="repeated_initializer_callee_0x284178" or key.startswith("startup_registration_") else 180 if key=="post_setup_direct_callee_0x27fd7c" else 120 if key=="post_setup_direct_callee_0x2803e4" else 64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" or key.startswith("stage_zero_second_tail_") or key=="startup_allocator_object_init_0x27e560" or key.startswith("verified_vtable_") else 40]],
+                for i in decoded[:180 if key.startswith("resource_factory_") else 96 if key.startswith("resource_lookup_") else 192 if key=="repeated_initializer_callee_0x284178" or key.startswith("startup_registration_") else 180 if key=="post_setup_direct_callee_0x27fd7c" else 120 if key=="post_setup_direct_callee_0x2803e4" else 64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" or key.startswith("stage_zero_second_tail_") or key=="startup_allocator_object_init_0x27e560" or key.startswith("verified_vtable_") else 40]],
         }
     # Two independently instruction-proven PC-relative literal loads.
     # Frame 0x27ef6c LDR r4,[pc,#0x90], 0x27ef74 ADD r4,pc,r4.
