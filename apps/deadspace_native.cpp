@@ -58,6 +58,14 @@ bool load_original_menu_stage(const std::string& root) {
 #ifdef DS_NATIVE_ORIGINAL_MENU_GL
     // The GPU backend is linked to this native game; do not draw until
     // original camera, world matrices and material links are recovered.
+    const auto topology=ds_port::recover_original_menu_topology(scene);
+    if(!topology.valid) {
+        std::cerr<<"Original menu topology rejected: "<<topology.error<<"\\n";
+        return false;
+    }
+    std::cerr<<"Original menu topology: "<<topology.child_parent.size()
+             <<" validated child-parent links, "<<topology.unresolved_groups
+             <<" unresolved groups.\\n";
     const auto resolved=ds_port::resolve_original_menu_scene(
         scene,draw,ui.images,{}, {}, {});
     if(!resolved.valid) {
