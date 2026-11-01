@@ -186,9 +186,7 @@ void copy_deflated(std::ifstream& in, std::ofstream& out, const Entry& entry) {
                 okay = true;
                 break;
             }
-            if (code != Z_OK || (produced == 0 &&
-                                  stream.avail_in == before_input &&
-                                  stream.avail_in == 0 && left == 0))
+            if (code != Z_OK || (produced == 0 && stream.avail_in == before_input))
                 throw std::runtime_error("Deflate stream invalid or truncated");
         }
         if (!okay || left != 0 || stream.avail_in != 0 ||
