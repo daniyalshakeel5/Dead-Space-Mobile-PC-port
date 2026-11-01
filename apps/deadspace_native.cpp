@@ -49,11 +49,11 @@ int main(int argc, char** argv) {
     if(present_splash && (private_asset_dir.empty() ||
                           !user_apk.empty() ||
                           !inspected_asset_dir.empty() || readiness)) {
-        std::cerr<<"Use --boot-splash --assets-dir INSTALLED_DIR only.\\n";
+        std::cerr<<"Use --boot-splash --assets-dir INSTALLED_DIR only.\n";
         return kBadArguments;
     }
     if(!present_splash && user_apk.empty()!=private_asset_dir.empty()) {
-        std::cerr<<"To import your APK, supply both --apk and --assets-dir.\\n";
+        std::cerr<<"To import your APK, supply both --apk and --assets-dir.\n";
         return kBadArguments;
     }
     if(present_splash) {
@@ -61,24 +61,24 @@ int main(int argc, char** argv) {
         const auto status=ds_port::present_original_splashes(private_asset_dir);
         switch(status){
             case ds_port::OriginalSplashResult::Completed:
-                std::cerr<<"Original EA and Dead Space splash images displayed.\\n"
-                         <<"Native main-menu renderer still incomplete.\\n";
+                std::cerr<<"Original EA and Dead Space splash images displayed.\n"
+                         <<"Native main-menu renderer still incomplete.\n";
                 return kNeedRecoveredEngine;
             case ds_port::OriginalSplashResult::UserAborted: return 0;
             case ds_port::OriginalSplashResult::MissingOriginalAssets:
-                std::cerr<<"Original installed splash assets not found.\\n";
+                std::cerr<<"Original installed splash assets not found.\n";
                 return 7;
             case ds_port::OriginalSplashResult::ImageDecodeFailed:
-                std::cerr<<"Original splash UI image parsing failed.\\n";
+                std::cerr<<"Original splash UI image parsing failed.\n";
                 return 8;
             case ds_port::OriginalSplashResult::GraphicsUnavailable:
-                std::cerr<<"Could not create native SDL2 splash window.\\n";
+                std::cerr<<"Could not create native SDL2 splash window.\n";
                 return 9;
         }
         return 9;
 #else
         std::cerr<<"SDL2 splash presentation disabled. "
-                    "Rebuild with SDL2 and -DDS_BUILD_BOOT_SPLASH=ON.\\n";
+                    "Rebuild with SDL2 and -DDS_BUILD_BOOT_SPLASH=ON.\n";
         return 5;
 #endif
     }
