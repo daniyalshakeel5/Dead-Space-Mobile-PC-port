@@ -15,7 +15,7 @@ option(DS_BUILD_IM_MESH_READER "Build native IronMonkey geometry-only mesh expor
 
 # These functions are independent x86-64 translations of 29 validated
 # original ARM game JNI constant returns; no guessed gameplay dispatch.
-add_library(ds_original_native_abi STATIC src/original_native_abi.cpp src/original_jni_exports.cpp src/original_frame_dispatch.cpp src/original_game_entry.cpp src/original_timing_math.cpp src/original_clock_source.cpp src/original_stage_zero_setup.cpp src/original_stage_zero_followup.cpp src/original_stage_zero_type_two.cpp src/original_record_postalloc.cpp src/original_runtime_globals.cpp src/original_allocator_call.cpp)
+add_library(ds_original_native_abi STATIC src/original_native_abi.cpp src/original_jni_exports.cpp src/original_frame_dispatch.cpp src/original_game_entry.cpp src/original_timing_math.cpp src/original_clock_source.cpp src/original_stage_zero_setup.cpp src/original_stage_zero_followup.cpp src/original_stage_zero_type_two.cpp src/original_record_postalloc.cpp src/original_runtime_globals.cpp src/original_allocator_call.cpp src/original_stage_zero_allocating.cpp)
 target_include_directories(ds_original_native_abi PUBLIC include)
 
 add_library(ds_port_input STATIC src/input.cpp)
@@ -142,6 +142,11 @@ if(DS_ENABLE_TESTS)
     target_link_libraries(ds_original_allocator_call_tests PRIVATE ds_original_native_abi)
     add_test(NAME ds_original_arm_virtual_allocator_abi_and_record
         COMMAND ds_original_allocator_call_tests)
+    add_executable(ds_original_stage_zero_allocating_tests
+        tests/original_stage_zero_allocating_tests.cpp)
+    target_link_libraries(ds_original_stage_zero_allocating_tests PRIVATE ds_original_native_abi)
+    add_test(NAME ds_original_arm_stage_zero_allocating_chain
+        COMMAND ds_original_stage_zero_allocating_tests)
     add_executable(ds_original_runtime_globals_tests
         tests/original_runtime_globals_tests.cpp)
     target_link_libraries(ds_original_runtime_globals_tests PRIVATE ds_original_native_abi)
