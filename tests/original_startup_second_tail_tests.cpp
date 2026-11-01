@@ -31,6 +31,8 @@ struct Harness {
     int embedded_virtuals=0,service_84=0,queries=0,secondary_allocs=0;
     bool refuse_last=false;
     bool use_native_registration=false;
+    int global_service_calls=0;
+    std::array<std::uint8_t,4> global_service_word{};
     int registrations=0,registration_lookups=0;
     std::array<std::array<std::uint8_t,4>,27> registration_got{};
     std::array<std::array<std::uint8_t,4>,27> registration_values{};
@@ -163,6 +165,32 @@ bool register_resource(const OriginalRegistrationCall& q,void* c) noexcept {
     assert(q.original_tail_branch==(i==26));
     return true;
 }
+bool global_construct(void*,std::size_t bytes,std::uint32_t desc,
+                      std::uint32_t duration,std::uint32_t owner,
+                      std::uint32_t literal,std::uint32_t enable,
+                      void* ctx) noexcept {
+    auto& h=*static_cast<Harness*>(ctx);
+    assert(h.global_service_calls++==0);
+    assert(bytes==0x148u&&desc==kOriginalGlobalServiceDescriptorVA);
+    assert(duration==1000000u&&owner==0xAAAAu);
+    assert(literal==kOriginalGlobalServiceArgumentVA&&enable==1u);
+    put(h.global_service_word.data(),0xBBBBu);
+    return true;
+}
+bool global_attach(std::uint32_t owner,void*,std::size_t len,
+                   void* ctx) noexcept {
+    auto& h=*static_cast<Harness*>(ctx);
+    assert(h.global_service_calls++==1);
+    assert(owner==0xBBBBu&&len==0x148u);
+    return true;
+}
+bool global_finish(void*,std::size_t len,void* ctx,
+                   std::uint32_t* result) noexcept {
+    auto& h=*static_cast<Harness*>(ctx);
+    assert(h.global_service_calls++==2);
+    assert(len==0x138u);
+    *result=0;return true;
+}
 void prepare(Harness& h) {
     put(h.ctx.data(),0x1100);put(h.ctx.data()+4,0x2000);
     put(h.context_table.data()+0x54,0x1120);
@@ -236,5 +264,24 @@ int main(){
     registered.original_context_arm_va=0xDEADBEEFu;
     assert(original_execute_stage_zero_tail_0x280580(in)==
            OriginalStartupSecondTailStatus::InvalidOriginalContext);
+
+    // Integration: native wrappers for BOTH original direct calls.
+    // No invented direct-call results, but the remaining engine leaf
+    // methods are controlled test callbacks and not gameplay code.
+    registered.original_context_arm_va=0x1000u;
+    h.directs=h.resources=h.allocs=h.bases=h.virtuals=0;
+    h.secondary_allocs=h.embedded_virtuals=h.queries=h.service_84=0;
+    h.registrations=h.registration_lookups=h.global_service_calls=0;
+    put(h.global_service_word.data(),0xAAAAu);
+    OriginalGlobalServiceInputs global_service{
+        h.global_service_word.data(),h.global_service_word.size(),
+        global_construct,global_attach,global_finish,&h};
+    in.native_global_service_0x36fd38=&global_service;
+    in.invoke_original_direct=nullptr;
+    assert(original_execute_stage_zero_tail_0x280580(in)==
+           OriginalStartupSecondTailStatus::CompletedOriginalSecondRoutine);
+    assert(h.directs==0&&h.registrations==27&&h.registration_lookups==27);
+    assert(h.global_service_calls==3&&h.resources==2&&h.allocs==2);
+    assert(h.virtuals==4&&h.secondary_allocs==1);
     return 0;
 }
