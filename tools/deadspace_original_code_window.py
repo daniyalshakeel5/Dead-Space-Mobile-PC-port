@@ -126,6 +126,49 @@ def elf32_jni_symbols(raw: bytes, names: set[str]) -> dict[str, tuple[int, int, 
     return found
 
 
+def proven_frame_dispatch_prefix(insns: list[dict]) -> dict[str, bool]:
+    """Prove short original ARM frame state transitions by exact instructions.
+
+    No inference from JNI names; a changed binary must NOT quietly pass.
+    These checks define the precise behaviors used by original_frame_dispatch.cpp.
+    """
+    selected={item["offset"]:(item["op"],item["args"]) for item in insns}
+    stage_selectors={
+        16:("ldr","r3, [r4]"),
+        20:("cmp","r3, #0"),
+        24:("beq","#0x27ef98"),
+        28:("ldr","r3, [r4]"),
+        32:("cmp","r3, #1"),
+        36:("beq","#0x27efac"),
+        40:("add","sp, sp, #8"),
+        44:("pop","{r4, pc}"),
+    }
+    stage_zero={
+        48:("add","r0, r4, #8"),
+        52:("bl","#0x27f870"),
+        56:("mov","r3, #1"),
+        60:("str","r3, [r4]"),
+        64:("b","#0x27ef90"),
+    }
+    stage_one={
+        68:("add","r0, r4, #8"),
+        72:("bl","#0x27fc68"),
+        76:("cmp","r0, #0"),
+        80:("bne","#0x27efc8"),
+        84:("add","sp, sp, #8"),
+        88:("pop","{r4, lr}"),
+        92:("b","#0x27eecc"),
+    }
+    verified_selectors=all(selected.get(k)==v for k,v in stage_selectors.items())
+    return {
+        "state_comparison_and_default_return":verified_selectors,
+        "state_zero_call_then_store_one":verified_selectors and all(
+            selected.get(k)==v for k,v in stage_zero.items()),
+        "state_one_tick_result_branch":verified_selectors and all(
+            selected.get(k)==v for k,v in stage_one.items()),
+    }
+
+
 def observe(apk: Path) -> dict:
     try:
         from capstone import Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB
@@ -192,9 +235,14 @@ def observe(apk: Path) -> dict:
                  "args": i.op_str.lower()}
                 for i in decoded[:40]],
         }
+    contract=proven_frame_dispatch_prefix(
+        out["native_frame_state_dispatch"]["instructions"])
+    if not all(contract.values()):
+        raise ValueError("Original ARM frame dispatch instruction contract changed")
     return {
         "schema": 1,
         "kind": "original-ARM-targeted-instruction-evidence",
+        "frame_dispatch_instruction_proof": contract,
         "windows": out,
         "original_elf_jni_symbols":symbol_windows,
         "limitations": (
