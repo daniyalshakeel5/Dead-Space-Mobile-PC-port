@@ -9,6 +9,8 @@ on:
       - "tools/deadspace_native_enum_recover.py"
       - "tools/deadspace_native_leaf_recover.py"
       - "tools/deadspace_original_code_window.py"
+      - "tools/deadspace_vita_abi_compare.py"
+      - "tests/test_deadspace_vita_abi_compare.py"
       - "tests/test_deadspace_original_code_window.py"
       - "tests/test_deadspace_native_leaf_recover.py"
       - "src/original_jni_exports.cpp"
@@ -173,6 +175,9 @@ jobs:
           python tools/deadspace_original_code_window.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
             --output report/deadspace-original-instruction-window.json
+          python -m tools.deadspace_vita_abi_compare \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-vita-abi-comparison.json
           python - <<'PY'
           import json
           from pathlib import Path
@@ -332,6 +337,7 @@ jobs:
           name: deadspace-port-audit
           path: |
             report/deadspace-public-evidence.json
+            report/deadspace-vita-abi-comparison.json
             report/deadspace-native-enums.json
             report/deadspace-original-jni-noops.json
             report/deadspace-original-instruction-window.json
