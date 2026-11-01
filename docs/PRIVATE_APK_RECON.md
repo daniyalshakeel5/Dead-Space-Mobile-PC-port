@@ -88,6 +88,44 @@ so **review it before sharing**; unlike the aggregate resource-recon report,
 it is not designed to be fully name-anonymized. Never upload or commit native
 library binaries, APKs, full symbol dumps or disassembled original code.
 
+## Running a real APK analysis on GitHub Actions without public APK uploads
+
+The original APK stored in ChatGPT's private Library is **not directly
+downloadable by GitHub Actions**. The linked GitHub connector also does not
+support sending a 326 MB private binary to a runner. The public port repository
+must never receive the APK as a commit, release asset or public artifact.
+
+To complete a hosted audit, provide an authorized, **short-lived HTTPS download
+URL** for the APK (for example, a temporary pre-signed private object-storage
+link) through the GitHub repository's **Settings → Secrets and variables →
+Actions → New repository secret**, named `DS_APK_URL`. Do **not** put the
+link in a commit, issue, pull request, Actions input or public comment.
+
+The `deadspace-research.yml` workflow runs the real audit only on an
+**owner push to the development branch** or a supported manual dispatch when
+the secret is configured. Otherwise, it explicitly performs a repository-only
+audit, with `real_apk_analyzed: false`. Because this workflow may not yet
+exist on the default branch, an owner push is the available trigger:
+
+1. In the GitHub web editor, open `docs/private-apk-analysis.trigger` on
+   `work/deadspace-remote-preflight-2026-11-01`.
+2. Change the non-sensitive trigger text and commit **to that same branch**.
+3. Look for the `Dead Space Mobile - remote port research` push run.
+4. Download the `deadspace-port-audit` artifact containing
+   `deadspace-public-evidence.json`; verify `real_apk_analyzed: true`.
+5. Remove the temporary URL from the secret after the job has finished.
+
+The runner uses a temporary APK file and removes it on exit. Raw audit
+results (including original JNI names, archive paths and SHA-256) stay in the
+runner's temporary directory and are not uploaded. The **public** report keeps
+only known public API import names and aggregate machine/format/category
+statistics. Synthetic tests explicitly check for identifier leakage. No
+original assets, libraries, filenames, hashes or code are shipped.
+
+This analysis will identify candidate resource/engine boundaries, not reproduce
+the game. Original loader semantics must still be verified privately before
+implementing a C++ decoder.
+
 ## What findings mean for implementation
 
 - Numerous DDS/PVR/KTX/PKM/ASTC entries suggest relevant texture decoders;
