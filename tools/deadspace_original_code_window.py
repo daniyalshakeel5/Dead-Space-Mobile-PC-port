@@ -514,7 +514,10 @@ def observe(apk: Path) -> dict:
             symbol_windows[short]={"present":False}
             continue
         addr,size,is_thumb=sym
-        count=min(size,64)
+        # Full game input JNI wrappers, unlike unrelated JNI stubs, need
+        # the entire original function to translate downstream dispatch.
+        long_input_names={"input_pointer_event","input_key_down","input_key_up"}
+        count=min(size,224 if short in long_input_names else 64)
         block=bounded_virtual_read(data,sections,addr,count)
         decoder=thumb if is_thumb else arm
         ins=list(decoder.disasm(block,addr))
@@ -524,8 +527,24 @@ def observe(apk: Path) -> dict:
             "symbol_size":size,
             "thumb":is_thumb,
             "instructions":[{"offset":i.address-addr,"op":i.mnemonic.lower(),
-                             "args":i.op_str.lower()} for i in ins[:14]],
+                             "args":i.op_str.lower()} for i in ins[:64 if short in long_input_names else 14]],
         }
+    # Original binary proof, not a value borrowed from the Vita loader.
+    raw_pointer_proof={
+        "input_raw_down":0x6000c,
+        "input_raw_move":0x4000c,
+        "input_raw_up":0x8000c,
+    }
+    for key,expected in raw_pointer_proof.items():
+        ins=symbol_windows[key]["instructions"]
+        if not symbol_windows[key]["present"] or len(ins)!=3:
+            raise ValueError("Original pointer constant ABI not complete")
+        # Capstone yields MOV r0, #HI and ADD r0, r0, #0xC.
+        expected_high=expected & ~0xffff
+        if (ins[0]["op"],ins[0]["args"])!=("mov",f"r0, #0x{expected_high:x}") or (
+            ins[1]["op"],ins[1]["args"])!=("add","r0, r0, #0xc") or (
+            ins[2]["op"],ins[2]["args"])!=("bx","lr"):
+            raise ValueError("Original ARM pointer constant proof mismatched")
     for key,(address,nbytes) in WINDOWS.items():
         evidence=mapping_comparison(data,sections,segs,address,nbytes)
         # The executable section table is the mapping used by the existing
