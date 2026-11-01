@@ -135,6 +135,22 @@ def prove_runtime_global_layout(frame_global: int, record_slot: int,
     }
 
 
+def resolve_arm_got_slot_from_pc_index(raw: bytes,
+                                       executable_spans: list[tuple[int,int,int]],
+                                       ldr_literal_address: int,
+                                       literal_immediate: int,
+                                       ldr_index_address: int) -> int:
+    """Original ARM: LDR r3,[PC,#imm]; then LDR r3,[PC,r3].
+
+    PC is instruction VA + 8 in both instructions; the former word is a
+    signed 32-bit displacement. Returns the original virtual GOT address,
+    not a guessed live object pointer or executable data contents.
+    """
+    displacement=struct.unpack("<i", bounded_virtual_read(
+        raw,executable_spans,ldr_literal_address+8+literal_immediate,4))[0]
+    return (ldr_index_address+8+displacement)&0xffffffff
+
+
 def elf32_jni_symbols(raw: bytes, names: set[str]) -> dict[str, tuple[int, int, bool]]:
     """Use original ELF dynamic symbols, not Ghidra's inferred function starts."""
     shoff=struct.unpack_from("<I",raw,32)[0]
@@ -501,6 +517,19 @@ def observe(apk: Path) -> dict:
     }
     if frame_global!=transition_global:
         raise ValueError("Original frame and state-two transition globals differ")
+    # Original ELF 0x27E930 is a service-interface query. It obtains an
+    # original singleton pointer via a PC-relative GOT word, then calls
+    # virtual offset +0x18 with request identifier 0x10004.
+    registry_got_va=resolve_arm_got_slot_from_pc_index(
+        data,sections,0x0027e944,0x24,0x0027e950)
+    registry_got_in_file=any(
+        begin<=registry_got_va and registry_got_va+4<=end
+        for begin,end,_ in segs)
+    registry_got_initial=(
+        struct.unpack("<I",bounded_virtual_read(
+            data,segs,registry_got_va,4))[0]
+        if registry_got_in_file else None
+    )
     # Original runtime global slot used after either allocator result:
     # LDR r3,[PC,#0x10] at 0x281DB0 and ADD r3,PC,r3 at 0x281DB4.
     original_record_slot=resolve_arm_literal_based_global(
@@ -542,6 +571,15 @@ def observe(apk: Path) -> dict:
         "frame_transition_global_address_proof":shared_original_global,
         "stage_zero_type2_runtime_float_evidence":type2_info,
         "stage_zero_0x281d54_record_global_slot":f"0x{original_record_slot:08x}",
+        "stage_zero_0x27e930_registry_query":{
+            "original_registry_got_slot":f"0x{registry_got_va:08x}",
+            "got_file_backed":registry_got_in_file,
+            "got_initial_pointer_or_relocation":(
+                f"0x{registry_got_initial:08x}"
+                if registry_got_initial is not None else None),
+            "requested_interface_id":0x10004,
+            "vtable_offset":0x18,
+        },
         "stage_zero_0x281d54_allocator_abi":{
             "callsite":"0x00281d84",
             "vtable_offset":12,
