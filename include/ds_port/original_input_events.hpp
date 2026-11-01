@@ -52,6 +52,37 @@ struct OriginalInputServices {
     OriginalInputQueue queue;
     void* context;
 };
+// Both singleton BSS slots were independently resolved from pointer,
+// key-down and key-up ARM handlers in original real APK run 41316094922.
+inline constexpr std::uint32_t kOriginalInputAllocatorSingletonSlotVA=0x00490b30u;
+inline constexpr std::uint32_t kOriginalInputQueueSingletonSlotVA=0x00490b24u;
+struct OriginalInputMappedOwner {
+    // Original 32-bit BSS word at one of the slots above.
+    const void* singleton_slot_bytes;
+    std::size_t singleton_slot_size;
+    // Original ARM32 address and its mapped x86-64 object representation.
+    std::uint32_t original_owner_arm_va;
+    const void* owner_bytes;
+    std::size_t owner_size;
+    // Original ARM32 vtable token stored in the mapped object's first word.
+    std::uint32_t original_vtable_arm_va;
+    const void* vtable_bytes;
+    std::size_t vtable_size;
+};
+struct OriginalInputMappedOwners {
+    OriginalInputMappedOwner allocator;
+    OriginalInputMappedOwner queue;
+};
+// Original JNI loads [global_slot] -> owner and [owner] -> vtable,
+// then branches through vtable +0x0C (allocator) or +0x20 (queue).
+// This resolves those four ARM address tokens from *mapped original
+// memory*, rather than supplying arbitrary host-side method addresses.
+// On failure, leaves output untouched.
+bool original_resolve_input_virtual_owners(
+    const OriginalInputMappedOwners& mapped,
+    OriginalInputAllocate allocate_callback,OriginalInputQueue queue_callback,
+    void* context,OriginalInputServices* output) noexcept;
+
 enum class OriginalInputStatus:std::uint8_t {
     NotReady,MissingOriginalService,AllocationRefused,AllocationReturnedNull,
     InvalidRecord,QueueRefused,Completed

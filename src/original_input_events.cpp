@@ -21,7 +21,46 @@ void store_float(std::uint8_t* p,float value) noexcept {
     std::uint32_t bits=0;
     std::memcpy(&bits,&value,4);
     store32(p,bits);
+std::uint32_t read32(const std::uint8_t* p) noexcept {
+    return std::uint32_t(p[0]) | (std::uint32_t(p[1])<<8) |
+           (std::uint32_t(p[2])<<16) | (std::uint32_t(p[3])<<24);
 }
+bool resolve_owner(const OriginalInputMappedOwner& x,std::size_t slot_offset,
+                   std::uint32_t* owner,std::uint32_t* method) noexcept {
+    if(!owner || !method || !x.singleton_slot_bytes ||
+       x.singleton_slot_size<4 || !x.original_owner_arm_va ||
+       !x.owner_bytes || x.owner_size<4 || !x.original_vtable_arm_va ||
+       !x.vtable_bytes || x.vtable_size<slot_offset+4)
+        return false;
+    const auto global=read32(static_cast<const std::uint8_t*>(x.singleton_slot_bytes));
+    if(global!=x.original_owner_arm_va)return false;
+    const auto vt=read32(static_cast<const std::uint8_t*>(x.owner_bytes));
+    if(vt!=x.original_vtable_arm_va)return false;
+    const auto target=read32(static_cast<const std::uint8_t*>(x.vtable_bytes)+slot_offset);
+    if(!target)return false;
+    *owner=global;*method=target;
+    return true;
+}
+
+}
+}
+bool original_resolve_input_virtual_owners(
+    const OriginalInputMappedOwners& mapped,
+    OriginalInputAllocate allocate_callback,OriginalInputQueue queue_callback,
+    void* context,OriginalInputServices* out) noexcept {
+    if(!out || !allocate_callback || !queue_callback)return false;
+    OriginalInputServices resolved{};
+    if(!resolve_owner(mapped.allocator,0x0cu,
+                      &resolved.pool_owner_arm_va,&resolved.allocator_method_arm_va))
+        return false;
+    if(!resolve_owner(mapped.queue,0x20u,
+                      &resolved.queue_owner_arm_va,&resolved.queue_method_arm_va))
+        return false;
+    resolved.allocate=allocate_callback;
+    resolved.queue=queue_callback;
+    resolved.context=context;
+    *out=resolved;
+    return true;
 }
 OriginalInputStatus original_dispatch_input_event(
     bool ready,const OriginalInputPacket& in,

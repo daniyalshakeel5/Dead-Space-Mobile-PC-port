@@ -59,8 +59,32 @@ int main() {
     static_assert(kOriginalRawPointerMove==0x4000c);
     static_assert(kOriginalRawPointerUp==0x8000c);
     Trace t{};
-    OriginalInputServices svc{0x1000,0x2000,0x3000,0x4000,
-        allocate,queue,&t};
+    // This is a synthetic host-memory fixture for original slots:
+    // allocator 0x00490B30, queue 0x00490B24. Their values, owner
+    // object vtable words and method targets must agree before dispatch.
+    std::array<std::uint8_t,4> allocator_slot{},queue_slot{};
+    std::array<std::uint8_t,4> allocator_owner{},queue_owner{};
+    std::array<std::uint8_t,0x10> allocator_table{};
+    std::array<std::uint8_t,0x24> queue_table{};
+    const auto put=[](std::uint8_t* p,std::uint32_t v){
+        for(unsigned i=0;i<4;++i)p[i]=static_cast<std::uint8_t>(v>>(8*i));
+    };
+    put(allocator_slot.data(),0x1000);put(queue_slot.data(),0x3000);
+    put(allocator_owner.data(),0x1110);put(queue_owner.data(),0x3330);
+    put(allocator_table.data()+0x0c,0x2000);
+    put(queue_table.data()+0x20,0x4000);
+    OriginalInputMappedOwners mapped{
+        {allocator_slot.data(),allocator_slot.size(),0x1000,
+         allocator_owner.data(),allocator_owner.size(),
+         0x1110,allocator_table.data(),allocator_table.size()},
+        {queue_slot.data(),queue_slot.size(),0x3000,
+         queue_owner.data(),queue_owner.size(),
+         0x3330,queue_table.data(),queue_table.size()}
+    };
+    OriginalInputServices svc{};
+    assert(original_resolve_input_virtual_owners(mapped,allocate,queue,&t,&svc));
+    assert(svc.pool_owner_arm_va==0x1000&&svc.allocator_method_arm_va==0x2000);
+    assert(svc.queue_owner_arm_va==0x3000&&svc.queue_method_arm_va==0x4000);
     OriginalInputPacket p{OriginalInputPacket::Kind::Pointer,
         kOriginalRawPointerDown,1000,7,123.25f,-48.5f,0,0};
     t.expected=p;
@@ -89,5 +113,18 @@ int main() {
     assert(run()==OriginalInputStatus::QueueRefused);
     t.fail_queue=false;svc.queue=nullptr;
     assert(run()==OriginalInputStatus::MissingOriginalService);
+
+    // Original ARM singleton data must not be guessed or silently accepted.
+    OriginalInputServices out=svc;
+    out.pool_owner_arm_va=0xdeadbeef;
+    put(allocator_slot.data(),0x7777);
+    assert(!original_resolve_input_virtual_owners(mapped,allocate,queue,&t,&out));
+    assert(out.pool_owner_arm_va==0xdeadbeef);
+    put(allocator_slot.data(),0x1000);
+    put(queue_table.data()+0x20,0);
+    assert(!original_resolve_input_virtual_owners(mapped,allocate,queue,&t,&out));
+    put(queue_table.data()+0x20,0x4000);
+    mapped.queue.vtable_size=0x20;
+    assert(!original_resolve_input_virtual_owners(mapped,allocate,queue,&t,&out));
     return 0;
 }
