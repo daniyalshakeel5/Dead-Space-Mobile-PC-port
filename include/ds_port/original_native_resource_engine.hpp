@@ -14,10 +14,28 @@ namespace ds_port::original_runtime {
 // All fields of original 0x27A768 are stored in a properly owned
 // host buffer and exposed to already reconstructed original services.
 // Original VAs remain virtual address tokens; never dereference them.
+// Native first two original loader calls at ARM 0x286918:
+// 0x27A768(owner=stack local, provider=r1, pool=[loader+4]);
+// 0x26C410(owner,opcode=1,value=1).
+// Subsequent original 0x278778 binding is not yet reconstructed.
+enum class OriginalLoaderPrefixStatus0x286918:std::uint8_t {
+    InvalidLoaderContext,ConstructorBlocked,ModeBlocked,
+    ReachedUnreconstructedOriginalBind
+};
+struct OriginalLoaderPrefixResult0x286918 {
+    OriginalLoaderPrefixStatus0x286918 status;
+    OriginalOwnerConstructorStatus0x27a768 constructor_status;
+    OriginalReceiverModeStatus0x26c410 mode_status;
+};
 class OriginalNativeResourceEngine {
 public:
     explicit OriginalNativeResourceEngine(std::uint32_t arm_owner_va) noexcept;
     OriginalOwnerConstructorResult0x27a768 initialize(
+        const OriginalOwnerConstructorInputs0x27a768& services) noexcept;
+    OriginalLoaderPrefixResult0x286918 begin_loader_0x286918(
+        const void* mapped_original_loader_context,
+        std::size_t accessible_original_loader_bytes,
+        std::uint32_t original_provider_arm_va,
         const OriginalOwnerConstructorInputs0x27a768& services) noexcept;
     OriginalReceiverModeResult0x26c410 set_mode(
         std::uint32_t opcode,std::uint32_t value,
