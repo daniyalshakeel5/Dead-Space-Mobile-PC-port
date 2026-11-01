@@ -52,6 +52,8 @@ jobs:
                  "resource_parser_owner_init_0x27a768",
                  "resource_parser_receiver_0x278018",
                  "resource_receiver_activation_0x278e58",
+                 "resource_receiver_activation_tree_clear_0x273570",
+                 "resource_receiver_activation_tail_0x279038",
                  "resource_receiver_tree_lookup_0x2710a8",
                  "resource_receiver_utf16_compare_0x26e670",
                  "resource_receiver_copy_0x276694",
