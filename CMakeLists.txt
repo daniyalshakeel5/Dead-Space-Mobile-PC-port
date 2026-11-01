@@ -24,6 +24,11 @@ target_include_directories(ds_original_native_abi PUBLIC include)
 # a diagnostic pretending to be playable. It links the same recovered ABI.
 # Original IronMonkey splash/frontend Image2D RGBA parser; no zlib
 # or Android dependency, and no copyrighted textures bundled.
+add_library(ds_port_im_menu STATIC src/im_menu_scene.cpp)
+target_include_directories(ds_port_im_menu PUBLIC include)
+add_executable(ds_im_menu_scene_probe apps/im_menu_scene_probe.cpp)
+target_link_libraries(ds_im_menu_scene_probe PRIVATE ds_port_im_menu)
+
 add_library(ds_port_im_ui STATIC src/im_ui_image.cpp)
 target_include_directories(ds_port_im_ui PUBLIC include)
 add_executable(ds_im_ui_probe apps/im_ui_probe.cpp)
@@ -145,6 +150,9 @@ endif()
 
 if(DS_ENABLE_TESTS)
     enable_testing()
+    add_executable(ds_im_menu_scene_tests tests/im_menu_scene_tests.cpp)
+    target_link_libraries(ds_im_menu_scene_tests PRIVATE ds_port_im_menu)
+    add_test(NAME ds_original_im_m3g_menu_uv_geometry COMMAND ds_im_menu_scene_tests)
     add_executable(ds_im_ui_image_tests tests/im_ui_image_tests.cpp)
     target_link_libraries(ds_im_ui_image_tests PRIVATE ds_port_im_ui)
     add_test(NAME ds_original_im_m3g_splash_ui_decoder COMMAND ds_im_ui_image_tests)
