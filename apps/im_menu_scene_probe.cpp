@@ -28,6 +28,15 @@ int main(int argc,char** argv){
              <<",\"triangles\":"<<scene.indices.size()/3
              <<",\"surfaces\":"<<scene.surfaces.size()
              <<",\"vertices_with_uv\":"<<scene.vertices.size()
-             <<"}\n";
+             <<",\"object_types\":{";
+    bool first=true;
+    for(unsigned i=0;i<scene.original_object_type_counts.size();++i) {
+        const auto count=scene.original_object_type_counts[i];
+        if(!count)continue;
+        if(!first)std::cout<<",";
+        first=false;
+        std::cout<<"\""<<i<<"\":"<<count;
+    }
+    std::cout<<"}}\n";
     return 0;
 }
