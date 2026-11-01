@@ -692,6 +692,32 @@ def observe(apk: Path) -> dict:
         data,sections,0x00280a34,0x8c,0x00280a40)
     constructor_280a34_secondary_base=resolve_arm_literal_based_global(
         data,sections,0x00280a38,0x8c,0x00280a44)
+    # Read only bounded original ELF vtable method pointer words (never
+    # original game assets or code bodies). The constructors install
+    # these exact original VAs. A relocation-zero or function pointer
+    # outside executable sections is reported, NOT assumed callable.
+    startup_method_slots={
+        "object34_method_0x0c":(0x00489a10,0x0c),
+        "object58_method_0x24":(0x00489880,0x24),
+        "secondary_method_0x0c":(0x00489a98,0x0c),
+        "embedded_method_0x18":(0x004897b8,0x18),
+    }
+    startup_method_targets={}
+    for label,(table_va,slot) in startup_method_slots.items():
+        pointer_va=(table_va+slot)&0xffffffff
+        try:
+            method=struct.unpack("<I",bounded_virtual_read(
+                data,segs,pointer_va,4))[0]
+        except ValueError:
+            method=None
+        executable=bool(method is not None and
+            any(start<=method<end for start,end,_ in sections))
+        startup_method_targets[label]={
+            "slot_va":f"0x{pointer_va:08x}",
+            "original_method_va":f"0x{method:08x}" if method is not None else None,
+            "file_backed":method is not None,
+            "executable_address":executable,
+        }
     # Original 0x287A94 object constructor has two PC-relative table
     # bases and a single outstanding direct call to 0x27E560.
     constructor_287a94_primary_base=resolve_arm_literal_based_global(
@@ -834,6 +860,11 @@ def observe(apk: Path) -> dict:
             "vtable_at_plus_0x14":f"0x{(constructor_280a34_secondary_base+8)&0xffffffff:08x}",
             "original_base_constructor_calls":3,
             "verified":True,
+        },
+        "original_stage_zero_concrete_method_targets":{
+            "targets":startup_method_targets,
+            "source":"original ELF file-backed vtable slots",
+            "does_not_prove_virtual_owner_constructed":True,
         },
         "original_constructor_287a94_literals":{
             "vtable_at_plus_zero":f"0x{(constructor_287a94_primary_base+8)&0xffffffff:08x}",
