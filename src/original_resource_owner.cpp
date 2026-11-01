@@ -29,17 +29,41 @@ original_construct_resource_owner_0x27a768(
     // Embedded original 0x27A4F0 obtains an already-present BSS
     // singleton through original GOT 0x49BCA8, or calls 0x27E560.
     // We require the real singleton pointer here and NEVER fabricate it.
-    const auto allocator=load32(
+    const auto* native_pool=in.native_default_pool;
+    if(native_pool &&
+       (static_cast<const void*>(native_pool->mapped_global_pointer_slot)!=
+            in.mapped_allocator_global_word ||
+        native_pool->accessible_slot_bytes<4u))
+        return blocked(S::InvalidMemory);
+    auto allocator=load32(
         static_cast<const std::uint8_t*>(
             in.mapped_allocator_global_word));
+    // Original 0x27A4F0 resolves the same original 0x49BCA8 slot
+    // used by 0x271914. When absent, both call 0x27E560.
+    // Never supply a stand-in pointer: native_singleton must contain
+    // the independently recovered guard/object/GOT state.
+    if(!allocator && native_pool) {
+        const auto acquired=original_default_pool_0x271914(*native_pool);
+        if(acquired.status==OriginalDefaultPoolStatus0x271914::CompletedNewSingleton ||
+           acquired.status==OriginalDefaultPoolStatus0x271914::CompletedExisting)
+            allocator=acquired.original_r0;
+    }
     if(!allocator)return blocked(S::MissingOriginalAllocator);
     auto pool=in.original_pool_arm_va;
     if(!pool) {
-        if(!in.default_pool_0x271914)
-            return blocked(S::MissingDefaultPool);
-        if(!in.default_pool_0x271914(
-            0x00271914u,in.context,&pool)||!pool)
-            return blocked(S::OriginalDefaultPoolRefused);
+        if(native_pool) {
+            const auto resolved=original_default_pool_0x271914(*native_pool);
+            if(resolved.status!=OriginalDefaultPoolStatus0x271914::CompletedExisting &&
+               resolved.status!=OriginalDefaultPoolStatus0x271914::CompletedNewSingleton)
+                return blocked(S::OriginalDefaultPoolRefused);
+            pool=resolved.original_r0;
+        } else {
+            if(!in.default_pool_0x271914)
+                return blocked(S::MissingDefaultPool);
+            if(!in.default_pool_0x271914(
+                0x00271914u,in.context,&pool)||!pool)
+                return blocked(S::OriginalDefaultPoolRefused);
+        }
     }
     std::uint32_t provider_r0=0;
     if(in.original_provider_arm_va) {
