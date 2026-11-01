@@ -62,4 +62,9 @@ struct M3gRgbaImage {
 };
 M3gRgbaImage decode_m3g_rgba_image(const std::uint8_t* data, std::size_t size);
 
+// IronMonkey Image2D code 116, only when bytes exactly match a complete
+// ETC1 mip pyramid. Decodes BASE LEVEL RGB to RGBA8 in memory; mip levels
+// are validated but not exposed. Visual orientation is unverified.
+M3gRgbaImage decode_m3g_etc1_image(const std::uint8_t* data, std::size_t size);
+
 }  // namespace ds_port
