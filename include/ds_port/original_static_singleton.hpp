@@ -35,4 +35,9 @@ struct OriginalSingletonResult {
 // Verifies exact size, addresses, and callbacks before modifying memory.
 OriginalSingletonResult original_initialize_static_0x27e560(
     const OriginalSingletonInputs&) noexcept;
+// Original 0x27E560 ignores incoming r0 and returns static object+4;
+// matches the existing startup constructor base-provider signature.
+bool original_static_singleton_base_provider(
+    std::uint32_t original_callee_va,std::uint32_t ignored_arm_argument,
+    void* context,std::uint32_t* original_return) noexcept;
 }

@@ -44,6 +44,18 @@ int main(){
     r=original_initialize_static_0x27e560(in);
     assert(r.status==OriginalSingletonStatus::Completed&&!r.constructed);
     assert(trace.acquires==2&&trace.releases==1);
+    // Both original startup object constructors call 0x27E560.
+    // First call initializes the singleton; second returns same ARM token.
+    bytes.fill(0);trace={};
+    std::uint32_t from34=0,from58=0;
+    assert(original_static_singleton_base_provider(
+        0x0027e560u,0xa000u,&in,&from34));
+    assert(original_static_singleton_base_provider(
+        0x0027e560u,0xb000u,&in,&from58));
+    assert(from34==0x9004u&&from58==from34);
+    assert(trace.acquires==1&&trace.releases==1&&trace.registrations==1);
+    assert(!original_static_singleton_base_provider(
+        0x0027e564u,0,&in,&from58));
     in.mapped_bytes=0x17;
     assert(original_initialize_static_0x27e560(in).status==
            OriginalSingletonStatus::InvalidMemory);

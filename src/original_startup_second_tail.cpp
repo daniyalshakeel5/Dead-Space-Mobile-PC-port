@@ -107,12 +107,17 @@ OriginalStartupSecondTailStatus original_execute_stage_zero_tail_0x280580(
     OriginalAllocatorReturn object34{};
     if(!x.allocate(0x34u,kStartupAllocate34Descriptor,&object34))
         return x.status;
-    if(!in.original_base_0x27e560)
+    const auto base_provider=in.native_singleton_0x27e560
+        ? original_static_singleton_base_provider:in.original_base_0x27e560;
+    void* base_context=in.native_singleton_0x27e560
+        ? const_cast<OriginalSingletonInputs*>(in.native_singleton_0x27e560)
+        : in.callback_context;
+    if(!base_provider)
         return OriginalStartupSecondTailStatus::MissingOriginalBaseConstructor;
     if(!original_construct_object34_0x287a94(
         object34.original_allocated_record_arm_address,
         object34.record_host_bytes,object34.accessible_record_bytes,
-        in.original_base_0x27e560,in.callback_context))
+        base_provider,base_context))
         return OriginalStartupSecondTailStatus::OriginalBaseConstructorRefused;
     // STR r5,[r4,#0xc] and vtable +0x0c(r0=allocated,r1=context,r2=owner).
     put(ctx+0x0c,object34.original_allocated_record_arm_address);
@@ -146,7 +151,7 @@ OriginalStartupSecondTailStatus original_execute_stage_zero_tail_0x280580(
     if(!original_construct_object58_0x280a34(
         object58.original_allocated_record_arm_address,
         object58.record_host_bytes,object58.accessible_record_bytes,
-        in.original_base_0x27e560,in.callback_context))
+        base_provider,base_context))
         return OriginalStartupSecondTailStatus::OriginalBaseConstructorRefused;
     put(ctx+0x10,object58.original_allocated_record_arm_address);
     if(!x.invoke(object58.original_allocated_record_arm_address,0x24u,

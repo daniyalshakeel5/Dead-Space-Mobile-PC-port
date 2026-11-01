@@ -52,4 +52,15 @@ OriginalSingletonResult original_initialize_static_0x27e560(
         return fail(OriginalSingletonStatus::AtexitRefused);
     return {OriginalSingletonStatus::Completed,token,true};
 }
+bool original_static_singleton_base_provider(
+    std::uint32_t callee,std::uint32_t,
+    void* context,std::uint32_t* result) noexcept {
+    if(callee!=0x0027e560u || !context || !result)return false;
+    const auto* in=static_cast<const OriginalSingletonInputs*>(context);
+    const auto r=original_initialize_static_0x27e560(*in);
+    if(r.status!=OriginalSingletonStatus::Completed)return false;
+    *result=r.original_object_arm_va;
+    return true;
+}
+
 }
