@@ -6,6 +6,7 @@ pixels, game file contents or ELF bytes. Extracted files auto-delete.
 """
 import argparse
 import json
+import struct
 from pathlib import Path
 import subprocess
 import tempfile
@@ -45,7 +46,27 @@ def inspect(apk:Path,probe:Path)->dict:
             call=subprocess.run([str(probe),str(target),"--decode-image"],
                 capture_output=True,text=True,timeout=60,check=True)
             decoded=json.loads(call.stdout)
+            # A published independent texture-format script identifies
+            # an image header around 0x60. Probe numeric dimensions
+            # and lengths only; never log original game bytes.
+            header={}
+            if info.file_size>=0x74:
+                with target.open("rb") as original:
+                    original.seek(0x60)
+                    chunk=original.read(20)
+                u,w,h,zero,n=struct.unpack("<IIIII",chunk)
+                plausible=(0<w<=8192 and 0<h<=8192 and
+                           n>0 and n<=info.file_size-0x74)
+                header={
+                    "field0":u,"width":w,"height":h,
+                    "field3":zero,"encoded_bytes":n,
+                    "plausible":plausible,
+                    "etc1_expected_bytes":((w+3)//4)*((h+3)//4)*8 if plausible else 0,
+                    "rgba_expected_bytes":w*h*4 if plausible else 0,
+                    "trailing_bytes":info.file_size-0x74-n if plausible else None
+                }
             results.append({
+                "candidate_offset_0x60":header,
                 "path":path,"present":True,"size":info.file_size,
                 "valid_diagnostic_container":decoded["valid"],
                 "type_counts":decoded["type_counts"],
