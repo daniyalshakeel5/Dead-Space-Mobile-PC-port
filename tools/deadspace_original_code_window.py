@@ -33,7 +33,7 @@ WINDOWS = {
     "stage_zero_owner_provider_0x27e930": (0x0027e930, 128),
     "original_input_ready_guard_0x27e97c": (0x0027e97c, 28),
     "record_allocator_virtual_call_0x281d54": (0x00281d54, 112),
-    "frame_stage_zero_second_callee": (0x00280520, 96),
+    "frame_stage_zero_second_callee": (0x00280520, 256),
     "stage_zero_setup_target_0x28ca24": (0x0028ca24, 160),
     "stage_zero_setup_type2_branch_0x28cad8": (0x0028cad8, 96),
     "stage_zero_followup_target_0x281d54": (0x00281d54, 160),
