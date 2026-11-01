@@ -15,7 +15,7 @@ option(DS_BUILD_IM_MESH_READER "Build native IronMonkey geometry-only mesh expor
 
 # These functions are independent x86-64 translations of 29 validated
 # original ARM game JNI constant returns; no guessed gameplay dispatch.
-add_library(ds_original_native_abi STATIC src/original_native_abi.cpp src/original_jni_exports.cpp src/original_frame_dispatch.cpp src/original_game_entry.cpp src/original_timing_math.cpp src/original_clock_source.cpp src/original_stage_zero_setup.cpp src/original_stage_zero_followup.cpp src/original_stage_zero_type_two.cpp src/original_record_postalloc.cpp)
+add_library(ds_original_native_abi STATIC src/original_native_abi.cpp src/original_jni_exports.cpp src/original_frame_dispatch.cpp src/original_game_entry.cpp src/original_timing_math.cpp src/original_clock_source.cpp src/original_stage_zero_setup.cpp src/original_stage_zero_followup.cpp src/original_stage_zero_type_two.cpp src/original_record_postalloc.cpp src/original_runtime_globals.cpp)
 target_include_directories(ds_original_native_abi PUBLIC include)
 
 add_library(ds_port_input STATIC src/input.cpp)
@@ -137,6 +137,11 @@ if(DS_ENABLE_TESTS)
     target_link_libraries(ds_original_record_postalloc_tests PRIVATE ds_original_native_abi)
     add_test(NAME ds_original_arm_record_allocation_postreturn
         COMMAND ds_original_record_postalloc_tests)
+    add_executable(ds_original_runtime_globals_tests
+        tests/original_runtime_globals_tests.cpp)
+    target_link_libraries(ds_original_runtime_globals_tests PRIVATE ds_original_native_abi)
+    add_test(NAME ds_original_arm_shared_globals_and_record
+        COMMAND ds_original_runtime_globals_tests)
     add_executable(ds_original_frame_nonzero_tests tests/original_frame_nonzero_tests.cpp)
     target_link_libraries(ds_original_frame_nonzero_tests PRIVATE ds_original_native_abi)
     add_test(NAME ds_original_arm_nonzero_two_virtual_calls
