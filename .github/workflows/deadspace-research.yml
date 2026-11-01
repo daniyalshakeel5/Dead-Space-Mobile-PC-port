@@ -7,11 +7,15 @@ on:
     paths:
       - "tools/deadspace_audit.py"
       - "tests/test_deadspace_audit.py"
+      - "tools/deadspace_asset_recon.py"
+      - "tests/test_deadspace_asset_recon.py"
       - ".github/workflows/deadspace-research.yml"
   pull_request:
     paths:
       - "tools/deadspace_audit.py"
       - "tests/test_deadspace_audit.py"
+      - "tools/deadspace_asset_recon.py"
+      - "tests/test_deadspace_asset_recon.py"
       - ".github/workflows/deadspace-research.yml"
   workflow_dispatch:
 
@@ -36,7 +40,7 @@ jobs:
         if: github.event_name != 'workflow_dispatch'
         run: python tools/deadspace_audit.py --root . --output report/deadspace-audit.json
 
-      - name: Analyze private APK if configured (manual run only)
+      - name: Analyze native ABI and resource formats if a private APK is configured (manual only)
         if: github.event_name == 'workflow_dispatch'
         env:
           DS_APK_URL: ${{ secrets.DS_APK_URL }}
@@ -46,6 +50,7 @@ jobs:
           if [[ -n "${DS_APK_URL:-}" ]]; then
             curl -fsSL --retry 2 --max-time 240 -o "$RUNNER_TEMP/deadspace.apk" "$DS_APK_URL"
             python tools/deadspace_audit.py --root . --apk "$RUNNER_TEMP/deadspace.apk" --output report/deadspace-audit.json
+            python tools/deadspace_asset_recon.py --apk "$RUNNER_TEMP/deadspace.apk" --output report/deadspace-resource-recon.json
             rm -f "$RUNNER_TEMP/deadspace.apk"
           else
             echo "DS_APK_URL not configured; performing safe repository-only audit."
@@ -56,6 +61,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: deadspace-port-audit
-          path: report/deadspace-audit.json
+          path: report/*.json
           if-no-files-found: error
           retention-days: 14
