@@ -664,6 +664,12 @@ def observe(apk: Path) -> dict:
         data,sections,0x002807a4,0x34,0x002807b0)
     input_initial_table=(event_constructor_base+8)&0xffffffff
     input_final_table=(event_constructor_base+0x20)&0xffffffff
+    # Original 0x287A94 object constructor has two PC-relative table
+    # bases and a single outstanding direct call to 0x27E560.
+    constructor_287a94_primary_base=resolve_arm_literal_based_global(
+        data,sections,0x00287a94,0x60,0x00287aa0)
+    constructor_287a94_secondary_base=resolve_arm_literal_based_global(
+        data,sections,0x00287a98,0x60,0x00287aa4)
     # Original 0x280520 later stage setup and three allocations.
     second_tail_descriptors={
         "resource_primary":(0x00280598,0x104,0x002805a0),
@@ -782,6 +788,13 @@ def observe(apk: Path) -> dict:
             "final_vtable_va":f"0x{input_final_table:08x}",
             "direct_helper_0x35194":"import-plt-target-still-unresolved",
             "required_event_bytes":48,
+            "verified":True,
+        },
+        "original_constructor_287a94_literals":{
+            "vtable_at_plus_zero":f"0x{(constructor_287a94_primary_base+8)&0xffffffff:08x}",
+            "table_at_plus_four":f"0x{(constructor_287a94_primary_base+0x40)&0xffffffff:08x}",
+            "vtable_at_plus_0x14":f"0x{(constructor_287a94_secondary_base+8)&0xffffffff:08x}",
+            "direct_callee":"0x0027e560",
             "verified":True,
         },
         "original_stage_zero_second_tail_descriptors":{
