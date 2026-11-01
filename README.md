@@ -57,8 +57,14 @@
   The original `0x27541C` 0x21C-byte UTF-16 string object is
   also constructed in native C++ with original pointer layout.
   **Actual non-null resource-provider activation remains incomplete.**
-- **60/60 synthetic native CTests passed on Windows and Linux** at
-  [verification run 41337741146](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41337741146).
+- Original receiver provider-mode check `0x2733E8` now
+  executes the native verified rejection branch, while the
+  accepted-mode path constructs all three original `0x27541C`
+  UTF-16 temporary objects in the mapped `0x278E58` stack
+  frame. Actual resource streaming through provider `+0x2C`
+  and owner `+0x70` still requires original native methods.
+- **62/62 synthetic native CTests passed on Windows and Linux** at
+  [verification run 41339111481](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41339111481).
   These tests do not prove real game-engine boot or scene rendering.
   [Latest detailed handoff](docs/HANDOFF_2026-11-01.md).
 
