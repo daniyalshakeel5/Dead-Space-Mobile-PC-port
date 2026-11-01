@@ -1,5 +1,8 @@
 #include "ds_port/original_secondary_pipeline.hpp"
 #include <array>
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <cassert>
 using namespace ds_port::original_runtime;
 namespace {
@@ -44,5 +47,10 @@ int main() {
     assert(r.allocation_status==OriginalSecondaryStatus::PostprocessRefused);
     assert(r.postprocess_status==OriginalPostprocessStatus::InvalidMemory);
     assert(r.original_result_arm_address==0&&s.steps==0);
+    s={};s.token=0;object.fill(0);
+    r=original_run_secondary_pipeline(inputs);
+    assert(r.allocation_status==OriginalSecondaryStatus::Completed);
+    assert(r.original_result_arm_address==0&&s.allocations==1&&s.steps==0);
+    for(auto byte:object)assert(byte==0);
     return 0;
 }
