@@ -69,6 +69,7 @@ ImMenuGeometry decode_im_menu_geometry(const std::uint8_t* data,
         out.original_object_type_counts.fill(0);
         out.camera_object_indices.clear();
         out.group_object_indices.clear();
+        out.scene_node_records.clear();
         return out;
     };
     std::vector<Chunk> chunks;
@@ -78,6 +79,9 @@ ImMenuGeometry decode_im_menu_geometry(const std::uint8_t* data,
         for(std::size_t i=0;i<chunks.size();++i) {
             const auto type=chunks[i].type;
             ++out.original_object_type_counts[type];
+            if(type==5 || type==9)out.scene_node_records.push_back({
+                static_cast<std::uint32_t>(i+1),type,
+                static_cast<std::uint32_t>(chunks[i].size)});
             if(type==5)out.camera_object_indices.push_back(
                 static_cast<std::uint32_t>(i+1));
             if(type==9)out.group_object_indices.push_back(
