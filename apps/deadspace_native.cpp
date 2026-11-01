@@ -3,6 +3,7 @@
 #ifdef DS_NATIVE_SPLASH_PRESENTATION
 #include "ds_port/original_splash_host.hpp"
 #include "ds_port/im_menu_scene.hpp"
+#include "ds_port/original_menu_draw_stream.hpp"
 #include "ds_port/im_ui_image.hpp"
 #include <filesystem>
 #include <fstream>
@@ -48,6 +49,8 @@ bool load_original_menu_stage(const std::string& root) {
        scene.mesh_count==0 || scene.surfaces.empty() ||
        scene.camera_object_indices.empty() ||
        scene.group_object_indices.empty())return false;
+    const auto draw=ds_port::prepare_original_menu_draw_stream(scene);
+    if(!draw.valid)return false;
     for(const auto& img:ui.images)
         if(!img.decoded || img.width!=1024 || img.height!=1024 ||
            img.pixels_rgba.size()!=1024u*1024u*4u)return false;
