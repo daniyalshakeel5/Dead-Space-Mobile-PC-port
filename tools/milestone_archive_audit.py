@@ -48,6 +48,7 @@ def unsafe_entry(name: str) -> bool:
     return (
         any(part in ("", ".", "..") for part in parts)
         or any(":" in part for part in parts)
+        or ".git" in parts
         or PurePosixPath(name).is_absolute()
     )
 
@@ -103,7 +104,7 @@ def audit(path: Path) -> dict:
                     report["critical_findings"].append("oversized_entry")
                 ratio = entry.file_size / max(1, entry.compress_size)
                 if ratio > MAX_RATIO and entry.file_size > 1024 * 1024:
-                    report["warnings"].append("suspicious_compression_ratio")
+                    report["critical_findings"].append("suspicious_compression_ratio")
 
                 suffix = PurePosixPath(name).suffix.lower() or "[none]"
                 counts[suffix] += 1
