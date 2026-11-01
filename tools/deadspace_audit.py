@@ -137,9 +137,10 @@ def analyze_library(path: Path, archive_path: str) -> dict:
     result["bootstrap_exports"] = sorted(exported & BOOTSTRAP_EXPORTS)
     # Only known platform API names; no private symbol table or text strings.
     result["platform_api_import_evidence"] = public_api_evidence(imported)
-    result["import_hints"] = {
-        key: sorted({name for name in imported
-                     if any(marker in name.lower() for marker in markers)})[:100]
+    # Report counts for broad heuristic families, never proprietary symbol names.
+    result["import_hint_counts"] = {
+        key: sum(any(marker in name.lower() for marker in markers)
+                 for name in imported)
         for key, markers in API_MARKERS.items()
     }
     result["symbol_scan_available"] = bool(symbols.strip())
