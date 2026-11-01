@@ -1,5 +1,6 @@
 #pragma once
 #include "ds_port/original_resource_owner.hpp"
+#include "ds_port/original_owner_byte_line.hpp"
 #include "ds_port/original_receiver_mode.hpp"
 #include "ds_port/original_receiver_activation.hpp"
 #include "ds_port/original_receiver_prefix.hpp"
@@ -54,6 +55,12 @@ public:
     OriginalReceiverActivationResult0x278e58 activate(
         OriginalActivationTreeClear original_tree_release=nullptr,
         void* context=nullptr) noexcept;
+    // Process caller-supplied original resource text after owner is
+    // constructed. This only extracts a mode-8 line; actual owner
+    // +0x70 postprocessing and provider virtuals remain incomplete.
+    OriginalNativeOwnerStreamResult read_resource_text_line_0x276d18(
+        OriginalNativeByteSource& source,
+        OriginalResourceByteString& output) const noexcept;
     OriginalReceiverPrefixResult0x278018 process_receiver_prefix(
         std::u16string_view record,
         OriginalRegistrationCharacterTable character_table,
