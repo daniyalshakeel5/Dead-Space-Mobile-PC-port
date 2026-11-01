@@ -13,14 +13,15 @@ OriginalParsedTreeResult original_register_parsed_trees_0x286918(
     auto fail=[](S status,unsigned count,unsigned passes) noexcept {
         return OriginalParsedTreeResult{status,count,passes};
     };
-    if(!in.original_parsed_arm_va||in.original_parsed_arm_va>0xffffff80u||
-       !in.parsed_host_bytes||in.parsed_accessible_bytes<0x84u||
+    if(!in.original_parsed_arm_va||in.original_parsed_arm_va>0xffffff77u||
+       !in.parsed_host_bytes||in.parsed_accessible_bytes<0x88u||
        !in.original_registration_context_arm_va||
        !in.resolve_original_node||!in.native_registration)
         return fail(S::InvalidOriginalState,0,0);
     const auto* bytes=static_cast<const std::uint8_t*>(in.parsed_host_bytes);
     // Original 0x283408(container) returns container+4. Its +8
-    // contains the first node (r7), and container+4 is the sentinel.
+    // contains the first node (r7); original ADD r8,r0,#4 means
+    // the sentinel is container+8, not container+4.
     // Original callsites BL 0x284178 are exactly:
     // 0x2869A8, 0x2869E4, 0x286A20.
     constexpr std::uint32_t offsets[3]={0x28u,0x50u,0x78u};
@@ -32,12 +33,13 @@ OriginalParsedTreeResult original_register_parsed_trees_0x286918(
         const auto header=original_tree_header_0x283408(container);
         if(header.status!=OriginalTreeWalkStatus::Completed)
             return fail(S::InvalidTreePointer,count,pass);
+        const std::uint32_t sentinel=header.original_node_va+4u;
         std::uint32_t current=word(bytes+offsets[pass]+0x0cu);
         if(!current)return fail(S::InvalidTreePointer,count,pass);
         // Bound hostile or malformed original-asset trees. Native tests
         // exercise this with mapped original ARM node layouts.
         unsigned steps=0;
-        while(current!=header.original_node_va) {
+        while(current!=sentinel) {
             if(++steps>65536u)
                 return fail(S::TraversalLimit,count,pass);
             OriginalTreeNodeSpan node{};
