@@ -362,7 +362,13 @@ public class GhidraGameCodeMap extends GhidraScript {
                 if(clockCalls>=8)break;
             }
         }
-        result.append("]}");
+        result.append("],\"clock_thunk_identity\":");
+        if(clockProvider!=null) {
+            Function resolved=clockProvider.getThunkedFunction(true);
+            result.append(escape(resolved==null ? "unresolved" :
+                (resolved.isExternal() ? "API:"+resolved.getName() : addr(resolved))));
+        } else result.append(escape("unresolved"));
+        result.append("}");
         result.append(",\"frame_callback_exact_return_only\":");
         Function frame=null;
         for(Function f:internals)
