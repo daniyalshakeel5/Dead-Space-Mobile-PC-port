@@ -24,7 +24,11 @@ MAX_RATIO = 250
 MAX_TOTAL_DECLARED = 32 * 1024 * 1024 * 1024
 
 CATEGORIES = {"assets", "res", "lib", "META-INF"}
+# Defined by the JSR-184 M3G file-format specification. Extension alone is
+# NOT proof: the mobile game can use its own unrelated .m3g serialization.
+JSR184_MAGIC = bytes.fromhex("ab4a5352313834bb0d0a1a0a")
 SIGNATURES = (
+    ("m3g_jsr184", JSR184_MAGIC),
     ("png", b"\x89PNG\r\n\x1a\n"),
     ("jpeg", b"\xff\xd8\xff"),
     ("dds", b"DDS "),
@@ -73,6 +77,11 @@ def sniff(prefix: bytes) -> str:
         return "xml-text"
     if prefix.startswith(b"{") or prefix.startswith(b"["):
         return "possible-json-text"
+    if len(prefix) >= 2:
+        cmf, flg = prefix[:2]
+        # Valid zlib header only, not proof that a complete stream decodes.
+        if (cmf & 0x0F) == 8 and (cmf >> 4) <= 7 and (256 * cmf + flg) % 31 == 0:
+            return "possible-zlib"
     return "unrecognized"
 
 
@@ -154,6 +163,17 @@ def investigate(apk: Path) -> dict:
                 skipped["probe_cap"] += len(candidates) - MAX_PROBES
 
             by_magic: dict = {}
+            by_extension_magic: dict = {}
+            # Pair count, not the underlying names; a useful clue as to
+            # whether .sph and .sps form two components of each sprite.
+            asset_sph = {entry.filename[:-4] for entry in entries
+                         if safe_name(entry.filename) and
+                         entry.filename.startswith("assets/") and
+                         entry.filename.lower().endswith(".sph")}
+            asset_sps = {entry.filename[:-4] for entry in entries
+                         if safe_name(entry.filename) and
+                         entry.filename.startswith("assets/") and
+                         entry.filename.lower().endswith(".sps")}
             unknown_large_bytes = 0
             unknown_large_count = 0
             read_errors = 0
@@ -166,6 +186,11 @@ def investigate(apk: Path) -> dict:
                     continue
                 kind = sniff(prefix)
                 stat_record(by_magic, kind, info.file_size)
+                # No paths or source bytes; just extension x validated magic.
+                ext = Path(info.filename).suffix.lower()
+                if ext in {".m3g", ".sps", ".sph", ".sb", ".bin"}:
+                    entry_group = by_extension_magic.setdefault(ext, {})
+                    stat_record(entry_group, kind, info.file_size)
                 if kind == "unrecognized" and info.file_size >= 1024 * 1024:
                     unknown_large_count += 1
                     unknown_large_bytes += info.file_size
@@ -176,6 +201,14 @@ def investigate(apk: Path) -> dict:
                 "extension_stats": dict(sorted(by_extension.items(),
                     key=lambda pair: (-pair[1]["declared_bytes"], pair[0]))[:80]),
                 "magic_stats": dict(sorted(by_magic.items())),
+                "extension_magic_stats": {ext: dict(sorted(stats.items()))
+                                          for ext, stats in
+                                          sorted(by_extension_magic.items())},
+                "sprite_stem_stats": {
+                    "sph_count": len(asset_sph),
+                    "sps_count": len(asset_sps),
+                    "paired_count": len(asset_sph & asset_sps),
+                },
                 "candidate_files": len(candidates),
                 "inspected_prefixes": len(inspected) - read_errors,
                 "prefix_read_errors": read_errors,
