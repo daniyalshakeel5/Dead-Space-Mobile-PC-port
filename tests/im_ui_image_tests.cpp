@@ -75,7 +75,7 @@ int main(){
     broken=one;
     // Image2D format field at first object's payload:
     // header 21 + 17, metadata user param 488, base 20.
-    const auto format=21u+17u+20u+488u;
+    const auto format=21u+17u+5u+20u+488u;
     assert(broken[format]==100u);
     broken[format]=116;
     assert(!decode_im_ui_rgba_images(broken.data(),broken.size()).decoded);
