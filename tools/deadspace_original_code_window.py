@@ -614,6 +614,13 @@ def observe(apk: Path) -> dict:
         data,sections,0x002849e4,0x40,0x00284a00)
     if secondary_descriptor_va==0:
         raise ValueError("Secondary allocation descriptor resolves to null")
+    # Original input event (0x2807A0) constructs with a PC-relative
+    # class-table pointer; the first temporary vtable is base+8, and
+    # it finally installs base+0x20. Resolve from this APK only.
+    event_constructor_base=resolve_arm_literal_based_global(
+        data,sections,0x002807a4,0x34,0x002807b0)
+    input_initial_table=(event_constructor_base+8)&0xffffffff
+    input_final_table=(event_constructor_base+0x20)&0xffffffff
     # Original 0x2828AC LDR at +0x00 / ADD at +0x0c / ADD #8 at +0x10.
     # Original 0x288688 LDR at +0x0c / ADD at +0x18 / ADD #8 at +0x1c.
     # Both literal-derived addresses are original ARM VAs, not host pointers.
@@ -694,6 +701,13 @@ def observe(apk: Path) -> dict:
                 if registry_got_initial is not None else None),
             "requested_interface_id":0x10004,
             "vtable_offset":0x18,
+        },
+        "input_event_constructor_0x2807a0":{
+            "initial_vtable_va":f"0x{input_initial_table:08x}",
+            "final_vtable_va":f"0x{input_final_table:08x}",
+            "direct_helper_0x35194":"import-plt-target-still-unresolved",
+            "required_event_bytes":48,
+            "verified":True,
         },
         "embedded_initializer_0x27fb28_literals":{
             "original_vtable_arm_va":f"0x{embedded_vtable_va:08x}",
