@@ -104,17 +104,35 @@ OriginalStartupSecondTailStatus original_execute_stage_zero_tail_0x280580(
     OriginalStartupVirtualResult r{};
     // Original context vtable +0x54 (r1..r3 caller-saved by direct call).
     if(!x.invoke(in.original_context_arm_va,0x54u,0,0,0,0,&r))return x.status;
-    if(!in.original_resource_0x2803e4)
+    if(!in.original_resource_0x2803e4 && !in.native_resource_query_0x2803e4)
         return OriginalStartupSecondTailStatus::MissingOriginalResource;
+    // Prefer the verified 0x2803E4 native call sequence when its resource
+    // provider and loader have been independently translated and bound.
+    const auto lookup_resource=[&](std::uint32_t descriptor,
+                                    std::uint32_t* result) noexcept -> bool {
+        if(in.native_resource_query_0x2803e4) {
+            const auto& native=*in.native_resource_query_0x2803e4;
+            if(native.original_context_arm_va!=in.original_context_arm_va ||
+               native.mapped_context!=in.original_context ||
+               native.context_bytes>in.context_bytes)
+                return false;
+            const auto queried=original_execute_resource_query_0x2803e4(
+                native,descriptor);
+            if(queried.status!=OriginalResourceQueryStatus::Completed)
+                return false;
+            *result=queried.original_r0;
+            return true;
+        }
+        return in.original_resource_0x2803e4(
+            0x002803e4u,in.original_context_arm_va,descriptor,
+            in.callback_context,result);
+    };
     std::uint32_t found=0;
-    // Resource query 0x2803E4 tries primary, then fallback only if zero.
-    if(!in.original_resource_0x2803e4(
-          0x002803e4u,in.original_context_arm_va,kStartupResourcePrimary,
-          in.callback_context,&found))
+    // Original 0x280580 attempts the fallback only if the first
+    // original resource query returned zero, never on provider refusal.
+    if(!lookup_resource(kStartupResourcePrimary,&found))
         return OriginalStartupSecondTailStatus::OriginalResourceRefused;
-    if(!found && !in.original_resource_0x2803e4(
-          0x002803e4u,in.original_context_arm_va,kStartupResourceFallback,
-          in.callback_context,&found))
+    if(!found && !lookup_resource(kStartupResourceFallback,&found))
         return OriginalStartupSecondTailStatus::OriginalResourceRefused;
 
     OriginalAllocatorReturn object34{};
