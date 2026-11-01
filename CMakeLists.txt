@@ -118,6 +118,11 @@ if(DS_ENABLE_TESTS)
     target_link_libraries(ds_original_jni_exports_tests PRIVATE ds_original_native_abi)
     add_test(NAME ds_original_arm_jni_29_individual_exports
         COMMAND ds_original_jni_exports_tests)
+    add_executable(ds_original_state_two_transition_tests
+        tests/original_state_two_transition_tests.cpp)
+    target_link_libraries(ds_original_state_two_transition_tests PRIVATE ds_original_native_abi)
+    add_test(NAME ds_original_arm_state_two_transition_prefix
+        COMMAND ds_original_state_two_transition_tests)
     add_executable(ds_original_frame_dispatch_tests tests/original_frame_dispatch_tests.cpp)
     target_link_libraries(ds_original_frame_dispatch_tests PRIVATE ds_original_native_abi)
     add_test(NAME ds_original_arm_frame_state_zero_transition
