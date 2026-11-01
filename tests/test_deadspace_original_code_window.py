@@ -51,6 +51,22 @@ class ArmWindowTests(unittest.TestCase):
                 64:("asr","r3, r2, #0x1f"),
                 68:("smlal","r2, r3, r1, r0"),
                 72:("strd","r2, r3, [r4, #0x40]")}),
+            "frame_state_one_nonzero_continuation":decoded({
+                0:("ldr","r1, [r4, #0x68]"),
+                4:("mov","r3, #0"),
+                8:("mov","r2, r3"),
+                12:("ldr","ip, [r1]"),
+                16:("mov","r0, r1"),
+                20:("str","r3, [sp]"),
+                24:("mov","r1, #0xe"),
+                28:("mov","lr, pc"),
+                32:("ldr","pc, [ip, #0x20]"),
+                36:("ldr","r3, [r4, #0x68]"),
+                40:("mov","r0, r3"),
+                44:("ldr","r3, [r3]"),
+                48:("mov","lr, pc"),
+                52:("ldr","pc, [r3, #0x38]"),
+                56:("b","#0x27ef90")}),
             "frame_state_one_zero_result_tail":decoded({
                 0:("push","{r4, r5, lr}"),
                 4:("ldr","r4, [pc, #0x84]"),
@@ -90,6 +106,13 @@ class ArmWindowTests(unittest.TestCase):
         windows["frame_state_one_zero_result_tail"]["instructions"][5]["args"] = "r3, [r4, #4]"
         self.assertFalse(proven_original_code_helpers(windows)[
             "original_state_one_transition_stores_two_first"])
+        windows["frame_state_one_nonzero_continuation"]["instructions"][13]["args"] = "pc, [r3, #0x34]"
+        self.assertFalse(proven_original_code_helpers(windows)[
+            "original_state_one_nonzero_two_vtable_calls"])
+        windows["frame_state_one_nonzero_continuation"]["instructions"][13]["args"] = "pc, [r3, #0x38]"
+        windows["frame_state_one_nonzero_continuation"]["instructions"][6]["args"] = "r1, #0xd"
+        self.assertFalse(proven_original_code_helpers(windows)[
+            "original_state_one_nonzero_two_vtable_calls"])
 
     def test_exact_original_arm_frame_dispatch_proof(self):
         specs={
