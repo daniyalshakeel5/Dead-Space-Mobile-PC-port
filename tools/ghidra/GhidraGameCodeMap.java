@@ -41,6 +41,44 @@ public class GhidraGameCodeMap extends GhidraScript {
     private static final int MAX_CALLERS = 80;
     private static final int MAX_DECOMPILATION_SECONDS = 12;
 
+    // Follow the exact original startup path, not unrelated renderer imports.
+    // Publish callgraph/address metadata only, never disassembled source.
+    private void appendEntryChain(StringBuilder out, Function root, int depth,
+                                  Set<String> seen, int maxNodes) throws Exception {
+        if(root==null || root.isExternal() || seen.size()>=maxNodes || depth>4) return;
+        final String id=addr(root);
+        if(!seen.add(id))return;
+        if(seen.size()>1)out.append(',');
+        out.append("{\"entry\":").append(escape(id));
+        out.append(",\"depth\":").append(depth);
+        out.append(",\"code_address_count\":").append(root.getBody().getNumAddresses());
+        InstructionIterator it=currentProgram.getListing().getInstructions(root.getBody(),true);
+        int instructionCount=0;
+        boolean justReturn=true;
+        while(it.hasNext() && instructionCount<65536) {
+            Instruction inst=it.next();instructionCount++;
+            if(!(instructionCount==1 &&
+                 inst.getMnemonicString().equalsIgnoreCase("bx") &&
+                 inst.getDefaultOperandRepresentation(0).equalsIgnoreCase("lr"))) {
+                justReturn=false;
+            }
+        }
+        out.append(",\"instruction_count\":").append(instructionCount);
+        out.append(",\"exact_bx_lr_only\":").append(justReturn);
+        List<Function> callees=new ArrayList<>();
+        for(Function child:root.getCalledFunctions(monitor)) {
+            if(!child.isExternal())callees.add(child);
+        }
+        callees.sort(Comparator.comparing(GhidraGameCodeMap::addr));
+        out.append(",\"native_callees\":[");
+        for(int i=0;i<Math.min(20,callees.size());i++) {
+            if(i>0)out.append(',');
+            out.append(escape(addr(callees.get(i))));
+        }
+        out.append("]}");
+        if(depth<4)
+            for(Function child:callees)appendEntryChain(out,child,depth+1,seen,maxNodes);
+    }
     private static String escape(String value) {
         StringBuilder out=new StringBuilder("\"");
         for (int i=0;i<value.length();++i) {
@@ -261,7 +299,32 @@ public class GhidraGameCodeMap extends GhidraScript {
             }
             result.append("]}");
         }
-        result.append("],");
+        result.append("],\"entrypoint_native_call_chain\":[");
+        Function gameEntry=null;
+        for(Function f:internals)
+            if(f.getName().equals("Java_com_ea_DeadSpace_DeadSpace_runEntryPoint")) {
+                gameEntry=f; break;
+            }
+        appendEntryChain(result,gameEntry,0,new LinkedHashSet<String>(),100);
+        result.append("],\"frame_callback_exact_return_only\":");
+        Function frame=null;
+        for(Function f:internals)
+            if(f.getName().equals("Java_com_ea_blast_AndroidRenderer_NativeOnDrawFrame")) {
+                frame=f;break;
+            }
+        boolean bxOnly=false;
+        if(frame!=null) {
+            InstructionIterator ins=currentProgram.getListing()
+                .getInstructions(frame.getBody(),true);
+            if(ins.hasNext()) {
+                Instruction one=ins.next();
+                bxOnly=!ins.hasNext() &&
+                    one.getMnemonicString().equalsIgnoreCase("bx") &&
+                    one.getDefaultOperandRepresentation(0).equalsIgnoreCase("lr");
+            }
+        }
+        result.append(bxOnly);
+        result.append(",");
         stringField(result,"limitations",
             "Function and calling-API evidence only. ARM code is not translated; "+
             "indirect calls, stripped symbols and original game control flow "+
