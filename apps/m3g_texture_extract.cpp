@@ -91,9 +91,14 @@ int main(int argc, char** argv) {
     if(!input.empty() && !in.read(reinterpret_cast<char*>(input.data()),count)){
         std::cerr<<"Input read failed.\n";return 2;
     }
-    const auto image=ds_port::decode_m3g_rgba_image(input.data(),input.size());
-    if(!image.decoded){std::cerr<<"Unsupported or invalid RGBA M3G resource.\n";return 1;}
+    auto image=ds_port::decode_m3g_rgba_image(input.data(),input.size());
+    if(!image.decoded)
+        image=ds_port::decode_m3g_etc1_image(input.data(),input.size());
+    if(!image.decoded){
+        std::cerr<<"Unsupported M3G resource (verified RGBA or ETC1 mip chain only).\n";
+        return 1;
+    }
     if(!write_png_rgba(output,image)){std::cerr<<"Could not write PNG.\n";return 1;}
-    std::cout<<"Decoded local RGBA texture: "<<image.width<<"x"<<image.height<<"\n";
+    std::cout<<"Decoded local RGBA pixels: "<<image.width<<"x"<<image.height<<"\n";
     return 0;
 }
