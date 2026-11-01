@@ -170,9 +170,10 @@ int main() {
     auto startup=boot.begin_loader_0x286918(
         loader.data(),loader.size(),0u,inputs);
     assert(startup.status==
-           OriginalLoaderPrefixStatus0x286918::ReachedUnreconstructedOriginalBind);
+           OriginalLoaderPrefixStatus0x286918::ReachedOriginalNullProviderExit);
     assert(startup.constructor_status==S::Completed);
     assert(startup.mode_status==OriginalReceiverModeStatus0x26c410::Completed);
+    assert(startup.binding_status==OriginalOwnerBindStatus0x278778::ReachedOriginalNullProviderExit);
     assert(boot.constructed());
     const auto* bp=boot.mapped_bytes();
     assert(word(bp)==kOriginalOwnerVtable0x27a768);
@@ -196,7 +197,7 @@ int main() {
     startup=no_pool.begin_loader_0x286918(
         loader.data(),loader.size(),0u,inputs);
     assert(startup.status==
-           OriginalLoaderPrefixStatus0x286918::ReachedUnreconstructedOriginalBind);
+           OriginalLoaderPrefixStatus0x286918::ReachedOriginalNullProviderExit);
     assert(no_pool.constructed());
     assert(word(no_pool.mapped_bytes()+0x8f4u)==0x37000u);
     return 0;
