@@ -2,6 +2,11 @@
 #include "ds_port/deadspace_paths.hpp"
 #ifdef DS_NATIVE_SPLASH_PRESENTATION
 #include "ds_port/original_splash_host.hpp"
+#include "ds_port/im_menu_scene.hpp"
+#include "ds_port/im_ui_image.hpp"
+#include <filesystem>
+#include <fstream>
+#include <vector>
 #endif
 #ifdef DS_NATIVE_APK_IMPORT
 #include "ds_port/asset_install.hpp"
@@ -13,6 +18,44 @@
 #include <string_view>
 namespace {
 constexpr int kNeedRecoveredEngine=20;
+#ifdef DS_NATIVE_SPLASH_PRESENTATION
+bool read_original_bounded(const std::string& root,const char* name,
+                           std::vector<std::uint8_t>& data) {
+    const auto p=ds_port::resolve_game_asset_path(root,name,true);
+    if(p.status!=ds_port::GamePathStatus::Resolved)return false;
+    std::ifstream in(p.path,std::ios::binary|std::ios::ate);
+    if(!in)return false;
+    const auto n=in.tellg();
+    if(n<=0 || static_cast<std::uint64_t>(n)>64ull*1024*1024)return false;
+    data.resize(static_cast<std::size_t>(n));
+    in.seekg(0);
+    return bool(in.read(reinterpret_cast<char*>(data.data()),n));
+}
+// Actual native boot stage after the splashes. This does not render or
+// simulate a menu: it establishes whether the original scene AND the
+// original frontend resources can be instantiated together, bounded and
+// without importing any game bytes into the executable.
+bool load_original_menu_stage(const std::string& root) {
+    std::vector<std::uint8_t> scene_bytes,ui_bytes;
+    if(!read_original_bounded(root,"published/models/main_menu.m3g",scene_bytes) ||
+       !read_original_bounded(root,"published/texturepacks_ui/ui_frontend.m3g",ui_bytes))
+        return false;
+    const auto scene=ds_port::decode_im_menu_geometry(
+        scene_bytes.data(),scene_bytes.size());
+    const auto ui=ds_port::decode_im_ui_rgba_images(
+        ui_bytes.data(),ui_bytes.size());
+    if(!scene.decoded || !ui.decoded || ui.images.size()!=2 ||
+       scene.mesh_count==0 || scene.surfaces.empty())return false;
+    for(const auto& img:ui.images)
+        if(!img.decoded || img.width!=1024 || img.height!=1024 ||
+           img.pixels_rgba.size()!=1024u*1024u*4u)return false;
+    std::cerr<<"Original menu stage resource load: "
+             <<scene.mesh_count<<" meshes, "<<scene.surfaces.size()
+             <<" surfaces, "<<scene.indices.size()/3<<" triangles, "
+             <<ui.images.size()<<" original frontend atlases.\\n";
+    return true;
+}
+#endif
 constexpr int kBadArguments=2;
 }
 int main(int argc, char** argv) {
@@ -61,6 +104,10 @@ int main(int argc, char** argv) {
         const auto status=ds_port::present_original_splashes(private_asset_dir);
         switch(status){
             case ds_port::OriginalSplashResult::Completed:
+                if(!load_original_menu_stage(private_asset_dir)) {
+                    std::cerr<<"Original menu scene/frontend resource loading failed.\\n";
+                    return 8;
+                }
                 std::cerr<<"Original EA and Dead Space splash images displayed.\n"
                          <<"Native main-menu renderer still incomplete.\n";
                 return kNeedRecoveredEngine;
