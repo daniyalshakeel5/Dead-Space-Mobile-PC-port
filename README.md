@@ -42,8 +42,15 @@
   receiver mode/parameter updates are native, including the
   conditional original owner reset call. Normal startup still
   cannot activate the real resource provider.
-- **56/56 synthetic native CTests passed on Windows and Linux** at
-  [verification run 41335144028](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41335144028).
+- Original `0x27A768` resource-engine owner and embedded
+  `0x27A4F0` constructor fields are now constructed on native
+  x86-64 from the confirmed APK layout. The C++ engine object owns
+  its mapped ARM32 state, mode transitions, activation and receiver
+  lookup. Original `0x286918` now begins with native construction
+  and `0x26C410` mode setup, stopping at the missing
+  `0x278778` resource-binding call.
+- **57/57 synthetic native CTests passed on Windows and Linux** at
+  [verification run 41336280754](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41336280754).
   These tests do not prove real game-engine boot or scene rendering.
   [Latest detailed handoff](docs/HANDOFF_2026-11-01.md).
 
