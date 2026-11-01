@@ -285,12 +285,26 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
         68:("smlal","r2, r3, r1, r0"),
         72:("strd","r2, r3, [r4, #0x40]"),
     })
+    stage_zero_setup=matched("frame_stage_zero_second_callee",{
+        0:("push","{r4, r5, lr}"),
+        4:("mov","r1, #2"),
+        8:("mov","r4, r0"),
+        12:("sub","sp, sp, #0x14"),
+        16:("add","r0, r0, #0x40"),
+        20:("bl","#0x28ca24"),
+        76:("ldr","r0, [r4, #4]"),
+        80:("bl","#0x281d54"),
+        84:("ldr","r1, [r4, #4]"),
+        88:("add","r0, r4, #0x18"),
+        92:("bl","#0x2833f4"),
+    })
     return {
         "jni_run_entrypoint_always_returns_zero":zero_return and entry_wrapper,
         "stage_zero_calls_both_native_routines_in_order":zero_chain,
         "stage_one_normalizes_virtual_return_to_zero_or_one":stage_one,
         "original_signed_time_math_and_store_at_0x40":signed_clock,
         "original_clock_slot_zero_check_before_store":conditional_clock,
+        "stage_zero_setup_and_two_followup_calls":stage_zero_setup,
         "original_gettimeofday_stack_arg_and_bl":conditional_clock and gettimeofday_call,
         "original_state_one_transition_stores_two_first":transition_state_two,
         "original_state_one_nonzero_two_vtable_calls":nonzero_calls,
