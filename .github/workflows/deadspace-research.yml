@@ -182,6 +182,10 @@ jobs:
               print("ARM_ALLOCATOR_CHAIN",name,
                     json.dumps(report["windows"][name]["instructions"][:32],
                                separators=(",",":")))
+          print("ORIGINAL_STAGE_ZERO_OWNER_CONSTRUCTION",
+                json.dumps(report["windows"][
+                    "stage_zero_owner_construction_tail_0x27f7e0"]["instructions"][:44],
+                           separators=(",",":")))
           print("ORIGINAL_ARM_OWNER_PROVIDER",
                 json.dumps(report["stage_zero_0x27e930_registry_query"],
                            sort_keys=True))
