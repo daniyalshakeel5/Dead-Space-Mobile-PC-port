@@ -45,11 +45,29 @@ OriginalNativeResourceEngine::begin_loader_0x286918(
     const auto configured=set_mode(1u,1u);
     if(configured.status!=MS::Completed)
         return {S::ModeBlocked,constructed.status,configured.status};
-    // Original next call is 0x278778(owner,
-    //   PC-relative original literal, loader+8). Its provider /
-    // resource binding is NOT implemented, so do not claim ready.
-    return {S::ReachedUnreconstructedOriginalBind,
-            constructed.status,configured.status};
+    // ARM 0x286958: BL 0x278778. Original 0x278778 tests
+    // owner+0x8B6 (zero after 0x27A768 constructor) and invokes
+    // original vtable+0x64 at 0x278E58. Only the verified
+    // null-provider early exit is translated. This still does NOT
+    // make the loader or the native game ready.
+    const auto bound=bind_original_owner_0x278778();
+    if(bound.status==
+       OriginalOwnerBindStatus0x278778::ReachedOriginalNullProviderExit)
+        return {S::ReachedOriginalNullProviderExit,constructed.status,
+                configured.status,bound.status};
+    return {S::OriginalBindingBlocked,constructed.status,
+            configured.status,bound.status};
+}
+
+OriginalOwnerBindResult0x278778
+OriginalNativeResourceEngine::bind_original_owner_0x278778(
+    OriginalActivationTreeClear release,void* context) noexcept {
+    if(!constructed_)return {
+        OriginalOwnerBindStatus0x278778::InvalidOriginalOwner,
+        OriginalReceiverActivationStatus0x278e58::InvalidOwner,0};
+    return original_bind_resource_owner_0x278778({
+        owner_va_,bytes_.data(),bytes_.size(),release,context
+    });
 }
 
 OriginalReceiverModeResult0x26c410
