@@ -22,11 +22,14 @@ bool original_construct_object58_0x280a34(
     put(p+0x24,value);
     for(unsigned at:{0x28u,0x2cu,0x30u,0x34u,0x38u})put(p+at,0);
     // 0x280A9C: same exact original callee again.
-    if(!provider(0x0027e560u,owner,context,&value))return false;
+    // Original ARM does not reload r0 before the second BL:
+    // r0 is the FIRST base-provider return, not the allocated object.
+    if(!provider(0x0027e560u,value,context,&value))return false;
     put(p+0x3c,value);
     for(unsigned at:{0x40u,0x44u,0x48u,0x4cu})put(p+at,0);
     // 0x280AB4: third call and final pointer at +0x50.
-    if(!provider(0x0027e560u,owner,context,&value))return false;
+    // Third BL likewise receives the second returned r0.
+    if(!provider(0x0027e560u,value,context,&value))return false;
     put(p+0x50,value);put(p+0x54,0);
     return true;
 }
