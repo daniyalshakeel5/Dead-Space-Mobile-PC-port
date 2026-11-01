@@ -1,4 +1,5 @@
 #pragma once
+#include "ds_port/original_receiver_string.hpp"
 #include <cstddef>
 #include <cstdint>
 
@@ -19,6 +20,16 @@ using OriginalActivationProviderMode14 = bool (*)(
     std::uint32_t original_provider_va,
     std::uint32_t original_vtable_offset,
     void* context,std::uint32_t* original_r0) noexcept;
+// Original 0x278E64/0x278E6C builds a 0xCD4-byte frame.
+// The three 0x27541C objects begin at original SP +0xAA0,
+// +0x888 and +0x670. These mapped original VA tokens are never
+// dereferenced as host pointers.
+struct OriginalReceiverActivationScratch0x278e58 {
+    std::uint32_t original_stack_arm_va=0;
+    void* mapped_stack=nullptr;
+    std::size_t accessible_bytes=0;
+    const OriginalDefaultPoolInputs0x271914* native_allocator_pool=nullptr;
+};
 struct OriginalReceiverActivationInputs0x278e58 {
     std::uint32_t owner_arm_va=0;
     void* mapped_owner=nullptr;
@@ -27,13 +38,16 @@ struct OriginalReceiverActivationInputs0x278e58 {
     void* context=nullptr;
     OriginalActivationProviderMode14 query_provider_mode_0x14=nullptr;
     std::uint32_t requested_mode=1u;
+    const OriginalReceiverActivationScratch0x278e58* native_scratch=nullptr;
 };
 enum class OriginalReceiverActivationStatus0x278e58 : std::uint8_t {
     InvalidOwner, MissingOriginalTreeDestructor, OriginalTreeReleaseRefused,
     CompletedEmptyProviderReset, UnreconstructedProviderActivation,
     ProviderModeQueryRefused, CompletedProviderRejected,
     UnreconstructedOwnerApproval,
-    ReachedUnreconstructedStreamInitialization
+    ReachedUnreconstructedStreamInitialization,
+    OriginalStringConstructionBlocked,
+    ConstructedThreeStringsAwaitingProviderStreams
 };
 struct OriginalReceiverActivationResult0x278e58 {
     OriginalReceiverActivationStatus0x278e58 status;
