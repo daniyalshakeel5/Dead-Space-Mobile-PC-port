@@ -180,9 +180,9 @@ def analyze(apk: Path) -> dict:
                      else "other"] += 1
                 if "size_class" in fields:
                     sizes[fields["size_class"]] += 1
-                # Ratios only; never output individual original pixel lengths.
-                ratios[str(fields["etc1_ratio_pct"])] += 1
-                mip_ratios[str(fields["mip_ratio_pct"])] += 1
+                    # Ratios only; never output individual original pixel lengths.
+                    ratios[str(fields["etc1_ratio_pct"])] += 1
+                    mip_ratios[str(fields["mip_ratio_pct"])] += 1
                     palettes["empty" if fields["palette_len"] == 0 else "nonempty"] += 1
                     offsets["exact_noesis_fixed_0x74" if fields[
                         "matches_noesis_offset_0x74"] else "variable"] += 1
