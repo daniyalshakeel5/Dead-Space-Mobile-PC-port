@@ -86,6 +86,8 @@ jobs:
           assert inventory["object_types"]["9"]==57
           assert len(inventory["camera_object_ids"])==1
           assert inventory["group_count"]==57
+          assert isinstance(inventory["candidate_reference_count"], int)
+          assert isinstance(inventory["candidate_offsets"], dict)
           assert len(inventory["scene_node_payload_sizes"])==58
           assert sum(1 for item in inventory["scene_node_payload_sizes"] if item[1]==5)==1
           assert sum(1 for item in inventory["scene_node_payload_sizes"] if item[1]==9)==57
