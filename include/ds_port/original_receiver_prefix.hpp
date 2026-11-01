@@ -1,5 +1,6 @@
 #pragma once
 #include "ds_port/original_receiver_tree.hpp"
+#include "ds_port/original_receiver_activation.hpp"
 #include "ds_port/original_resource_registration.hpp"
 #include <cstddef>
 #include <cstdint>
@@ -19,10 +20,14 @@ struct OriginalReceiverPrefixInputs0x278018 {
     OriginalTreeNodeResolver resolve_node=nullptr;
     OriginalReceiverWideResolver resolve_utf16=nullptr;
     void* context=nullptr;
+    // Optional native 0x278E58 activation path for the original
+    // owner+0x8B6==0 branch. Still gated by missing provider services.
+    const OriginalReceiverActivationInputs0x278e58* native_activation=nullptr;
 };
 enum class OriginalReceiverPrefixStatus0x278018 : std::uint8_t {
     CompletedNoMatch,
     InvalidOriginalOwner, UnreconstructedAlternateMode,
+    OriginalActivationBlocked,
     InvalidOriginalCharacterTable, InvalidOriginalText,
     LookupBlocked, UnreconstructedOwnerReset,
     UnreconstructedMatchedReceiver, AllocationBlocked
