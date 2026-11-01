@@ -35,6 +35,9 @@ struct ImMenuGeometry {
     std::vector<ImMenuMeshBounds> mesh_bounds;
     // Raw original IM-M3G object-type histogram; type semantics unverified.
     std::array<std::uint32_t,256> original_object_type_counts{};
+    // Original one-based object IDs, retained for reconstructing the scene graph.
+    std::vector<std::uint32_t> camera_object_indices;
+    std::vector<std::uint32_t> group_object_indices;
 };
 ImMenuGeometry decode_im_menu_geometry(
     const std::uint8_t* original_im_m3g,std::size_t bytes);
