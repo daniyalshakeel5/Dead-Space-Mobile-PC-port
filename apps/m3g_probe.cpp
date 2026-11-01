@@ -44,6 +44,12 @@ int main(int argc, char** argv) {
               << ",\"diagnostic\":" << (diagnostic ? "true" : "false")
               << ",\"nonstandard_header_objects\":" << result.nonstandard_header_objects
               << ",\"reserved_type_objects\":" << result.reserved_type_objects
+              << ",\"image2d_objects\":" << result.image2d_objects
+              << ",\"image2d_standard_payloads\":" << result.image2d_standard_payloads
+              << ",\"image2d_unrecognized_payloads\":" << result.image2d_unrecognized_payloads
+              << ",\"image2d_max_width\":" << result.image2d_max_width
+              << ",\"image2d_max_height\":" << result.image2d_max_height
+              << ",\"image2d_validated_pixel_bytes\":" << result.image2d_validated_pixel_bytes
               << ",\"reason\":\"" << result.error << "\""
               << ",\"type_counts\":{";
     bool first = true;
@@ -52,6 +58,14 @@ int main(int argc, char** argv) {
         if (!first) std::cout << ",";
         first = false;
         std::cout << "\"" << i << "\":" << result.object_type_count[i];
+    }
+    std::cout << "},\"image2d_formats\":{";
+    first = true;
+    for (std::size_t i = 0; i < result.image2d_format_counts.size(); ++i) {
+        if (!result.image2d_format_counts[i]) continue;
+        if (!first) std::cout << ",";
+        first = false;
+        std::cout << "\"" << (i + 96) << "\":" << result.image2d_format_counts[i];
     }
     std::cout << "}}\n";
     return 0; // Invalid source content is data for the research tally.
