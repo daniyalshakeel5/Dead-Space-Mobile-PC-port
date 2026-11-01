@@ -203,6 +203,10 @@ jobs:
                 json.dumps(report["windows"]["post_setup_direct_callee_0x27fd7c"]["instructions"][:180],separators=(",",":")))
           print("ENGINE_RESOURCE_0x2803E4_FULL",
                 json.dumps(report["windows"]["post_setup_direct_callee_0x2803e4"]["instructions"][:120],separators=(",",":")))
+          for name in ("startup_global_direct_service_0x36fd38",
+                       "startup_registration_helper_first_0x2839c8"):
+              print("ORIGINAL_ENGINE_DIRECT_DETAIL",name,
+                    json.dumps(report["windows"][name]["instructions"][:40],separators=(",",":")))
           print("ORIGINAL_ENGINE_REGISTER_HELPER",
                 json.dumps(report["windows"]["repeated_initializer_callee_0x284178"]["instructions"][:42],separators=(",",":")))
           for name in ("post_setup_direct_callee_0x27fd7c",
