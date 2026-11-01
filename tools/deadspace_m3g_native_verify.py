@@ -53,6 +53,8 @@ def analyze(apk: Path, native_probe: Path) -> dict:
     diagnostic_outcomes: Counter = Counter()
     diagnostic_types: Counter = Counter()
     image2d_format_counts: Counter = Counter()
+    image_decoding_counts: Counter = Counter()
+    decoded_rgba_bytes = 0
     image2d_objects = 0
     image2d_standard_payloads = 0
     image2d_unrecognized_payloads = 0
@@ -143,6 +145,21 @@ def analyze(apk: Path, native_probe: Path) -> dict:
                                 for key, val in (extra.get("image2d_formats") or {}).items():
                                     if key in {"96", "97", "98", "99", "100"}:
                                         image2d_format_counts[key] += int(val)
+                                if int(extra.get("image2d_standard_payloads", 0)) > 0:
+                                    decoded = subprocess.run(
+                                        [str(native_probe), str(stage), "--decode-image"],
+                                        capture_output=True, text=True, check=False, timeout=30)
+                                    if decoded.returncode != 0:
+                                        image_decoding_counts["native_error"] += 1
+                                    else:
+                                        payload = json.loads(decoded.stdout)
+                                        if payload.get("rgba_decoded") is True:
+                                            image_decoding_counts["rgba_decoded"] += 1
+                                            decoded_rgba_bytes += (
+                                                int(payload["rgba_width"]) *
+                                                int(payload["rgba_height"]) * 4)
+                                        else:
+                                            image_decoding_counts["unsupported_image"] += 1
                                 for key, value in (extra.get("type_counts") or {}).items():
                                     if key.isdecimal() and 0 <= int(key) <= 255:
                                         diagnostic_types[key] += int(value)
@@ -177,6 +194,8 @@ def analyze(apk: Path, native_probe: Path) -> dict:
         "image2d_max_height": image2d_max_height,
         "image2d_validated_pixel_bytes": image2d_validated_pixel_bytes,
         "image2d_jsr184_format_counts": dict(sorted(image2d_format_counts.items())),
+        "image_rgba_decode_outcomes": dict(sorted(image_decoding_counts.items())),
+        "image_rgba_decoded_bytes": decoded_rgba_bytes,
         "limitations": "Strict JSR-184 results separate from diagnostic opaque object framing. Diagnostic passes are NOT validated model decoders or gameplay.",
     }
 
