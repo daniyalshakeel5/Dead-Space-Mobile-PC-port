@@ -4,12 +4,12 @@
 using namespace ds_port::original_runtime;
 namespace {
 struct Trace { int count=0; int fail_at=0; };
-bool call(std::uint32_t target,std::uint32_t arg,void* c,std::uint32_t* result) noexcept {
+bool call(std::uint32_t target,std::uint32_t arg,std::uint32_t arg1,std::uint32_t arg2,void* c,std::uint32_t* result) noexcept {
     auto& t=*static_cast<Trace*>(c);
     const std::uint32_t targets[]={0x2828acu,0x27fb28u,0x27fa74u};
     assert(t.count<3);assert(target==targets[t.count]);
     assert(arg==(t.count==0?0x1000u:0x1014u));
-    ++t.count;
+    assert(arg1==(t.count==0?0u:t.count==1?1u:2u));\n    assert(arg2==(t.count==2?3u:0u));\n    ++t.count;
     if(t.fail_at==t.count)return false;
     *result=0xaabbccddu;return true;
 }
