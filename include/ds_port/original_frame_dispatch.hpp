@@ -103,12 +103,56 @@ enum class OriginalActiveFramePrefixResult : std::uint8_t {
     OriginalStateWasNotOne,
     MissingOriginalVirtualTarget,
     OriginalNonzeroBranchUnimplemented,
-    OriginalStateTwoTransitionPrefixExecuted
+    OriginalStateTwoTransitionPrefixExecuted,
+    OriginalNonzeroTwoVirtualCallsExecuted,
+    OriginalNonzeroFirstCallOnly
 };
 OriginalActiveFramePrefixResult original_execute_active_frame_prefix(
     void* original_shared_state, std::size_t accessible_bytes,
     void* original_virtual_object,
     OriginalVirtualFirstMethod original_virtual_method,
     void** context_after_state_two_postincrement) noexcept;
+
+// Original active frame's NONZERO branch, ELF 0x0027efc8..0x0027f000:
+//   backend = *(shared_global + 0x68);
+//   backend->vtable[0x20/4](backend,14,0,0,stack_zero);
+//   backend = *(shared_global + 0x68);     // critically RELOADED
+//   backend->vtable[0x38/4](backend);
+//   B 0x0027ef90 (frame return).
+// Every instruction and call ordering is matched to the real APK.
+// Backend pointer and both virtual target implementations remain
+// dependency-injected until the original object layout is reconstructed.
+// The resolver must re-read the host equivalent of [shared_global+0x68]
+// EVERY time; the original can change the backend in the first call.
+using OriginalFrameBackendResolver = void* (*)(void* shared_global) noexcept;
+using OriginalFrameEventMethod = void (*)(
+    void* backend, std::uint32_t event_code,
+    std::uint32_t zero_a, std::uint32_t zero_b,
+    std::uint32_t stack_zero) noexcept;
+using OriginalFrameFollowupMethod = void (*)(void* backend) noexcept;
+enum class OriginalNonzeroVirtualSequenceResult : std::uint8_t {
+    MissingOriginalTargets,
+    FirstBackendUnavailable,
+    SecondBackendUnavailableAfterFirstCall,
+    TwoOriginalVirtualCallsExecuted
+};
+OriginalNonzeroVirtualSequenceResult original_execute_nonzero_virtual_sequence(
+    void* original_shared_global,
+    OriginalFrameBackendResolver original_backend_resolver,
+    OriginalFrameEventMethod original_event_virtual_0x20,
+    OriginalFrameFollowupMethod original_followup_virtual_0x38) noexcept;
+
+// Same verified stage-one dispatch as original_execute_active_frame_prefix,
+// with the additional two ARM-verified nonzero-path virtual calls when
+// their original targets have been supplied. Neither method is faked,
+// and the original transition's remaining actions are not implemented.
+OriginalActiveFramePrefixResult original_execute_active_frame_verified_branches(
+    void* original_shared_global, std::size_t accessible_bytes,
+    void* original_active_virtual_object,
+    OriginalVirtualFirstMethod original_active_virtual_method,
+    void** context_after_state_two_postincrement,
+    OriginalFrameBackendResolver original_backend_resolver,
+    OriginalFrameEventMethod original_event_virtual_0x20,
+    OriginalFrameFollowupMethod original_followup_virtual_0x38) noexcept;
 
 } // namespace ds_port::original_runtime
