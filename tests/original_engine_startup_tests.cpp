@@ -115,6 +115,7 @@ int main(){
     missing_tail.original_context=tail_missing.frame.data()+8;
     missing_tail.context_bytes=tail_missing.frame.size()-8;
     missing_tail.original_context_arm_va=0x0049cab0u;
+    missing_tail.resolve_object=resolve;
     blocked_input.original_second_tail_0x280580=&missing_tail;
     const auto blocked=original_execute_known_engine_startup(blocked_input);
     assert(blocked.status==OriginalEngineStartupStatus::OriginalSecondTailBlocked);
