@@ -4,6 +4,7 @@ on:
     paths:
       - ".github/workflows/engine-resource-evidence.yml"
       - "tools/deadspace_original_code_window.py"
+      - "tools/deadspace_boot_asset_manifest.py"
   workflow_dispatch:
 
 permissions:
@@ -31,6 +32,7 @@ jobs:
             --output "$RUNNER_TEMP/deadspace.apk" \
             https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes/releases/download/dead_space_mobile_fixes/Deas.Space.Mobile.Fixes.apk
           test "$(wc -c < "$RUNNER_TEMP/deadspace.apk" | tr -d ' ')" = 325769461
+          python tools/deadspace_boot_asset_manifest.py --apk "$RUNNER_TEMP/deadspace.apk"
           python tools/deadspace_original_code_window.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
             --output "$RUNNER_TEMP/full-instruction-windows.json"
