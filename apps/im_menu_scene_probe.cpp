@@ -43,6 +43,13 @@ int main(int argc,char** argv){
         std::cout<<scene.camera_object_indices[i];
     }
     std::cout<<"],\"group_count\":"<<scene.group_object_indices.size()
-             <<"}\n";
+             <<",\"scene_node_payload_sizes\":[";
+    for(std::size_t i=0;i<scene.scene_node_records.size();++i) {
+        const auto& node=scene.scene_node_records[i];
+        if(i)std::cout<<",";
+        std::cout<<"["<<node.object_index<<","<<unsigned(node.object_type)
+                 <<","<<node.payload_bytes<<"]";
+    }
+    std::cout<<"]}\n";
     return 0;
 }
