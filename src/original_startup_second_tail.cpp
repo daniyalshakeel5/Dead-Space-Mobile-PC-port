@@ -82,7 +82,9 @@ OriginalStartupSecondTailStatus original_execute_stage_zero_tail_0x280580(
         return OriginalStartupSecondTailStatus::InvalidOriginalContext;
     Runner x{in,OriginalStartupSecondTailStatus::InvalidOriginalContext};
     auto* ctx=static_cast<std::uint8_t*>(in.original_context);
-    if(!in.invoke_original_direct)
+    if(!in.invoke_original_direct &&
+       (!in.native_registration_0x27fd7c ||
+        !in.native_global_service_0x36fd38))
         return OriginalStartupSecondTailStatus::MissingOriginalDirect;
     // Complete 0x27FD7C wrapper: 27 ordered native calls into the
     // still-unresolved original 0x284178 engine resource handler.
@@ -155,8 +157,15 @@ OriginalStartupSecondTailStatus original_execute_stage_zero_tail_0x280580(
           in.original_context_arm_va,word(ctx+4),0,3,&r))
         return x.status;
 
-    // 0x28063C: direct no-argument global service 0x36FD38.
-    if(!in.invoke_original_direct(0x0036fd38u,0,in.callback_context))
+    // 0x28063C: direct no-argument 0x36FD38; original r0=1
+    // tail-branches into 0x37000C, now reconstructed in native C++.
+    if(in.native_global_service_0x36fd38) {
+        const auto result=original_execute_global_service_0x36fd38(
+            *in.native_global_service_0x36fd38);
+        if(result.status!=OriginalGlobalServiceStatus::CompletedOriginalWrapper)
+            return OriginalStartupSecondTailStatus::OriginalDirectRefused;
+    } else if(!in.invoke_original_direct(
+                  0x0036fd38u,0,in.callback_context))
         return OriginalStartupSecondTailStatus::OriginalDirectRefused;
 
     OriginalAllocatorReturn object58{};

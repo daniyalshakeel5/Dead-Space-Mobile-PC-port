@@ -6,6 +6,7 @@
 #include "ds_port/original_startup_object58.hpp"
 #include "ds_port/original_static_singleton.hpp"
 #include "ds_port/original_startup_registration.hpp"
+#include "ds_port/original_startup_global_service.hpp"
 #include <cstddef>
 #include <cstdint>
 namespace ds_port::original_runtime {
@@ -40,6 +41,8 @@ struct OriginalStartupSecondTailInputs {
     const OriginalSingletonInputs* native_singleton_0x27e560=nullptr;
     // Verified native 27-call 0x27FD7C wrapper when available.
     const OriginalRegistrationInputs* native_registration_0x27fd7c=nullptr;
+    // Reconstructed 0x36FD38 -> 0x37000C wrapper.
+    const OriginalGlobalServiceInputs* native_global_service_0x36fd38=nullptr;
 };
 enum class OriginalStartupSecondTailStatus:std::uint8_t {
     InvalidOriginalContext,
