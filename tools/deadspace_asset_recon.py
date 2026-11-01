@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter, defaultdict
 import hashlib
+import gzip
 import json
 from pathlib import Path
 import stat
@@ -67,6 +68,9 @@ def file_sha256(path: Path) -> str:
 
 
 def sniff(prefix: bytes) -> str:
+    # IronMonkey container: 0x1f8c + little-endian expanded size + gzip.
+    if len(prefix) >= 8 and prefix[:2] == b"\x1f\x8c" and prefix[6:8] == b"\x1f\x8b":
+        return "m3g_gzip_wrapper"
     for kind, marker in SIGNATURES:
         if prefix.startswith(marker):
             if kind == "riff" and len(prefix) >= 12:
@@ -167,6 +171,7 @@ def investigate(apk: Path) -> dict:
 
             by_magic: dict = {}
             by_extension_magic: dict = {}
+            m3g_inner_magic: dict = {}
             # Pair count, not the underlying names; a useful clue as to
             # whether .sph and .sps form two components of each sprite.
             asset_sph = {entry.filename[:-4] for entry in entries
@@ -189,6 +194,15 @@ def investigate(apk: Path) -> dict:
                     continue
                 kind = sniff(prefix)
                 stat_record(by_magic, kind, info.file_size)
+                if kind == "m3g_gzip_wrapper" and info.filename.lower().endswith(".m3g"):
+                    try:
+                        with archive.open(info) as raw:
+                            raw.read(6)  # 2-byte wrapper ID, 4-byte expected expanded size
+                            with gzip.GzipFile(fileobj=raw) as inflated:
+                                inner_magic = sniff(inflated.read(12))
+                                stat_record(m3g_inner_magic, inner_magic, info.file_size)
+                    except (OSError, EOFError, ValueError, RuntimeError, BadZipFile):
+                        stat_record(m3g_inner_magic, "inner_read_error", info.file_size)
                 # No paths or source bytes; just extension x validated magic.
                 ext = Path(info.filename).suffix.lower()
                 if ext in {".m3g", ".sps", ".sph", ".sb", ".bin"}:
@@ -204,6 +218,7 @@ def investigate(apk: Path) -> dict:
                 "extension_stats": dict(sorted(by_extension.items(),
                     key=lambda pair: (-pair[1]["declared_bytes"], pair[0]))[:80]),
                 "magic_stats": dict(sorted(by_magic.items())),
+                "m3g_inner_magic_stats": dict(sorted(m3g_inner_magic.items())),
                 "extension_magic_stats": {ext: dict(sorted(stats.items()))
                                           for ext, stats in
                                           sorted(by_extension_magic.items())},
