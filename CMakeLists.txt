@@ -15,7 +15,7 @@ option(DS_BUILD_IM_MESH_READER "Build native IronMonkey geometry-only mesh expor
 
 # These functions are independent x86-64 translations of 29 validated
 # original ARM game JNI constant returns; no guessed gameplay dispatch.
-add_library(ds_original_native_abi STATIC src/original_native_abi.cpp src/original_jni_exports.cpp)
+add_library(ds_original_native_abi STATIC src/original_native_abi.cpp src/original_jni_exports.cpp src/original_frame_dispatch.cpp)
 target_include_directories(ds_original_native_abi PUBLIC include)
 
 add_library(ds_port_input STATIC src/input.cpp)
@@ -118,6 +118,10 @@ if(DS_ENABLE_TESTS)
     target_link_libraries(ds_original_jni_exports_tests PRIVATE ds_original_native_abi)
     add_test(NAME ds_original_arm_jni_29_individual_exports
         COMMAND ds_original_jni_exports_tests)
+    add_executable(ds_original_frame_dispatch_tests tests/original_frame_dispatch_tests.cpp)
+    target_link_libraries(ds_original_frame_dispatch_tests PRIVATE ds_original_native_abi)
+    add_test(NAME ds_original_arm_frame_state_zero_transition
+        COMMAND ds_original_frame_dispatch_tests)
     add_executable(ds_input_tests tests/input_tests.cpp)
     target_link_libraries(ds_input_tests PRIVATE ds_port_input)
     add_test(NAME ds_input_state_machine COMMAND ds_input_tests)
