@@ -17,7 +17,7 @@ MAGIC_CATEGORIES = {
     "ogg", "flac", "id3", "wav", "webp", "riff-other", "gif", "bmp",
     "zip", "gzip", "sqlite", "elf", "dex", "unityfs", "glb", "bink",
     "xml-text", "possible-json-text", "unrecognized",
-    "m3g_jsr184", "possible-zlib",
+    "m3g_jsr184", "m3g_im2", "m3g_im3", "possible-zlib",
 }
 GROUPS = {"assets", "res", "lib", "META-INF", "other"}
 METRIC_KEYS = ("count", "declared_bytes")
