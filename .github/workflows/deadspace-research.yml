@@ -177,6 +177,17 @@ jobs:
           import json
           from pathlib import Path
           report=json.loads(Path("report/deadspace-original-instruction-window.json").read_text())
+          for name in ("frame_stage_zero_first_callee",
+                       "frame_stage_zero_second_callee",
+                       "frame_state_one_zero_result_tail"):
+              item=report["windows"][name]
+              print("Targeted original ARM instructions", name,
+                    json.dumps(item["instructions"][:32], separators=(",",":")))
+          PY
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path("report/deadspace-original-instruction-window.json").read_text())
           print("ORIGINAL_GLOBAL_STATE_PROOF",
                 json.dumps(report["frame_transition_global_address_proof"],sort_keys=True))
           for key in ("original_time_pair_source","native_frame_state_dispatch","frame_stage_zero_second_callee",
