@@ -217,10 +217,20 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
         28:("movne","r0, #1"),
         32:("pop","{r4, pc}"),
     })
+    signed_clock=matched("frame_stage_zero_second_callee",{
+        48:("ldr","r2, [sp, #0xc]"),
+        52:("ldr","r0, [sp, #8]"),
+        56:("mov","r1, #0xf4000"),
+        60:("add","r1, r1, #0x240"),
+        64:("asr","r3, r2, #0x1f"),
+        68:("smlal","r2, r3, r1, r0"),
+        72:("strd","r2, r3, [r4, #0x40]"),
+    })
     return {
         "jni_run_entrypoint_always_returns_zero":zero_return and entry_wrapper,
         "stage_zero_calls_both_native_routines_in_order":zero_chain,
         "stage_one_normalizes_virtual_return_to_zero_or_one":stage_one,
+        "original_signed_time_math_and_store_at_0x40":signed_clock,
     }
 
 
