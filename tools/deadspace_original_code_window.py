@@ -259,6 +259,23 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
         16:("add","r4, pc, r4"),
         20:("str","r3, [r4], #8"),
     })
+    nonzero_calls=matched("frame_state_one_nonzero_continuation",{
+        0:("ldr","r1, [r4, #0x68]"),
+        4:("mov","r3, #0"),
+        8:("mov","r2, r3"),
+        12:("ldr","ip, [r1]"),
+        16:("mov","r0, r1"),
+        20:("str","r3, [sp]"),
+        24:("mov","r1, #0xe"),
+        28:("mov","lr, pc"),
+        32:("ldr","pc, [ip, #0x20]"),
+        36:("ldr","r3, [r4, #0x68]"),
+        40:("mov","r0, r3"),
+        44:("ldr","r3, [r3]"),
+        48:("mov","lr, pc"),
+        52:("ldr","pc, [r3, #0x38]"),
+        56:("b","#0x27ef90"),
+    })
     signed_clock=matched("frame_stage_zero_second_callee",{
         48:("ldr","r2, [sp, #0xc]"),
         52:("ldr","r0, [sp, #8]"),
@@ -276,6 +293,7 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
         "original_clock_slot_zero_check_before_store":conditional_clock,
         "original_gettimeofday_stack_arg_and_bl":conditional_clock and gettimeofday_call,
         "original_state_one_transition_stores_two_first":transition_state_two,
+        "original_state_one_nonzero_two_vtable_calls":nonzero_calls,
     }
 
 
