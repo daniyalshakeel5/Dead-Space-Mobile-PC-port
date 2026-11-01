@@ -15,6 +15,9 @@ on:
       - "src/m3g_container.cpp"
       - "include/ds_port/m3g_container.hpp"
       - "tests/m3g_container_tests.cpp"
+      - "include/ds_port/etc1.hpp"
+      - "src/etc1.cpp"
+      - "tests/etc1_tests.cpp"
       - "apps/m3g_texture_extract.cpp"
       - ".github/workflows/asset-installer.yml"
   pull_request:
@@ -29,6 +32,9 @@ on:
       - "src/m3g_container.cpp"
       - "include/ds_port/m3g_container.hpp"
       - "tests/m3g_container_tests.cpp"
+      - "include/ds_port/etc1.hpp"
+      - "src/etc1.cpp"
+      - "tests/etc1_tests.cpp"
       - "apps/m3g_texture_extract.cpp"
       - ".github/workflows/asset-installer.yml"
   workflow_dispatch:
