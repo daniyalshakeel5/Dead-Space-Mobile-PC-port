@@ -155,6 +155,17 @@ jobs:
                                        owner_vtable+offset,4))[0])
           print("ORIGINAL_RECEIVER_OWNER_VIRTUALS",
                 json.dumps(owner_slots,separators=(",",":")))
+          # Original constructor 0x27A4F0: PC-relative embedded
+          # vtable literal at 0x27A5D8, plus #0x210, and allocator
+          # singleton pointer-slot literal at 0x27A5DC.
+          embedded_disp=struct.unpack("<i",bounded_virtual_read(
+              elf,elf32_executable_sections(elf),0x27a5d8,4))[0]
+          embedded_vtable=(0x27a4f8+8+embedded_disp+0x210)&0xffffffff
+          allocator_disp=struct.unpack("<i",bounded_virtual_read(
+              elf,elf32_executable_sections(elf),0x27a5dc,4))[0]
+          allocator_global_slot=(0x27a518+8+allocator_disp)&0xffffffff
+          print("ORIGINAL_RECEIVER_EMBEDDED_VTABLE",hex(embedded_vtable),
+                "ALLOCATOR_SLOT",hex(allocator_global_slot))
           outfile=Path(os.environ["RUNNER_TEMP"])/"resource-instructions.json"
           outfile.write_text(json.dumps({"schema":2,
                "factory_mode1_vtable_arm_va":hex(vtable),
