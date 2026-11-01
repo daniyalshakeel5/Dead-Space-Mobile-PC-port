@@ -65,7 +65,7 @@ class ArmWindowTests(unittest.TestCase):
         self.assertFalse(proven_original_code_helpers(windows)[
             "stage_one_normalizes_virtual_return_to_zero_or_one"])
         windows["frame_stage_one_routine"]["instructions"][7]["op"]="movne"
-        windows["frame_stage_zero_second_callee"]["instructions"][3]["args"]="r1, r1, #0x244"
+        windows["frame_stage_zero_second_callee"]["instructions"][7]["args"]="r1, r1, #0x244"
         self.assertFalse(proven_original_code_helpers(windows)[
             "original_signed_time_math_and_store_at_0x40"])
         windows["frame_stage_zero_second_callee"]["instructions"][3]["args"]="#0x280570"
