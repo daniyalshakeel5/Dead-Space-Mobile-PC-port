@@ -75,9 +75,16 @@ jobs:
               elf,elf32_executable_sections(elf),0x28b4bc,4))[0]
           vtable=(0x28b3b4+8+displacement+8)&0xffffffff
           print("ORIGINAL_FACTORY_VTABLE",hex(vtable))
+          # Original 0x28A4F8 cleanup vtable via 0x28A4FC LDR,
+          # 0x28A508 ADD PC and 0x28A50C ADD #8.
+          cleanup_displacement=struct.unpack("<i",bounded_virtual_read(
+              elf,elf32_executable_sections(elf),0x28a53c,4))[0]
+          cleanup_vtable=(0x28a508+8+cleanup_displacement+8)&0xffffffff
+          print("ORIGINAL_UNREADY_CLEANUP_VTABLE",hex(cleanup_vtable))
           outfile=Path(os.environ["RUNNER_TEMP"])/"resource-instructions.json"
           outfile.write_text(json.dumps({"schema":2,
                "factory_mode1_vtable_arm_va":hex(vtable),
+               "unready_cleanup_vtable_arm_va":hex(cleanup_vtable),
                "windows":windows},indent=2)+"\n")
           PY
       - name: Publish ARM instruction metadata only
