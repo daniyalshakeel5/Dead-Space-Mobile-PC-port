@@ -54,6 +54,38 @@ check its asset layout, but still exits explicitly with engine
 initialization incomplete. No ARM emulator or compatibility game
 runtime is introduced.
 
+## Original startup vtable methods: concrete ARM targets now identified
+
+Directly reading the original APK ELF's file-backed vtable words
+(GitHub Actions research run
+[41320569241](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41320569241))
+resolved four concrete virtual methods:
+
+| Reconstructed native object / slot | Original ELF method VA | Vtable word VA |
+| --- | --- | --- |
+| Constructor `0x287A94` / +`0x0C` | `0x002876D0` | `0x00489A1C` |
+| Constructor `0x280A34` / +`0x24` | `0x00281B40` | `0x004898A4` |
+| Secondary `0x288688` / +`0x0C` | `0x002828E4` | `0x00489AA4` |
+| Embedded `0x27FB28` / +`0x18` | `0x002800E0` | `0x004897D0` |
+
+All four method VAs are file-backed executable ARM addresses. The
+additional original instruction traces are logged by
+[research run 41320823056](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41320823056).
+
+- `0x2876D0`: stores +8 and +12, then dispatches several virtual methods;
+  not a trivial leaf method.
+- `0x281B40`: stores +8 and +12, delegates to virtual +0x24,
+  then enters a branch-sensitive, larger setup sequence.
+- `0x2828E4`: stores fields at +4/+12, dispatches several
+  virtual +0x28 calls, sets bytes +0x10/+0x11, then tail virtual +0x18.
+- `0x2800E0`: adjusts r0 by +0x40 then tail-branches directly
+  to original ARM `0x293180`, whose native implementation is pending.
+
+These findings identify genuine virtual targets but do NOT
+implement those methods or prove the registry/allocator owners have
+been constructed. They are the next ARM bodies to reconstruct for
+real native engine initialization.
+
 ## Real engine initialization blockers (not to be faked)
 
 1. **Registry implementation**: original `0x27E930` virtual
