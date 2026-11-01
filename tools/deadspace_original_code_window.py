@@ -70,6 +70,7 @@ WINDOWS = {
     "resource_parser_receiver_tail_0x278618": (0x00278618, 384),
     "resource_parser_owner_mode_0x26c410": (0x0026c410, 512),
     "resource_parser_owner_bind_0x278778": (0x00278778, 512),
+    "resource_parser_owner_bind_tail_0x278a78": (0x00278a78, 512),
     "resource_parser_tail_0x2866ec": (0x002866ec, 520),
     "resource_copy_0x285918": (0x00285918, 384),
     "resource_string_pair_0x2857a0": (0x002857a0, 384),
