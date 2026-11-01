@@ -74,6 +74,13 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=ON -DDS_FETCH_SDL2=OFF "-DCMAKE_PREFIX_PATH=${{ steps.sdl.outputs.prefix }}"
       - name: Build native diagnostics AND the input tests
         run: cmake --build build --config Release --parallel 2
+      - name: Stage Windows SDL2 runtime before native CTest
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem -Path "${{ steps.sdl.outputs.prefix }}" -Filter SDL2.dll -File -Recurse | Select-Object -First 1
+          if (-not $dll) { throw "setup-sdl did not provide SDL2.dll" }
+          Copy-Item $dll.FullName build/Release/SDL2.dll
       - name: Run input unit tests
         run: ctest --test-dir build --build-config Release --output-on-failure
       - name: Stage Linux input diagnostic
