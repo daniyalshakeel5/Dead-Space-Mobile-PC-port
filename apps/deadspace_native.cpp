@@ -78,6 +78,7 @@ constexpr int kBadArguments=2;
 int main(int argc, char** argv) {
     bool readiness=false;
     bool present_splash=false;
+    bool boot_imported_apk=false;
     std::string user_apk;
     std::string private_asset_dir;
     std::string inspected_asset_dir;
@@ -85,6 +86,7 @@ int main(int argc, char** argv) {
         const std::string_view arg(argv[i]);
         if(arg=="--check-native" || arg=="--status") readiness=true;
         else if(arg=="--boot-splash") present_splash=true;
+        else if(arg=="--boot-apk") boot_imported_apk=true;
         else if(arg=="--apk" && i+1<argc) user_apk=argv[++i];
         else if(arg=="--assets-dir" && i+1<argc) private_asset_dir=argv[++i];
         else if(arg=="--inspect-assets" && i+1<argc) inspected_asset_dir=argv[++i];
@@ -106,6 +108,15 @@ int main(int argc, char** argv) {
         std::cerr<<"--inspect-assets cannot be combined with an APK import.\n";
         return kBadArguments;
     }
+    if(present_splash && boot_imported_apk) {
+        std::cerr<<"Choose one boot mode.\\n";
+        return kBadArguments;
+    }
+    if(boot_imported_apk && (user_apk.empty() || private_asset_dir.empty() ||
+                             !inspected_asset_dir.empty() || readiness)) {
+        std::cerr<<"--boot-apk requires --apk and --assets-dir only.\\n";
+        return kBadArguments;
+    }
     if(present_splash && (private_asset_dir.empty() ||
                           !user_apk.empty() ||
                           !inspected_asset_dir.empty() || readiness)) {
@@ -115,6 +126,21 @@ int main(int argc, char** argv) {
     if(!present_splash && user_apk.empty()!=private_asset_dir.empty()) {
         std::cerr<<"To import your APK, supply both --apk and --assets-dir.\n";
         return kBadArguments;
+    }
+    if(boot_imported_apk) {
+#if defined(DS_NATIVE_APK_IMPORT) && defined(DS_NATIVE_SPLASH_PRESENTATION)
+        const auto imported=ds_port::install_apk_assets(user_apk,private_asset_dir);
+        if(!imported.success) {
+            std::cerr<<"Private original asset install failed: "<<imported.error<<"\\n";
+            return 4;
+        }
+        std::cerr<<"Installed "<<imported.assets_installed
+                 <<" user-owned APK assets. Entering native boot.\\n";
+        present_splash=true;
+#else
+        std::cerr<<"--boot-apk requires SDL2 and -DDS_BUILD_ASSET_INSTALLER=ON.\\n";
+        return 5;
+#endif
     }
     if(present_splash) {
 #ifdef DS_NATIVE_SPLASH_PRESENTATION
