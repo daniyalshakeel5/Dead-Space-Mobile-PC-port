@@ -22,16 +22,18 @@
 - Native bounded ARM `0x285918` byte-string append and `0x2863EC`
   missing-suffix copy behavior are implemented. Original UTF-16 range
   constructor `0x285590` is native. The complete resource parser
-  `0x2863EC`, token matching, and record insertion remain unported.
+  `0x2863EC` and the receiver's actual resource insertion remain unported.
 - Original token matcher `0x285630` and sorted tree search
   `0x2854B8` use a native case-table-driven token index with
   original unsigned-byte ordering.
 - The resource text decoder `0x28CC88` now processes original UTF-8
   into native UTF-16, including malformed-sequence return behavior and
   original four-byte truncation. The two-pass conversion step in
-  `0x28611C` is native; its later record mutation remains unported.
-- **50/50 synthetic native CTests passed on Windows and Linux** at
-  [verification run 41331736161](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41331736161).
+  `0x28611C` and UTF-16 record replacement are native. Outer `0x2862E8`
+  record preparation and receiver dispatch are integrated, but original
+  receiver `0x278018` remains unported.
+- **52/52 synthetic native CTests passed on Windows and Linux** at
+  [verification run 41332413006](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41332413006).
   These tests do not prove real game-engine boot or scene rendering.
   [Latest detailed handoff](docs/HANDOFF_2026-11-01.md).
 
