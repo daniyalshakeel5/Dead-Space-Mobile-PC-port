@@ -5,6 +5,10 @@
 #include <string_view>
 
 namespace ds_port::original_runtime {
+// Proven from original 0x27A768 constructor and user-confirmed APK
+// vtable at 0x00489670, slot +0x58 (run 41332675767).
+inline constexpr std::uint32_t kOriginalRecordReceiverVtableVA=0x00489670u;
+inline constexpr std::uint32_t kOriginalRecordReceiverSlot58VA=0x00278018u;
 // The original 0x2862E8 first constructs a temporary wide string at
 // 0x285590, calls 0x28611C to replace its text from a byte range,
 // then invokes r4's virtual method +0x58 with r1=decoded UTF-16
