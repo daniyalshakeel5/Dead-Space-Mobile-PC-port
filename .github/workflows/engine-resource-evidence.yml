@@ -204,6 +204,13 @@ jobs:
           allocator_global_slot=(0x27a518+8+allocator_disp)&0xffffffff
           print("ORIGINAL_RECEIVER_EMBEDDED_VTABLE",hex(embedded_vtable),
                 "ALLOCATOR_SLOT",hex(allocator_global_slot))
+          embedded_methods={}
+          for method_slot in (0x14,0x24,0x28,0x2c,0x34):
+              embedded_methods[hex(method_slot)]=hex(struct.unpack(
+                  "<I",bounded_virtual_read(
+                      elf,original_segments,embedded_vtable+method_slot,4))[0])
+          print("ORIGINAL_EMBEDDED_PROVIDER_METHODS",
+                json.dumps(embedded_methods,separators=(",",":")))
           # 0x271914 default pool accessor: LDR r4,[PC,#0x1c]
           # at 0x271918 loads signed literal from 0x27193c,
           # ADD r4,PC,r4 at 0x27191c resolves original global slot.
