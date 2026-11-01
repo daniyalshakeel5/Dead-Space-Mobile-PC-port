@@ -123,6 +123,19 @@ jobs:
                   separators=(",",":")))
           except (ValueError,IndexError,struct.error) as exc:
               print("ORIGINAL_UTF8_TABLE_UNAVAILABLE",type(exc).__name__,str(exc)[:160])
+          # Real parser owner from original 0x27A768: LDR at +0x0
+          # from 0x27A85C, ADD at 0x27A770, ADD #0x188 at 0x27A774.
+          # Capture numeric original vtable +0x58 target only, not game
+          # ELF bytes. The runner must fail if the mapping is invalid.
+          from tools.deadspace_original_code_window import elf32_load_ranges
+          owner_disp=struct.unpack("<i",bounded_virtual_read(
+              elf,elf32_executable_sections(elf),0x27a85c,4))[0]
+          owner_vtable=(0x27a770+8+owner_disp+0x188)&0xffffffff
+          original_segments=elf32_load_ranges(elf)
+          method58=struct.unpack("<I",bounded_virtual_read(
+              elf,original_segments,owner_vtable+0x58,4))[0]
+          print("ORIGINAL_PARSER_OWNER_VTABLE",hex(owner_vtable),
+                "SLOT_0x58",hex(method58))
           outfile=Path(os.environ["RUNNER_TEMP"])/"resource-instructions.json"
           outfile.write_text(json.dumps({"schema":2,
                "factory_mode1_vtable_arm_va":hex(vtable),
