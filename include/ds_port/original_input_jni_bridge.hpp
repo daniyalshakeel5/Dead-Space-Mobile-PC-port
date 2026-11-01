@@ -18,6 +18,14 @@ struct OriginalInputBinding {
 };
 // The integration owner must keep callback contexts valid while bound.
 void original_bind_input_services(const OriginalInputBinding&) noexcept;
+// Production binding path: resolve actual original BSS pointers, original
+// owner vtable tokens and the verified method slots before enabling the
+// native JNI dispatch. Failure leaves any prior binding unchanged.
+bool original_bind_input_mapped_runtime(
+    const OriginalInputMappedOwners& original_owners,
+    const void* mapped_original_frame_state,std::size_t frame_state_bytes,
+    OriginalInputAllocate original_allocator,OriginalInputQueue original_queue,
+    void* callback_context) noexcept;
 void original_unbind_input_services() noexcept;
 OriginalInputStatus original_last_input_status() noexcept;
 } // namespace ds_port::original_runtime

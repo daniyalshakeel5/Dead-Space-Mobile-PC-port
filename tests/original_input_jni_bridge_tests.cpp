@@ -39,11 +39,34 @@ int main(){
     Java_com_ea_blast_TouchSurfaceAndroid_NativeOnPointerEvent(
         nullptr,nullptr,kOriginalRawPointerDown,1000,1,123.f,70.f);
     assert(original_last_input_status()==OriginalInputStatus::MissingOriginalService);
-    OriginalInputBinding b{
-        {0x1000,0x2000,0x3000,0x4000,allocate,queue,&h},
-        h.frame_state.data(),h.frame_state.size()
+    // Production-style mapping fixture: original ARM BSS global
+    // pointers + owner objects + 0x0C/0x20 virtual call slots.
+    std::array<std::uint8_t,4> pool_global{},queue_global{};
+    std::array<std::uint8_t,4> pool_owner{},queue_owner{};
+    std::array<std::uint8_t,0x10> pool_table{};
+    std::array<std::uint8_t,0x24> queue_table{};
+    const auto put=[](std::uint8_t* p,std::uint32_t v) {
+        for(unsigned i=0;i<4;++i)p[i]=std::uint8_t(v>>(i*8));
     };
-    original_bind_input_services(b);
+    put(pool_global.data(),0x1000);put(queue_global.data(),0x3000);
+    put(pool_owner.data(),0x1110);put(queue_owner.data(),0x3330);
+    put(pool_table.data()+0x0c,0x2000);
+    put(queue_table.data()+0x20,0x4000);
+    OriginalInputMappedOwners mapped{
+        {pool_global.data(),pool_global.size(),0x1000,
+         pool_owner.data(),pool_owner.size(),0x1110,
+         pool_table.data(),pool_table.size()},
+        {queue_global.data(),queue_global.size(),0x3000,
+         queue_owner.data(),queue_owner.size(),0x3330,
+         queue_table.data(),queue_table.size()}
+    };
+    mapped.allocator.original_owner_arm_va=0x9999;
+    assert(!original_bind_input_mapped_runtime(
+        mapped,h.frame_state.data(),4,allocate,queue,&h));
+    assert(original_last_input_status()==OriginalInputStatus::MissingOriginalService);
+    mapped.allocator.original_owner_arm_va=0x1000;
+    assert(original_bind_input_mapped_runtime(
+        mapped,h.frame_state.data(),4,allocate,queue,&h));
     Java_com_ea_blast_KeyboardAndroid_NativeOnKeyDown(nullptr,nullptr,600,99,1);
     assert(original_last_input_status()==OriginalInputStatus::NotReady);
     assert(h.allocations==0&&h.queues==0);

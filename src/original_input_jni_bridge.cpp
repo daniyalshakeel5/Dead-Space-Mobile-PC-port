@@ -23,6 +23,19 @@ void original_bind_input_services(const OriginalInputBinding& input) noexcept {
     std::lock_guard<std::mutex> lock(runtime_mutex);
     bound=input;is_bound=true;
 }
+bool original_bind_input_mapped_runtime(
+    const OriginalInputMappedOwners& mapped,
+    const void* frame_state,std::size_t frame_bytes,
+    OriginalInputAllocate allocator,OriginalInputQueue queue,
+    void* ctx) noexcept {
+    if(!frame_state || frame_bytes<4)return false;
+    OriginalInputServices services{};
+    if(!original_resolve_input_virtual_owners(
+        mapped,allocator,queue,ctx,&services))
+        return false;
+    original_bind_input_services({services,frame_state,frame_bytes});
+    return true;
+}
 void original_unbind_input_services() noexcept {
     std::lock_guard<std::mutex> lock(runtime_mutex);
     bound={};is_bound=false;
