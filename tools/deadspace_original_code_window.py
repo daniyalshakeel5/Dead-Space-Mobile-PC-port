@@ -289,6 +289,39 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
         68:("smlal","r2, r3, r1, r0"),
         72:("strd","r2, r3, [r4, #0x40]"),
     })
+    # Original ELF 0x281D54: allocator via original owner's virtual
+    # slot 0x0C, conditional returned-record memory init, and global
+    # pointer publication. The virtual allocator must NOT be fabricated.
+    stage_zero_allocator_post_return=matched("stage_zero_followup_target_0x281d54",{
+        0:("push","{r4, r5, lr}"),
+        4:("ldr","r2, [pc, #0x64]"),
+        8:("sub","sp, sp, #0xc"),
+        12:("mov","r3, #4"),
+        16:("mov","r4, #0"),
+        20:("stm","sp, {r3, r4}"),
+        24:("add","r2, pc, r2"),
+        28:("ldr","ip, [r0]"),
+        32:("mov","r1, #0x20"),
+        36:("mov","r3, #1"),
+        40:("mov","r5, r0"),
+        44:("mov","lr, pc"),
+        48:("ldr","pc, [ip, #0xc]"),
+        52:("cmp","r0, #0"),
+        56:("beq","#0x281db0"),
+        60:("add","r3, r0, #4"),
+        64:("str","r5, [r0, #0x18]"),
+        68:("str","r4, [r0, #0x1c]"),
+        72:("str","r3, [r0, #8]"),
+        76:("str","r4, [r0, #0xc]"),
+        80:("strb","r4, [r0, #0x10]"),
+        84:("str","r4, [r0, #0x14]"),
+        88:("str","r3, [r0, #4]"),
+        92:("ldr","r3, [pc, #0x10]"),
+        96:("add","r3, pc, r3"),
+        100:("str","r0, [r3]"),
+        104:("add","sp, sp, #0xc"),
+        108:("pop","{r4, r5, pc}"),
+    })
     # The original engine passes type 2 to 0x0028ca24. Prove the
     # dispatch table, selected case, float field read and function epilogue.
     stage_zero_type2=matched("stage_zero_setup_target_0x28ca24",{
@@ -346,6 +379,8 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
             stage_zero_setup and stage_zero_followup_stores),
         "stage_zero_type2_0x28ca24_complete_case":(
             stage_zero_setup and stage_zero_type2),
+        "stage_zero_0x281d54_allocator_post_return_and_global_store":(
+            stage_zero_setup and stage_zero_allocator_post_return),
         "original_gettimeofday_stack_arg_and_bl":conditional_clock and gettimeofday_call,
         "original_state_one_transition_stores_two_first":transition_state_two,
         "original_state_one_nonzero_two_vtable_calls":nonzero_calls,
@@ -432,6 +467,10 @@ def observe(apk: Path) -> dict:
     }
     if frame_global!=transition_global:
         raise ValueError("Original frame and state-two transition globals differ")
+    # Original runtime global slot used after either allocator result:
+    # LDR r3,[PC,#0x10] at 0x281DB0 and ADD r3,PC,r3 at 0x281DB4.
+    original_record_slot=resolve_arm_literal_based_global(
+        data,sections,0x00281db0,0x10,0x00281db4)
     type2_proof=proven_original_code_helpers(out).get(
         "stage_zero_type2_0x28ca24_complete_case")
     if not type2_proof:
@@ -462,6 +501,7 @@ def observe(apk: Path) -> dict:
         "frame_dispatch_instruction_proof": contract,
         "frame_transition_global_address_proof":shared_original_global,
         "stage_zero_type2_runtime_float_evidence":type2_info,
+        "stage_zero_0x281d54_record_global_slot":f"0x{original_record_slot:08x}",
         "reconstructed_native_helper_proof": helpers,
         "windows": out,
         "original_elf_jni_symbols":symbol_windows,
