@@ -150,6 +150,18 @@ jobs:
           python tools/deadspace_native_enum_recover.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
             --output report/deadspace-native-enums.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          info=json.loads(Path("report/deadspace-native-enums.json").read_text())
+          original=info.get("constants",{})
+          selected={k.split("_")[-1]:v for k,v in original.items()
+                    if "NativeGetRawPointer" in k}
+          print("Verified ARM/Thumb JNI integer functions:",
+                info["proven_constant_functions"])
+          print("Instruction-proven raw pointer event constants:",
+                json.dumps(selected,sort_keys=True))
+          PY
           python tools/deadspace_m3g_preflight.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
             --output report/deadspace-m3g-evidence.json
