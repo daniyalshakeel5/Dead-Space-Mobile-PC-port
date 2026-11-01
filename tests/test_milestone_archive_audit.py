@@ -1,9 +1,9 @@
 """Synthetic, no-game-data tests for secure milestone ZIP metadata intake."""
-import io
 from pathlib import Path
 import tempfile
+import stat
 import unittest
-from zipfile import ZIP_DEFLATED, ZipFile
+from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 from tools.milestone_archive_audit import audit, unsafe_entry
 
@@ -38,7 +38,7 @@ class ArchiveAuditTests(unittest.TestCase):
         for candidate in ("../unsafe.py", "/root/unsafe.py",
                           "C:/tmp/readme.md", "ok\\bad.cpp",
                           "dir//file.cpp", "folder/./file.cpp",
-                          "folder/../file.cpp", "folder/"):
+                          "folder/../file.cpp", ".git/config", "folder/"):
             if candidate == "folder/":
                 self.assertFalse(unsafe_entry(candidate))
             else:
@@ -80,7 +80,20 @@ class ArchiveAuditTests(unittest.TestCase):
                 ("payload.txt", b"A" * (2 * 1024 * 1024)),
             ])
             report = audit(archive)
-            self.assertIn("suspicious_compression_ratio", report["warnings"])
+            self.assertIn("suspicious_compression_ratio", report["critical_findings"])
+            self.assertFalse(report["safe_to_extract_after_independent_license_review"])
+
+    def test_symlink_entry_not_approved(self):
+        with tempfile.TemporaryDirectory() as folder:
+            archive = Path(folder) / "checkpoint.zip"
+            link = ZipInfo("src/linked.cpp")
+            link.create_system = 3
+            link.external_attr = (stat.S_IFLNK | 0o777) << 16
+            with ZipFile(archive, "w") as out:
+                out.writestr(link, "../../outside.cpp")
+            report = audit(archive)
+            self.assertIn("symbolic_link", report["critical_findings"])
+            self.assertFalse(report["safe_to_extract_after_independent_license_review"])
 
     def test_non_zip(self):
         with tempfile.TemporaryDirectory() as folder:
