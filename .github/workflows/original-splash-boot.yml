@@ -31,11 +31,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install SDL2 for actual native splash rendering
-        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libgl-dev
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libgl-dev zlib1g-dev
       - name: Configure original splash-capable game executable
         run: >
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           -DDS_BUILD_BOOT_SPLASH=ON -DDS_BUILD_INPUT_PROBE=ON
+          -DDS_BUILD_ASSET_INSTALLER=ON
       - name: Compile native game executable and test UI decoder
         run: cmake --build build --target deadspace_native ds_im_ui_image_tests ds_im_menu_scene_tests ds_original_menu_draw_stream_tests ds_original_menu_gl_tests ds_im_menu_scene_probe --parallel 2
       - name: Verify synthetic IM-M3G Image2D cases
@@ -113,7 +114,25 @@ jobs:
             "$RUNNER_TEMP/native-splash-exit.txt"
           grep -F "Native main-menu renderer still incomplete." \
             "$RUNNER_TEMP/native-splash-exit.txt"
+      - name: Test one-command user APK install and native boot (no bundled assets)
+        shell: bash
+        run: |
+          set +e
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+          SDL_RENDER_DRIVER=software timeout 75s \
+            build/deadspace_native --boot-apk \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --assets-dir "$RUNNER_TEMP/native-installed" \
+            > "$RUNNER_TEMP/native-boot-apk.txt" 2>&1
+          actual_exit=$?
+          set -e
+          # Original gameplay engine not yet recovered: no false success.
+          test "$actual_exit" = 20
+          grep -F "user-owned APK assets. Entering native boot." \
+            "$RUNNER_TEMP/native-boot-apk.txt"
+          grep -F "Original menu stage resource load:" \
+            "$RUNNER_TEMP/native-boot-apk.txt"
       - name: Remove original game bytes from runner
         if: always()
         shell: bash
-        run: rm -rf "$RUNNER_TEMP/boot-assets" "$RUNNER_TEMP/deadspace.apk" "$RUNNER_TEMP/native-splash-exit.txt" "$RUNNER_TEMP/menu-inventory.json"
+        run: rm -rf "$RUNNER_TEMP/native-installed" "$RUNNER_TEMP/native-boot-apk.txt" "$RUNNER_TEMP/boot-assets" "$RUNNER_TEMP/deadspace.apk" "$RUNNER_TEMP/native-splash-exit.txt" "$RUNNER_TEMP/menu-inventory.json"
