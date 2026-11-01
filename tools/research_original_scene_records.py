@@ -34,3 +34,38 @@ for ident,b in [(i+1,b) for i,(t,b) in enumerate(obj) if t==5][:1]:
           [(offset,round(struct.unpack_from('<f',b,offset)[0],5))
            for offset in range(0,len(b)-3,4)
            if abs(struct.unpack_from('<f',b,offset)[0])>1e-7 and abs(struct.unpack_from('<f',b,offset)[0])<1e7])
+
+# Find potential *trailing* child tables: group payloads contain variable
+# length object names so reference offsets need not be 4-byte aligned.
+# Check a count followed by exactly count valid node/mesh IDs at end;
+# print only (group object ID, start offset, count, target types).
+def trailing_tables(typ):
+    results=[]
+    for obj_id,(t,blob) in enumerate(obj,1):
+        if t!=typ:continue
+        matches=[]
+        for offset in range(0,len(blob)-3):
+            count=struct.unpack_from('<I',blob,offset)[0]
+            if count==0 or count>128 or offset+4+4*count!=len(blob):
+                continue
+            ids=struct.unpack_from('<'+'I'*count,blob,offset+4)
+            if all(0<id_<=len(obj) and obj[id_-1][0] in (5,9,14) for id_ in ids):
+                matches.append((offset,count,tuple(obj[id_-1][0] for id_ in ids)))
+        results.append((obj_id,len(blob),matches))
+    return results
+for typ in (9,5):
+    found=trailing_tables(typ)
+    print('trailing_reference_table_type',typ,'records',len(found))
+    print('  matched',sum(bool(x[2]) for x in found))
+    for item in found[:15]:print('  tail_record',item)
+# Sliding-window reference frequencies for each named node; count and
+# type pattern only. This avoids assuming payload byte alignment.
+for typ in (9,5):
+    nodes=[(i+1,b) for i,(t,b) in enumerate(obj) if t==typ]
+    counts=collections.Counter()
+    for ident,b in nodes:
+        for off in range(0,len(b)-3):
+            id_=struct.unpack_from('<I',b,off)[0]
+            if id_ and id_<=len(obj) and obj[id_-1][0] in (5,9,14):
+                counts[(off,obj[id_-1][0])]+=1
+    print('unaligned_candidate_freq_type',typ,counts.most_common(25))
