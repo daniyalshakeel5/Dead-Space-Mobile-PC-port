@@ -133,7 +133,7 @@ def menu_vertex_binding_evidence(blob:bytes)->dict:
         "scene_object_types":scene_types,
         "first_five_vertex_bindings":bindings[:5]}
 
-def inspect(apk:Path,probe:Path,im_probe:Path|None=None,ui_probe:Path|None=None)->dict:
+def inspect(apk:Path,probe:Path,im_probe:Path|None=None,ui_probe:Path|None=None,menu_probe:Path|None=None)->dict:
     results=[]
     with ZipFile(apk) as archive, tempfile.TemporaryDirectory(prefix="ds-boot-") as root:
         for number,path in enumerate(ASSETS):
@@ -183,6 +183,12 @@ def inspect(apk:Path,probe:Path,im_probe:Path|None=None,ui_probe:Path|None=None)
                     capture_output=True,text=True,timeout=60,check=False)
                 im["vertex_bindings"]=menu_vertex_binding_evidence(
                     target.read_bytes())
+                if menu_probe:
+                    geometry=subprocess.run([str(menu_probe),str(target)],
+                        capture_output=True,text=True,timeout=60,check=False)
+                    im["native_menu_uv_supported"]=geometry.returncode==0
+                    if geometry.returncode==0:
+                        im["native_menu_uv_report"]=json.loads(geometry.stdout)
                 im["native_mesh_supported"]=checked.returncode==0
                 if checked.returncode==0:
                     im["native_mesh_report"]=json.loads(checked.stdout)
@@ -216,7 +222,8 @@ def main():
     parser.add_argument("--probe",type=Path,required=True)
     parser.add_argument("--im-probe",type=Path)
     parser.add_argument("--ui-probe",type=Path)
+    parser.add_argument("--menu-probe",type=Path)
     args=parser.parse_args()
     print("ORIGINAL_BOOT_NATIVE_DECODER_AUDIT",json.dumps(
-        inspect(args.apk,args.probe,args.im_probe,args.ui_probe),separators=(",",":")))
+        inspect(args.apk,args.probe,args.im_probe,args.ui_probe,args.menu_probe),separators=(",",":")))
 if __name__=="__main__":main()
