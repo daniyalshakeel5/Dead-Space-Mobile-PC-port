@@ -97,6 +97,22 @@ def mapping_comparison(raw: bytes, sections: list[tuple[int,int,int]],
     }
 
 
+def resolve_arm_literal_based_global(raw: bytes, sections: list[tuple[int,int,int]],
+                                     ldr_addr: int, ldr_pc_immediate: int,
+                                     add_addr: int) -> int:
+    """ARM32 LDR reg,[PC,#imm] followed by ADD reg,PC,reg.
+
+    PC at each ARM instruction is instruction address + 8, and the
+    32-bit immediate loaded from the executable literal pool is signed.
+    Input addresses/offsets must first be verified against the game's ARM
+    instructions. Return the referenced *virtual address*, never data.
+    """
+    literal_at=ldr_addr+8+ldr_pc_immediate
+    displacement=struct.unpack("<i",bounded_virtual_read(
+        raw,sections,literal_at,4))[0]
+    return (add_addr+8+displacement)&0xffffffff
+
+
 def elf32_jni_symbols(raw: bytes, names: set[str]) -> dict[str, tuple[int, int, bool]]:
     """Use original ELF dynamic symbols, not Ghidra's inferred function starts."""
     shoff=struct.unpack_from("<I",raw,32)[0]
@@ -322,6 +338,18 @@ def observe(apk: Path) -> dict:
                  "args": i.op_str.lower()}
                 for i in decoded[:40]],
         }
+    # Two independently instruction-proven PC-relative literal loads.
+    # Frame 0x27ef6c LDR r4,[pc,#0x90], 0x27ef74 ADD r4,pc,r4.
+    # Transition 0x27eed0 LDR r4,[pc,#0x84], 0x27eedc ADD r4,pc,r4.
+    frame_global=resolve_arm_literal_based_global(
+        data,sections,0x0027ef6c,0x90,0x0027ef74)
+    transition_global=resolve_arm_literal_based_global(
+        data,sections,0x0027eed0,0x84,0x0027eedc)
+    shared_original_global={
+        "frame_state_global":f"0x{frame_global:08x}",
+        "transition_state_global":f"0x{transition_global:08x}",
+        "identical":frame_global==transition_global
+    }
     contract=proven_frame_dispatch_prefix(
         out["native_frame_state_dispatch"]["instructions"])
     if not all(contract.values()):
@@ -333,6 +361,7 @@ def observe(apk: Path) -> dict:
         "schema": 1,
         "kind": "original-ARM-targeted-instruction-evidence",
         "frame_dispatch_instruction_proof": contract,
+        "frame_transition_global_address_proof":shared_original_global,
         "reconstructed_native_helper_proof": helpers,
         "windows": out,
         "original_elf_jni_symbols":symbol_windows,
