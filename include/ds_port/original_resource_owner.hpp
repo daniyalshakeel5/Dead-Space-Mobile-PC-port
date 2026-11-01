@@ -1,4 +1,5 @@
 #pragma once
+#include "ds_port/original_default_pool.hpp"
 #include <cstddef>
 #include <cstdint>
 
@@ -31,6 +32,9 @@ struct OriginalOwnerConstructorInputs0x27a768 {
     OriginalOwnerDefaultPool default_pool_0x271914=nullptr;
     OriginalOwnerProviderFlags provider_flags_0x14=nullptr;
     void* context=nullptr;
+    // Optional verified native 0x271914/0x27E560 dependency, using
+    // the very same original 0x49BCA8 global as the embedded owner.
+    const OriginalDefaultPoolInputs0x271914* native_default_pool=nullptr;
 };
 enum class OriginalOwnerConstructorStatus0x27a768:std::uint8_t {
     Completed,InvalidMemory,MissingOriginalAllocator,
