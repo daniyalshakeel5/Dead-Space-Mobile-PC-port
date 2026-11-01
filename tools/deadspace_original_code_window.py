@@ -599,6 +599,16 @@ def observe(apk: Path) -> dict:
         data,sections,0x002886bc,0x24,0x002886c8))&0xffffffff
     if not all((embedded_init_arg,embedded_setup_arg1,embedded_setup_arg2)):
         raise ValueError("Original secondary constructor argument resolves to zero")
+    # Complete 0x27FB28 ARM function: LDR/ADD vtable and two
+    # literal-derived parameters for its +0x84 virtual call.
+    embedded_vtable_va=(resolve_arm_literal_based_global(
+        data,sections,0x0027fb28,0xbc,0x0027fb34)+8)&0xffffffff
+    embedded_method84_arg2=resolve_arm_literal_based_global(
+        data,sections,0x0027fb68,0x80,0x0027fb80)
+    embedded_method84_arg3=resolve_arm_literal_based_global(
+        data,sections,0x0027fb6c,0x80,0x0027fb78)
+    if not all((embedded_vtable_va,embedded_method84_arg2,embedded_method84_arg3)):
+        raise ValueError("Original embedded initializer literal resolution failed")
     if not constructor_vtable_va or not secondary_vtable_va:
         raise ValueError("Original constructor vtable literal resolves to zero")
     for key,prefix in (
@@ -652,6 +662,13 @@ def observe(apk: Path) -> dict:
                 if registry_got_initial is not None else None),
             "requested_interface_id":0x10004,
             "vtable_offset":0x18,
+        },
+        "embedded_initializer_0x27fb28_literals":{
+            "original_vtable_arm_va":f"0x{embedded_vtable_va:08x}",
+            "method_0x84_arg2_va":f"0x{embedded_method84_arg2:08x}",
+            "method_0x84_arg3_va":f"0x{embedded_method84_arg3:08x}",
+            "direct_helper_0x27faf4":True,
+            "verified":True,
         },
         "secondary_postallocation_constructor_evidence":{
             "constructor_0x2828ac_vtable_va":f"0x{constructor_vtable_va:08x}",
