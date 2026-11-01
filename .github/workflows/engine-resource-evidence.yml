@@ -152,7 +152,7 @@ jobs:
           print("ORIGINAL_PARSER_OWNER_VTABLE",hex(owner_vtable),
                 "SLOT_0x58",hex(method58))
           owner_slots={}
-          for offset in (0x28,0x64,0x70):
+          for offset in (0x24,0x28,0x64,0x70):
               owner_slots[hex(offset)]=hex(struct.unpack("<I",
                   bounded_virtual_read(elf,original_segments,
                                        owner_vtable+offset,4))[0])
