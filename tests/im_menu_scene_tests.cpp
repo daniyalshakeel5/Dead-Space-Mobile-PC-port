@@ -66,6 +66,9 @@ int main(){
     assert(original.decoded&&original.mesh_count==1);
     assert(original.vertices.size()==3 && original.indices.size()==3);
     assert(original.surfaces.size()==1);
+    assert(original.original_object_type_counts[14]==1);
+    assert(original.original_object_type_counts[20]==2);
+    assert(original.original_object_type_counts[21]==1);
     assert(original.mesh_bounds.size()==1);
     const auto& b=original.mesh_bounds[0];
     assert(b.mesh_object_index==8);
