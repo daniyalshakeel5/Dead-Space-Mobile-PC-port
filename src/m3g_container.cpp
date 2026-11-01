@@ -25,6 +25,66 @@ bool valid_object_type(std::uint8_t t) {
     return t <= 22 || t == 0xff;  // 23..254 are reserved.
 }
 
+
+// JSR-184 Object3D + Image2D layout. Only checks bounded lengths and
+// format/dimensions; it never copies, transforms or exports image pixels.
+struct Image2dEvidence {
+    std::uint8_t format = 0;
+    std::uint32_t width = 0, height = 0, pixel_bytes = 0;
+};
+
+bool parse_image2d_payload(const std::uint8_t* bytes,
+                           std::size_t size, Image2dEvidence& evidence) {
+    std::size_t at = 0;
+    const auto take32 = [&](std::uint32_t& out) -> bool {
+        if (at > size || size - at < 4) return false;
+        out = le32(bytes + at);
+        at += 4;
+        return true;
+    };
+    std::uint32_t user_id = 0, count = 0;
+    if (!take32(user_id) || !take32(count)) return false;
+    if (count > (size - at) / 4) return false;
+    at += std::size_t(count) * 4; // ObjectIndex[] animationTracks
+    if (!take32(count) || count > (size - at) / 8) return false;
+    for (std::uint32_t i = 0; i < count; ++i) {
+        std::uint32_t parameter_id = 0, length = 0;
+        if (!take32(parameter_id) || !take32(length)) return false;
+        if (length > size - at) return false;
+        at += length;
+    }
+    if (size - at < 10) return false;
+    const std::uint8_t format = bytes[at++];
+    const std::uint8_t mutable_flag = bytes[at++];
+    if (format < 96 || format > 100 || mutable_flag > 1) return false;
+    const std::uint32_t width = le32(bytes + at); at += 4;
+    const std::uint32_t height = le32(bytes + at); at += 4;
+    if (!width || !height || width > 8192 || height > 8192) return false;
+    std::uint32_t pixel_bytes = 0;
+    if (mutable_flag == 0) {
+        std::uint32_t palette_len = 0, pixel_len = 0;
+        if (!take32(palette_len) || palette_len > size - at) return false;
+        at += palette_len;
+        if (!take32(pixel_len) || pixel_len > size - at) return false;
+        at += pixel_len;
+        // Validate counts against JSR-184 encodings, not an arbitrary guessed
+        // pixel format. Palette consists of at most 256 component entries.
+        const std::uint32_t channels = format <= 97 ? 1u :
+            (format == 98 ? 2u : (format == 99 ? 3u : 4u));
+        const std::uint64_t pixels = std::uint64_t(width) * height;
+        if (palette_len > 0) {
+            if (palette_len % channels || palette_len > 256u * channels ||
+                pixel_len != pixels) return false;
+        } else if (std::uint64_t(pixel_len) != pixels * channels) {
+            return false;
+        }
+        pixel_bytes = pixel_len;
+    }
+    if (at != size) return false;
+    evidence = Image2dEvidence{format, width, height, pixel_bytes};
+    return true;
+}
+
 }  // namespace
 
 M3gContainerReport scan_m3g_container(const std::uint8_t* data,
@@ -133,6 +193,21 @@ M3gContainerReport scan_m3g_container(const std::uint8_t* data,
                     return fail("external reference section contains scene object");
                 if (!external_section && type == 0xff && !report.diagnostic_mode)
                     return fail("unexpected external reference object");
+            }
+            if (type == 10) {
+                ++report.image2d_objects;
+                Image2dEvidence evidence;
+                if (parse_image2d_payload(objects + offset, length, evidence)) {
+                    ++report.image2d_standard_payloads;
+                    ++report.image2d_format_counts[evidence.format - 96];
+                    report.image2d_max_width =
+                        std::max(report.image2d_max_width, evidence.width);
+                    report.image2d_max_height =
+                        std::max(report.image2d_max_height, evidence.height);
+                    report.image2d_validated_pixel_bytes += evidence.pixel_bytes;
+                } else {
+                    ++report.image2d_unrecognized_payloads;
+                }
             }
             ++objects_in_section;
             ++report.object_count;
