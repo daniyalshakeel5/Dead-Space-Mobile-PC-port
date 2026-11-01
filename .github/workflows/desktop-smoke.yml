@@ -58,7 +58,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install system SDL2 (Linux only)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libgl1-mesa-dev
       - name: Prepare SDL2 on Windows using GitHub-hosted setup-sdl
         if: runner.os == 'Windows'
         id: sdl
@@ -68,10 +68,10 @@ jobs:
           build-type: Release
       - name: Configure on Linux with system SDL2
         if: runner.os == 'Linux'
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=ON -DDS_FETCH_SDL2=OFF
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=ON -DDS_FETCH_SDL2=OFF -DDS_BUILD_IM_MESH_READER=ON -DDS_BUILD_IM_VIEWER=ON
       - name: Configure on Windows with setup-sdl's package
         if: runner.os == 'Windows'
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=ON -DDS_FETCH_SDL2=OFF "-DCMAKE_PREFIX_PATH=${{ steps.sdl.outputs.prefix }}"
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=ON -DDS_FETCH_SDL2=OFF -DDS_BUILD_IM_MESH_READER=ON -DDS_BUILD_IM_VIEWER=ON "-DCMAKE_PREFIX_PATH=${{ steps.sdl.outputs.prefix }}"
       - name: Build native diagnostics AND the input tests
         run: cmake --build build --config Release --parallel 2
       - name: Run input unit tests
@@ -79,7 +79,7 @@ jobs:
       - name: Stage Linux input diagnostic
         if: runner.os == 'Linux'
         shell: bash
-        run: mkdir -p dist && cp build/ds_input_probe build/ds_apk_probe dist/
+        run: mkdir -p dist && cp build/ds_input_probe build/ds_apk_probe dist/ && cp build/ds_im_mesh_viewer dist/
       - name: Stage Windows input diagnostic
         if: runner.os == 'Windows'
         shell: pwsh
@@ -87,6 +87,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item build/Release/ds_input_probe.exe dist/
           Copy-Item build/Release/ds_apk_probe.exe dist/
+          Copy-Item build/Release/ds_im_mesh_viewer.exe dist/
           # Package SDL2.dll only if the setup-sdl package linked dynamically.
           $dll = Get-ChildItem -Path "${{ steps.sdl.outputs.prefix }}" -Filter SDL2.dll -File -Recurse | Select-Object -First 1
           if ($dll) { Copy-Item $dll.FullName dist/ }
