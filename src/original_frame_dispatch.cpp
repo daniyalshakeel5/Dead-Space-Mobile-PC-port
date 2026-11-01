@@ -108,4 +108,42 @@ OriginalStateTwoPrefixResult original_write_state_two_transition_prefix(
     return OriginalStateTwoPrefixResult::OriginalStateTwoStored;
 }
 
+OriginalActiveFramePrefixResult original_execute_active_frame_prefix(
+    void* original_shared_state, std::size_t accessible_bytes,
+    void* original_virtual_object,
+    OriginalVirtualFirstMethod original_virtual_method,
+    void** context_after_state_two_postincrement) noexcept {
+    if (!original_shared_state || accessible_bytes < 8 ||
+        !context_after_state_two_postincrement)
+        return OriginalActiveFramePrefixResult::InvalidOriginalContext;
+
+    const auto* state=static_cast<const std::uint8_t*>(original_shared_state);
+    // ARM at ELF 0x0027ef84: compare first 32-bit word of shared global
+    // to stage 1, branch into 0x0027efac only if equal.
+    if (state[0]!=1 || state[1]!=0 || state[2]!=0 || state[3]!=0)
+        return OriginalActiveFramePrefixResult::OriginalStateWasNotOne;
+
+    if (!original_virtual_object || !original_virtual_method)
+        return OriginalActiveFramePrefixResult::MissingOriginalVirtualTarget;
+
+    // Original 0x0027fc68 calls [object->vtable+0] and applies
+    // SUBS r0,r0,#1 / MOVNE r0,#1. The original object and function
+    // MUST be supplied by a separate verified runtime implementation.
+    const auto result=original_invoke_stage_one_first_virtual(
+        original_virtual_object, original_virtual_method);
+    if (result != OriginalVirtualDispatchResult::OriginalReturnWasOne)
+        return OriginalActiveFramePrefixResult::OriginalNonzeroBranchUnimplemented;
+
+    // The dispatcher sees normalized r0=0 and tail-branches to
+    // 0x0027eecc. Independently verified PC-relative literals show
+    // both routines refer to THE SAME original global at 0x0049caa8.
+    // 0x0027eecc immediately stores state=2 and advances r4 by 8.
+    const auto written=original_write_state_two_transition_prefix(
+        original_shared_state,accessible_bytes,
+        context_after_state_two_postincrement);
+    return written == OriginalStateTwoPrefixResult::OriginalStateTwoStored
+        ? OriginalActiveFramePrefixResult::OriginalStateTwoTransitionPrefixExecuted
+        : OriginalActiveFramePrefixResult::InvalidOriginalContext;
+}
+
 } // namespace ds_port::original_runtime
