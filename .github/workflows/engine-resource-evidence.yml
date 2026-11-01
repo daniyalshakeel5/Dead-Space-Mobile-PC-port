@@ -96,6 +96,30 @@ jobs:
               elf,elf32_executable_sections(elf),0x28a53c,4))[0]
           cleanup_vtable=(0x28a508+8+cleanup_displacement+8)&0xffffffff
           print("ORIGINAL_UNREADY_CLEANUP_VTABLE",hex(cleanup_vtable))
+          # Extract only numeric UTF-8 validation-table ranges; do not
+          # publish any proprietary ELF bytes or text.
+          try:
+              from tools.deadspace_original_code_window import elf32_load_ranges
+              mapped=elf32_load_ranges(elf)
+              read=lambda va,n: bounded_virtual_read(elf,mapped,va,n)
+              d8=struct.unpack("<i",read(0x28cdb4,4))[0]
+              ds=struct.unpack("<i",read(0x28cdb8,4))[0]
+              count_base=(0x28cca0+d8-0x6e8)&0xffffffff
+              limit_base=(0x28cca4+ds)&0xffffffff
+              prefix_counts=list(read(count_base+0xc0,64))
+              limit_rows=[]
+              for i in range(1,7):
+                  base=limit_base+i*4
+                  limits=[struct.unpack("<I",read(base+v,4))[0]
+                          for v in (0x98,0xac,0xc0)]
+                  limit_rows.append({"n":i,"min":limits[0],
+                                     "max_exclusive":limits[1],
+                                     "fallback":limits[2]})
+              print("ORIGINAL_UTF8_TABLE_METADATA",json.dumps({
+                  "counts_c0_ff":prefix_counts,"limit_rows":limit_rows},
+                  separators=(",",":")))
+          except (ValueError,IndexError,struct.error) as exc:
+              print("ORIGINAL_UTF8_TABLE_UNAVAILABLE",type(exc).__name__,str(exc)[:160])
           outfile=Path(os.environ["RUNNER_TEMP"])/"resource-instructions.json"
           outfile.write_text(json.dumps({"schema":2,
                "factory_mode1_vtable_arm_va":hex(vtable),
