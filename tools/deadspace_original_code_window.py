@@ -588,6 +588,16 @@ def observe(apk: Path) -> dict:
         data,sections,0x002828ac,0x24,0x002828b8)+8)&0xffffffff
     secondary_vtable_va=(resolve_arm_literal_based_global(
         data,sections,0x00288694,0x40,0x002886a0)+8)&0xffffffff
+    # 0x288688 also loads all three constructor arguments from real
+    # PC-relative literals. Resolve each static VA at the precise ADD.
+    embedded_init_arg=(resolve_arm_literal_based_global(
+        data,sections,0x00288698,0x40,0x002886ac))&0xffffffff
+    embedded_setup_arg1=(resolve_arm_literal_based_global(
+        data,sections,0x002886b8,0x24,0x002886c4))&0xffffffff
+    embedded_setup_arg2=(resolve_arm_literal_based_global(
+        data,sections,0x002886bc,0x24,0x002886c8))&0xffffffff
+    if not all((embedded_init_arg,embedded_setup_arg1,embedded_setup_arg2)):
+        raise ValueError("Original secondary constructor argument resolves to zero")
     if not constructor_vtable_va or not secondary_vtable_va:
         raise ValueError("Original constructor vtable literal resolves to zero")
     for key,prefix in (
@@ -645,6 +655,9 @@ def observe(apk: Path) -> dict:
         "secondary_postallocation_constructor_evidence":{
             "constructor_0x2828ac_vtable_va":f"0x{constructor_vtable_va:08x}",
             "postprocess_0x288688_override_vtable_va":f"0x{secondary_vtable_va:08x}",
+            "embedded_init_0x27fb28_arg1":f"0x{embedded_init_arg:08x}",
+            "embedded_setup_0x27fa74_arg1":f"0x{embedded_setup_arg1:08x}",
+            "embedded_setup_0x27fa74_arg2":f"0x{embedded_setup_arg2:08x}",
             "constructor_direct_call":"0x002828ac",
             "constructor_first_byte_range":"0x00..0x12",
             "verified":True,
