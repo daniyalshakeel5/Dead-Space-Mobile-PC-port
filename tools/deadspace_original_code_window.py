@@ -664,6 +664,12 @@ def observe(apk: Path) -> dict:
         data,sections,0x002807a4,0x34,0x002807b0)
     input_initial_table=(event_constructor_base+8)&0xffffffff
     input_final_table=(event_constructor_base+0x20)&0xffffffff
+    # Original 0x280A34 third startup object constructor, with three
+    # 0x27E560 calls and a 0x58-byte fully decoded field range.
+    constructor_280a34_primary_base=resolve_arm_literal_based_global(
+        data,sections,0x00280a34,0x8c,0x00280a40)
+    constructor_280a34_secondary_base=resolve_arm_literal_based_global(
+        data,sections,0x00280a38,0x8c,0x00280a44)
     # Original 0x287A94 object constructor has two PC-relative table
     # bases and a single outstanding direct call to 0x27E560.
     constructor_287a94_primary_base=resolve_arm_literal_based_global(
@@ -788,6 +794,13 @@ def observe(apk: Path) -> dict:
             "final_vtable_va":f"0x{input_final_table:08x}",
             "direct_helper_0x35194":"import-plt-target-still-unresolved",
             "required_event_bytes":48,
+            "verified":True,
+        },
+        "original_constructor_280a34_literals":{
+            "vtable_at_plus_zero":f"0x{(constructor_280a34_primary_base+8)&0xffffffff:08x}",
+            "table_at_plus_four":f"0x{(constructor_280a34_primary_base+0x4c)&0xffffffff:08x}",
+            "vtable_at_plus_0x14":f"0x{(constructor_280a34_secondary_base+8)&0xffffffff:08x}",
+            "original_base_constructor_calls":3,
             "verified":True,
         },
         "original_constructor_287a94_literals":{
