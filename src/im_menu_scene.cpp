@@ -67,13 +67,22 @@ ImMenuGeometry decode_im_menu_geometry(const std::uint8_t* data,
         out.vertices.clear();out.indices.clear();out.surfaces.clear();
         out.mesh_bounds.clear();
         out.original_object_type_counts.fill(0);
+        out.camera_object_indices.clear();
+        out.group_object_indices.clear();
         return out;
     };
     std::vector<Chunk> chunks;
     if(!read_chunks(data,bytes,chunks))
         return fail("malformed original menu IM-M3G framing");
     try{
-        for(const auto& obj:chunks)++out.original_object_type_counts[obj.type];
+        for(std::size_t i=0;i<chunks.size();++i) {
+            const auto type=chunks[i].type;
+            ++out.original_object_type_counts[type];
+            if(type==5)out.camera_object_indices.push_back(
+                static_cast<std::uint32_t>(i+1));
+            if(type==9)out.group_object_indices.push_back(
+                static_cast<std::uint32_t>(i+1));
+        }
         for(std::size_t i=0;i<chunks.size();++i){
             const auto& mesh=chunks[i];
             if(mesh.type!=14)continue;
