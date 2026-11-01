@@ -70,6 +70,7 @@ ImMenuGeometry decode_im_menu_geometry(const std::uint8_t* data,
         out.camera_object_indices.clear();
         out.group_object_indices.clear();
         out.scene_node_records.clear();
+        out.scene_reference_candidates.clear();
         return out;
     };
     std::vector<Chunk> chunks;
@@ -86,6 +87,22 @@ ImMenuGeometry decode_im_menu_geometry(const std::uint8_t* data,
                 static_cast<std::uint32_t>(i+1));
             if(type==9)out.group_object_indices.push_back(
                 static_cast<std::uint32_t>(i+1));
+        }
+        // Inventory aligned raw index candidates only. This deliberately
+        // does not assert which bytes represent parent/child relationships.
+        for(const auto& node:out.scene_node_records) {
+            const auto& payload=chunks[node.object_index-1];
+            for(std::size_t off=0;off+4<=payload.size;off+=4) {
+                const auto id=le32(payload.p+off);
+                if(id>0 && id<=chunks.size() &&
+                   (chunks[id-1].type==5 || chunks[id-1].type==9 ||
+                    chunks[id-1].type==14)) {
+                    if(out.scene_reference_candidates.size()>=10000)
+                        return fail("scene candidate reference limit exceeded");
+                    out.scene_reference_candidates.push_back({
+                        node.object_index,static_cast<std::uint32_t>(off),id});
+                }
+            }
         }
         for(std::size_t i=0;i<chunks.size();++i){
             const auto& mesh=chunks[i];
