@@ -59,7 +59,9 @@ jobs:
           root=Path(os.environ["RUNNER_TEMP"])/"boot-assets"/"assets"
           with ZipFile(Path(os.environ["RUNNER_TEMP"])/"deadspace.apk") as source:
               for name in ("published/texturepacks_ui/splash_ea.m3g",
-                           "published/texturepacks_ui/splash_deadspace.m3g",\n                           "published/models/main_menu.m3g",\n                           "published/texturepacks_ui/ui_frontend.m3g"):
+                           "published/texturepacks_ui/splash_deadspace.m3g",
+                           "published/models/main_menu.m3g",
+                           "published/texturepacks_ui/ui_frontend.m3g"):
                   source_name="assets/"+name
                   info=source.getinfo(source_name)
                   if info.file_size>32*1024*1024:raise RuntimeError("boot resource oversized")
