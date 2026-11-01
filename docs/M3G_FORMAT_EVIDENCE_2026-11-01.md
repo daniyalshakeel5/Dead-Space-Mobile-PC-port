@@ -69,19 +69,25 @@ Source: GitHub Actions push runs `41285804108`, `41286597401`,
 - [GitHub Actions run 41290357084](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41290357084) compiled the new native PNG extractor, used it on **three** real textures, and validated PNG headers, CRC32s, dimensions, zlib decompression and scanline lengths. The PNG files were ephemeral and deleted; no copyrighted data entered artifacts.
 - Local user-owned workflow: run `ds_asset_install` on the user's APK, then `ds_m3g_probe "<local texture.m3g>" --decode-image` and `ds_m3g_texture_extract "<local texture.m3g>" "<new output.png>"`. The extractor refuses to overwrite existing output.
 - Code: `src/m3g_container.cpp` / `include/ds_port/m3g_container.hpp` decoder, `apps/m3g_texture_extract.cpp` PNG output, `tools/deadspace_m3g_native_verify.py` private APK checks, synthetic CTest fixtures. Windows and Linux builds use existing GitHub Actions, with no bundled game content.
-- **Not yet achieved:** decoding the 100 other Image2D payloads, 91 IronMonkey meshes, renderer integration, gameplay engine, collision, AI, animation, audio, mission logic. No playable native PC build.
-## Next format gate (do not bypass)
+- **Historical status, now superseded:** see later findings on native ETC1 and IM-M3G decoding. Renderer integration, gameplay, physics, audio, animation and missions remain missing.
+## Superseding native decoder findings (actual APK verified)
 
-1. Compare `IM-M3G` first-section layout and compression/checksum with
-   JSR-184, keeping dialects distinct.
-2. For the JSR-184-header assets, investigate why **every** second section
-   starts with object type 0; confirm the intended IronMonkey custom object
-   structure against genuine native loader routines before relaxing strict
-   validation. The strict parser must remain available as a baseline.
-3. Implement a separately labeled IronMonkey structural parser, with bounded
-   synthetic tests, and verify it against actual game files privately.
-4. Only after object and texture layouts are verified, add a native OpenGL
-   texture/mesh viewer; then animation, collision, engine behavior and missions.
-   Green fixture CI is not evidence of playable game functionality.
+**Code and original asset verification:**
 
-**No native x86-64 playable game exists at this checkpoint.**
+- **Format 116 ETC1** — The code `0x74` refers to 100 immutable textures sharing a fixed `0x74` pixel start offset. **99/100** match ETC1 **full mipmap chains**, rather than base images alone; the remaining resource is still unsupported. New independent `src/etc1.cpp` and `include/ds_port/etc1.hpp` decode ETC1 base mip RGB into RGBA8 with bounded sizes and invalid-block rejection. Real APK native verification decoded **99** images (161,599,488 RGBA output bytes), with **three** temporary PNG smoke checks. **67 raw RGBA** images from the other format also decode. Neither family has visual-pixel-reference validation. [GitHub run 41291717211](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41291717211).
+- **91 IM-M3G files** have bounded proprietary type/length object chunks. Observed: **4,154 Mesh**, **10,078 VertexArray**, **4,165 VertexBuffer**, **4,431 TriangleStripArray**, **4,431 proprietary IndexBuffer**, **11 SkinnedMesh** chunks. All 4,154 Mesh→VertexBuffer references, all 4,165 VertexBuffer→VertexArray references and 10,078 exact VertexArray raw sizes passed. Index encodings `0x81` (3,722) and `0x82` (709); all IndexBuffer→strip/Appearance references valid. [Topology run 41292317869](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41292317869).
+- **Verified geometry numerics** — All 4,154 meshes use signed int16×3 position arrays and finite VertexBuffer bias/scale; all 4,362 referenced index buffers use exactly three indices per strip with every index in bounds. [Numeric run 41292464520](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41292464520).
+- **Native model extractor** — `src/im_mesh.cpp`, `include/ds_port/im_mesh.hpp`, `apps/im_mesh_extract.cpp` and `tests/im_mesh_tests.cpp` add bounded C++17 position/triangle OBJ extraction. **37/91 genuine IM-M3G resources** decoded: **4,154 Mesh objects, 4,362 submeshes, 546,488 vertices, 398,634 triangles**. Three temporary original-model OBJ exports passed face/vertex/index count verification and were deleted. The other 54 resources are outside this supported geometry subset, not necessarily corrupt. [Native real-APK CI 41292859630](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41292859630).
+- This geometry output has **no UVs, normals, textures, materials, rigging, animations, scene transforms or demonstrated visual fidelity**. The proprietary IM-M3G trailer/checksum is not original-native validated. No playable engine or OpenGL game scene exists.
+- Credits: [Sleepyzay's Dead Space Mobile Noesis/Maxscript research](https://github.com/sleepyzay/Maxscript-Projects/tree/main/Dead%20Space%20Mobile), [RaduMC/M3G2FBX](https://github.com/RaduMC/M3G2FBX), [ResHax format discussion](https://reshax.com/topic/1460-mobile-dead-space-m3g-modeltexture-bundles-help/), original mobile fixes [RAFALAMAO](https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes). Independent code does not include copied game or community tool assets.
+
+**Local usage on user-owned resources only:**
+
+```sh
+ds_m3g_texture_extract "<owned-local-texture.m3g>" "<new-output.png>"
+ds_im_mesh_extract "<owned-local-model.m3g>"               # metadata only
+ds_im_mesh_extract "<owned-local-model.m3g>" "<new-output.obj>"
+```
+
+**Next work:** verify UV/reference material/normal data in the original IM-M3G assets; integrate verified untextured geometry in an SDL2/OpenGL **diagnostic** viewer; then validate coordinate orientation, material/texture bindings, animation and original engine behavior. All unimplemented systems must stay labeled as such. No emulation, no proprietary game asset distribution, no use of excluded milestone ZIP.
+
