@@ -41,6 +41,7 @@ WINDOWS = {
     "post_setup_direct_callee_0x2849e0": (0x002849e0, 160),
     "post_setup_direct_callee_0x280a34": (0x00280a34, 160),
     "original_input_event_record_init_0x2807a0": (0x002807a0, 160),
+    "input_event_constructor_helper_0x35194": (0x00035194, 96),
     "secondary_allocator_postprocess_0x288688": (0x00288688, 160),
     "postprocess_constructor_0x2828ac": (0x002828ac, 192),
     "postprocess_embedded_init_0x27fb28": (0x0027fb28, 256),
