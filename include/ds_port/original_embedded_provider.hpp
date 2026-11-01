@@ -60,5 +60,11 @@ OriginalEmbeddedProviderResult original_embedded_provider_seek_file_0x273034(
     void* mapped_provider,std::size_t accessible_bytes,
     int native_fd,std::int32_t original_offset,
     std::uint32_t original_origin) noexcept;
+// Original provider +0x28 file-mode selector=0 calls
+// lseek(fd,0,SEEK_CUR) via PLT 0x35350. The host fd is explicitly
+// bound and checked against provider+0x10, never inferred.
+OriginalEmbeddedProviderResult original_embedded_provider_position_file_0x271794(
+    const void* mapped_provider,std::size_t accessible_bytes,
+    int native_fd,std::uint32_t original_selector) noexcept;
 
 } // namespace ds_port::original_runtime
