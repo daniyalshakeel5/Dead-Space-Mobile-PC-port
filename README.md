@@ -1,109 +1,133 @@
 # Dead Space Mobile — Native Windows/Linux rebuild (research stage)
 
-> **Not a playable PC game yet.** This repository currently contains
-> original PC-port research tools, a C++17 input/timing foundation, and a
-> local, user-owned APK asset installer. No working reconstructed game
-> engine, graphics, mission logic, audio, or animation has been verified.
-> The original Android ARM code is **not** executable natively on x86-64.
+> **No playable PC game exists yet.** The project now has independently written
+> and actual-APK-tested native **texture and mesh extraction** tools, plus the
+> desktop host foundation. Original game scene, animation, physics, input
+> semantics, audio, AI, combat and mission loop are **not implemented**.
 
-## Project goals
+## Goal
 
-Reconstruct Dead Space Mobile for native x86-64 Windows and Linux with
-full keyboard/mouse support, performance suitable for modest hardware, and
-**no ARM emulator or runtime instruction translation**. Use the user's
-own legitimately obtained APK as the source of game resources. Do not
-bundle, commit, or redistribute proprietary game binaries or assets.
+A genuine native x86-64 Windows/Linux game rebuilt in portable C++17/CMake,
+with efficient keyboard/mouse and OpenGL/SDL2 rendering, **no Android
+emulator**, no ARM instruction translation, and no proprietary game files
+shipped inside the executable or installer.
 
-## What works today
+The user's legally obtained mobile APK provides their local assets. This
+repository is an independent study and is not affiliated with the original
+game publisher.
 
-| Component | Scope | Verification |
+## Verified tools and current scope
+
+| Utility/component | What it actually does | Evidence |
 | --- | --- | --- |
-| `ds_input_probe` | SDL2 keyboard/mouse diagnostic | CI: Windows + Linux |
-| `ds_port_input` | Provisional desktop action handling | Synthetic CTest |
-| `ds_port_timing` | Bounded fixed-step host timing | Synthetic CTest |
-| `ds_apk_probe` | Read-only ZIP32 APK metadata inspector | Synthetic CTest |
-| `ds_asset_install` | Installs a user's APK `assets/` into a *new local folder* | Synthetic CTest on both OSes |
-| `deadspace_audit.py` | Private APK native-library/ELF summary | Synthetic tests |
-| `deadspace_asset_recon.py` | Redacted texture/audio/container signature reconnaissance | Synthetic tests |
+| `ds_input_probe`, host timing | SDL2 keyboard/mouse diagnostic and fixed-step host scheduler; not original game logic | Windows/Linux synthetic CTest |
+| `ds_apk_probe`, `ds_asset_install` | ZIP32 APK inspection and safe fresh-directory `assets/` installation from a user-owned APK | Windows/Linux synthetic CTest |
+| `ds_m3g_probe` | Strict JSR-184 checks and an explicitly separate IronMonkey diagnostic on user-provided texture files | Actual APK structural checks |
+| `ds_m3g_texture_extract` | User-local texture → PNG for native-supported raw RGBA or ETC1 full-mipmap formats | **67** native RGBA and **99** native ETC1 base-mip decodes; 3+3 ephemeral PNGs validated |
+| `ds_im_mesh_extract` | User-local IM-M3G geometry → new OBJ with XYZ vertices and basic triangles, **no materials/UVs/rigs** | **37/91** resources passed real-APK C++ decoder, 3 ephemeral OBJ files checked |
+| Python research tools | Aggregate-only native ELF, resource signatures, mesh reference and format probes | Real APK GitHub Actions, plus synthetic fixture tests |
 
-Passing the tests does **not** mean the original game APK has been
-verified or that its asset formats have been decoded. Original game code
-and data are not included in any GitHub Actions build artifact.
+Original APK model/texture assets are **never committed, bundled or
+published**. GitHub Actions temporarily downloads the original upstream
+release confirmed by the user to be the same file they own, performs
+research and deletes the temporary copy. All published research reports
+contain aggregate counts, not original contents.
 
-## Download the native utilities
+### Real game evidence
 
-Open [GitHub Actions — native asset installer](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/workflows/asset-installer.yml).
-Select a successful run and download its Windows or Linux artifact.
-Those archives contain only independently written native tools.
+- `.m3g` signatures: 174 JSR-184-like and 91 proprietary `IM-M3G`.
+- Image2D: 67 native raw RGBA images, 99 native ETC1 base-level decodes from
+  complete mipmap chains; one additional code-116 resource remains unsupported.
+- Geometry: 37 resources decoded into **4,154 meshes, 4,362 submeshes,
+  546,488 vertices, 398,634 triangles**. The other 54 IM-M3G files are
+  not decoded by this geometry-only tool.
+- No verified game renderer, full texture/material/UV mapping, correct
+  scene orientation, skinned characters or native x86-64 gameplay.
 
-To install resources locally (the destination must not exist):
+[Native original-APK geometry verification](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41292859630) ·
+[Native ETC1 decoder verification](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41291717211) ·
+[Technical handoff](docs/HANDOFF_2026-11-01.md)
 
-Windows PowerShell:
+## Download native diagnostic utilities
+
+Open [GitHub Actions — Native asset installer](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/workflows/asset-installer.yml)
+and download the Windows or Linux artifact from a successful CI run.
+Only independently written diagnostic programs are packaged, never the game.
+
+## Use with your own APK assets
+
+The installer creates a **new** destination folder (does not overwrite it):
 
 ```powershell
+# Windows PowerShell
 .\ds_asset_install.exe "D:\Games\DeadSpaceMobile.apk" "D:\Games\DeadSpaceAssets"
 ```
 
-Linux:
-
-```bash
+```sh
+# Linux
 ./ds_asset_install "$HOME/Games/DeadSpaceMobile.apk" "$HOME/Games/DeadSpaceAssets"
 ```
 
-The installer reads ZIP32 entries and writes **only `assets/`** with
-bounded stored/DEFLATE extraction and CRC checks. It does not run or
-decode the game. See [local installation and limitations](docs/LOCAL_ASSET_INSTALL.md).
+Run these tools on **local files extracted from that owned APK**:
 
-## Research the game resources privately
-
-The asset scanner can analyze the user's APK without uploading it:
-
-```bash
-python3 tools/deadspace_asset_recon.py --apk "/path/to/owned.apk" --output "resource-recon.json"
+```sh
+ds_m3g_probe "<local-texture.m3g>" --decode-image
+ds_m3g_texture_extract "<local-texture.m3g>" "<new-output.png>"
+ds_im_mesh_extract "<local-model.m3g>"
+ds_im_mesh_extract "<local-model.m3g>" "<new-output.obj>"
 ```
 
-Only aggregate metadata and the APK SHA-256 are written to JSON; original
-filenames and file bytes are not emitted. See
-[private APK research](docs/PRIVATE_APK_RECON.md) and the
-[technical handoff](docs/NATIVE_PORT_HANDOFF.md).
-A private GitHub Actions workflow also supports short-lived authorized
-APK access with the `DS_APK_URL` secret.
+The texture extractor supports verified raw RGBA and ETC1 resources only;
+the geometry extractor supports a verified position/triangle-only subset.
+They reject unsupported files and refuse to overwrite output files.
+The user's extracted PNGs/OBJs contain copyrighted game content; **do not
+upload or redistribute them**.
 
-## Build the native utilities
+## Native CMake build
 
-Requires CMake 3.20+, a C++17 toolchain, and zlib development libraries
-for the optional asset installer.
+CMake 3.20+, a C++17 compiler, zlib dev libraries for optional APK
+installer / M3G texture formats, SDL2 if enabling its windowed diagnostic:
 
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=OFF -DDS_BUILD_ASSET_INSTALLER=ON
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+  -DDS_BUILD_INPUT_PROBE=OFF \
+  -DDS_BUILD_ASSET_INSTALLER=ON \
+  -DDS_BUILD_M3G_READER=ON \
+  -DDS_BUILD_IM_MESH_READER=ON \
+  -DDS_ENABLE_TESTS=ON
 cmake --build build --config Release
 ctest --test-dir build --build-config Release --output-on-failure
 ```
 
-Enable `DS_BUILD_INPUT_PROBE=ON` when SDL2 development libraries are
-available. All heavyweight project builds run on GitHub-hosted
-Windows/Linux runners.
+Heavy builds/actual resource processing should run via GitHub Actions;
+the assistant's local VM has been unstable during archive work.
 
-## Next evidence gate
+## Next engineering gate
 
-Collect actual APK resource/ABI metadata privately, identify real loader
-code and resource formats, and then implement evidence-backed parsers and
-a renderer. **There is currently no verified native PC gameplay.**
+Investigate authentic UV, normal, Appearance and Texture2D object references
+in the IronMonkey meshes, then integrate the verified triangle and texture
+decoders into a native **SDL2/OpenGL diagnostic viewer**. After visual
+comparison against original resources and loader behavior, start the
+actual game engine reconstruction. A decoded OBJ is not a playable port.
 
-## Upstream credit and provenance
+## Upstream attribution and licensing
 
-This repository originated as a fork of
-[RAFALAMAO/Dead-Space-Mobile-Fixes](https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes),
-which documents the Android brightness/aspect-ratio fixes.
-Original [XDA thread](https://xdaforums.com/t/dead-space-android-13-100-brightness-fix-almost-21-9-full-screen-decompiled-apktool.4664045/).
-Credit for that upstream work belongs to its original contributors.
-The independent desktop research/code does not confer rights to
-distribute the original game's copyrighted content.
+- Original mobile brightness/aspect-ratio fixes:
+  [RAFALAMAO/Dead-Space-Mobile-Fixes](https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes)
+- Existing game format investigation:
+  [Sleepyzay Noesis/Maxscript](https://github.com/sleepyzay/Maxscript-Projects/tree/main/Dead%20Space%20Mobile);
+  [RaduMC/M3G2FBX](https://github.com/RaduMC/M3G2FBX);
+  [ResHax Dead Space Mobile formats](https://reshax.com/topic/1460-mobile-dead-space-m3g-modeltexture-bundles-help/)
+- Source/reference format:
+  [JSR-184](https://wupp.cc/j2meapi/JSR_184_Mobile_3D_Graphics_API_1_1/file-format.html)
+
+Independent code does not grant redistribution rights for the original
+game's copyrighted assets or executable.
 
 ![Original upstream cover](front.jpg)
 
-## Resume development / handoff
+## Resume work
 
-The current verified engineering state, GitHub Actions run IDs, unresolved
-APK evidence, and next steps are in [the November 1, 2026 handoff](docs/HANDOFF_2026-11-01.md).
-Read that document first when starting a new chat or engineering session.
+Read [current handoff](docs/HANDOFF_2026-11-01.md) and
+[M3G evidence](docs/M3G_FORMAT_EVIDENCE_2026-11-01.md). Continue development
+on `work/deadspace-remote-preflight-2026-11-01` and [draft PR #1](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/pull/1).
