@@ -37,6 +37,25 @@ class ArmWindowTests(unittest.TestCase):
                 0:("push","{r4, lr}"),4:("mov","r4, r0"),
                 8:("bl","#0x27f790"),12:("mov","r0, r4"),
                 16:("pop","{r4, lr}"),20:("b","#0x280520")}),
+            "stage_zero_setup_target_0x28ca24":decoded({
+                0:("vldr","s15, [pc, #0xf4]"),
+                4:("push","{r4, r5, r6, lr}"),
+                8:("sub","r3, r1, #1"),
+                12:("vpush","{d8}"),
+                16:("mov","r4, r0"),
+                20:("vstr","s15, [r0, #0x14]"),
+                24:("str","r1, [r0, #0x10]"),
+                28:("cmp","r3, #5"),
+                32:("addls","pc, pc, r3, lsl #2"),
+                44:("b","#0x28cad8"),
+                132:("vpop","{d8}"),
+                136:("pop","{r4, r5, r6, pc}")}),
+            "stage_zero_setup_type2_branch_0x28cad8":decoded({
+                0:("ldr","r3, [pc, #0x50]"),
+                4:("add","r3, pc, r3"),
+                8:("vldr","s15, [r3, #0x1c]"),
+                12:("vstr","s15, [r0, #0x14]"),
+                16:("b","#0x28caa8")}),
             "stage_zero_followup_target_0x2833f4":decoded({
                 0:("mov","r3, #0"),
                 4:("str","r3, [r0, #0x20]"),
@@ -112,6 +131,18 @@ class ArmWindowTests(unittest.TestCase):
             self.assertFalse(proven_original_code_helpers(windows)[result_key])
             stores[index]["args"]=old
         self.assertTrue(proven_original_code_helpers(windows)[result_key])
+        name="stage_zero_type2_0x28ca24_complete_case"
+        self.assertTrue(proven_original_code_helpers(windows)[name])
+        type2=windows["stage_zero_setup_type2_branch_0x28cad8"]["instructions"]
+        old=type2[2]["args"]
+        type2[2]["args"]="s15, [r3, #0x18]"
+        self.assertFalse(proven_original_code_helpers(windows)[name])
+        type2[2]["args"]=old
+        type2entry=windows["stage_zero_setup_target_0x28ca24"]["instructions"]
+        selected=next(x for x in type2entry if x["offset"]==44)
+        selected["args"]="#0x28caec"
+        self.assertFalse(proven_original_code_helpers(windows)[name])
+        selected["args"]="#0x28cad8"
         zero_steps=windows["frame_stage_zero_second_callee"]["instructions"]
         match=lambda off: next(item for item in zero_steps if item["offset"]==off)
         match(84)["args"]="r1, [r4, #8]"
