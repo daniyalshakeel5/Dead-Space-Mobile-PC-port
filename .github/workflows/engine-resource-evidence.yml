@@ -169,6 +169,13 @@ jobs:
           allocator_global_slot=(0x27a518+8+allocator_disp)&0xffffffff
           print("ORIGINAL_RECEIVER_EMBEDDED_VTABLE",hex(embedded_vtable),
                 "ALLOCATOR_SLOT",hex(allocator_global_slot))
+          # 0x271914 default pool accessor: LDR r4,[PC,#0x1c]
+          # at 0x271918 loads signed literal from 0x27193c,
+          # ADD r4,PC,r4 at 0x27191c resolves original global slot.
+          pool_relative=struct.unpack("<i",bounded_virtual_read(
+              elf,elf32_executable_sections(elf),0x27193c,4))[0]
+          pool_slot=(0x27191c+8+pool_relative)&0xffffffff
+          print("ORIGINAL_DEFAULT_POOL_SLOT_0x271914",hex(pool_slot))
           outfile=Path(os.environ["RUNNER_TEMP"])/"resource-instructions.json"
           outfile.write_text(json.dumps({"schema":2,
                "factory_mode1_vtable_arm_va":hex(vtable),
