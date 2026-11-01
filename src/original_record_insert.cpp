@@ -1,6 +1,7 @@
 #include "ds_port/original_record_insert.hpp"
 #include "ds_port/original_resource_utf16.hpp"
 #include <string>
+#include <utility>
 namespace ds_port::original_runtime {
 OriginalRecordInsertResult0x2862e8 original_insert_record_0x2862e8(
     const OriginalRecordInsertInputs0x2862e8& in) noexcept {
