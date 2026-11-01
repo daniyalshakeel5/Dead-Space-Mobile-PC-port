@@ -34,6 +34,8 @@ WINDOWS = {
     "original_input_ready_guard_0x27e97c": (0x0027e97c, 28),
     "record_allocator_virtual_call_0x281d54": (0x00281d54, 112),
     "frame_stage_zero_second_callee": (0x00280520, 256),
+    "stage_zero_second_tail_0x28061c": (0x0028061c, 256),
+    "stage_zero_second_tail_0x28071c": (0x0028071c, 128),
     "stage_zero_setup_target_0x28ca24": (0x0028ca24, 160),
     "stage_zero_setup_type2_branch_0x28cad8": (0x0028cad8, 96),
     "stage_zero_followup_target_0x281d54": (0x00281d54, 160),
@@ -572,7 +574,7 @@ def observe(apk: Path) -> dict:
                 {"offset": i.address-address,
                  "op": i.mnemonic.lower(),
                  "args": i.op_str.lower()}
-                for i in decoded[:64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" else 40]],
+                for i in decoded[:64 if key.startswith("postprocess_embedded_") or key=="frame_stage_zero_second_callee" or key.startswith("stage_zero_second_tail_") else 40]],
         }
     # Two independently instruction-proven PC-relative literal loads.
     # Frame 0x27ef6c LDR r4,[pc,#0x90], 0x27ef74 ADD r4,pc,r4.
