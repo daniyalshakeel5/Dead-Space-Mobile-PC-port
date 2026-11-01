@@ -71,6 +71,8 @@ def examine(source: str) -> dict | None:
     klass = CLASS.search(source)
     # A class name is ABI metadata, not decompiled method code.
     identifier = (package.group(1) + "." if package else "") + (klass.group(1) if klass else "unknown")
+    natives = sorted(set(NATIVE_DECL.findall(source)))[:100]
+    native_set = set(natives)
     methods = []
     for m in METHOD.finditer(source):
         name = m.group(1)
@@ -79,16 +81,18 @@ def examine(source: str) -> dict | None:
         body = get_body(source, m.end())
         if not body:
             continue
-        ordered = [x for x in CALL.findall(body) if x in SAFE_CALLS]
+        all_calls = CALL.findall(body)
+        ordered = [x for x in all_calls if x in SAFE_CALLS]
+        native_calls = [x for x in all_calls if x in native_set]
         methods.append({
             "callback": name,
             "public_runtime_call_sequence": ordered[:80],
+            "native_call_sequence": native_calls[:80],
             "body_present": True,
             "private_call_count": sum(x not in SAFE_CALLS for x in CALL.findall(body)),
         })
         if len(methods) >= 30:
             break
-    natives = sorted(set(NATIVE_DECL.findall(source)))[:100]
     libraries = sorted(set(LOAD_LIBRARY.findall(source)))[:20]
     if not (methods or natives or libraries):
         return None
