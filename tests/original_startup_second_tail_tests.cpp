@@ -30,6 +30,10 @@ struct Harness {
     int allocs=0,virtuals=0,directs=0,resources=0,bases=0;
     int embedded_virtuals=0,service_84=0,queries=0,secondary_allocs=0;
     bool refuse_last=false;
+    bool use_native_registration=false;
+    int registrations=0,registration_lookups=0;
+    std::array<std::array<std::uint8_t,4>,27> registration_got{};
+    std::array<std::array<std::uint8_t,4>,27> registration_values{};
 };
 bool map(std::uint32_t va,void* c,OriginalStartupServiceMemory* out) noexcept {
     auto& h=*static_cast<Harness*>(c);
@@ -49,8 +53,10 @@ bool map(std::uint32_t va,void* c,OriginalStartupServiceMemory* out) noexcept {
 }
 bool direct(std::uint32_t callee,std::uint32_t ctx,void* c) noexcept {
     auto& h=*static_cast<Harness*>(c);++h.directs;
-    assert(callee==(h.directs==1?0x27fd7cu:0x36fd38u));
-    assert(ctx==(h.directs==1?0x1000u:0u));
+    assert(callee==(h.use_native_registration?0x36fd38u:
+        (h.directs==1?0x27fd7cu:0x36fd38u)));
+    assert(ctx==(h.use_native_registration?0u:
+        (h.directs==1?0x1000u:0u)));
     return true;
 }
 bool virt(const OriginalStartupVirtualCall& call,void* c,
@@ -135,6 +141,28 @@ bool embedded84(const OriginalEmbeddedMethod84Call& q,void* c,
     assert(q.caller_arg2==kOriginal27fa74SecondArgVA);
     *result=0x5200;return true;
 }
+bool registration_global(std::uint32_t original_slot,void* c,
+                         OriginalRegistrationMappedGlobal* out) noexcept {
+    auto& h=*static_cast<Harness*>(c);
+    assert(h.registration_lookups<27);
+    const auto i=static_cast<unsigned>(h.registration_lookups++);
+    assert(original_slot==kOriginalRegistrationSequence0x27fd7c[i].global_slot_arm_va);
+    *out={0x8000u+4*i,h.registration_got[i].data(),
+          h.registration_got[i].size(),h.registration_values[i].data(),
+          h.registration_values[i].size()};
+    return true;
+}
+bool register_resource(const OriginalRegistrationCall& q,void* c) noexcept {
+    auto& h=*static_cast<Harness*>(c);
+    assert(h.registrations<27);
+    const auto i=static_cast<unsigned>(h.registrations++);
+    assert(q.original_callsite_va==kOriginalRegistrationSequence0x27fd7c[i].callsite_arm_va);
+    assert(q.descriptor_arm_va==kOriginalRegistrationSequence0x27fd7c[i].descriptor_arm_va);
+    assert(q.original_subcontext_va==0x1018u);
+    assert(q.original_global_value==0x9000u+i);
+    assert(q.original_tail_branch==(i==26));
+    return true;
+}
 void prepare(Harness& h) {
     put(h.ctx.data(),0x1100);put(h.ctx.data()+4,0x2000);
     put(h.context_table.data()+0x54,0x1120);
@@ -185,5 +213,28 @@ int main(){
     h.secondary_allocs=h.embedded_virtuals=h.queries=h.service_84=0;
     assert(original_execute_stage_zero_tail_0x280580(in)==
            OriginalStartupSecondTailStatus::OriginalVirtualRefused);
+
+    // Exercise the 27-call native 0x27FD7C wrapper through the FULL
+    // stage-zero tail, not just the isolated registration unit test.
+    h.refuse_last=false;h.use_native_registration=true;
+    h.directs=h.resources=h.allocs=h.bases=h.virtuals=0;
+    h.secondary_allocs=h.embedded_virtuals=h.queries=h.service_84=0;
+    h.registrations=h.registration_lookups=0;
+    for(unsigned i=0;i<27;++i) {
+        put(h.registration_got[i].data(),0x8000u+i*4u);
+        put(h.registration_values[i].data(),0x9000u+i);
+    }
+    OriginalRegistrationInputs registered{0x1000u,registration_global,
+                                          register_resource,&h};
+    in.native_registration_0x27fd7c=&registered;
+    assert(original_execute_stage_zero_tail_0x280580(in)==
+           OriginalStartupSecondTailStatus::CompletedOriginalSecondRoutine);
+    assert(h.registrations==27&&h.registration_lookups==27);
+    // The ONLY remaining direct call in this fixture is 0x36FD38.
+    assert(h.directs==1&&h.resources==2&&h.allocs==2);
+    assert(h.virtuals==4&&h.embedded_virtuals==6);
+    registered.original_context_arm_va=0xDEADBEEFu;
+    assert(original_execute_stage_zero_tail_0x280580(in)==
+           OriginalStartupSecondTailStatus::InvalidOriginalContext);
     return 0;
 }

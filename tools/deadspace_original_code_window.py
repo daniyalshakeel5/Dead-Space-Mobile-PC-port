@@ -61,6 +61,7 @@ WINDOWS = {
     "postprocess_embedded_setup_0x27fa74": (0x0027fa74, 192),
     "repeated_initializer_callee_0x284178": (0x00284178, 320),
     "startup_global_direct_service_0x36fd38": (0x0036fd38, 256),
+    "startup_global_direct_service_target_0x37000c": (0x0037000c, 256),
     "startup_registration_helper_first_0x2839c8": (0x002839c8, 256),
     "original_time_pair_source": (0x000357c4, 12),
     "frame_stage_one_routine": (0x0027fc68, 96),

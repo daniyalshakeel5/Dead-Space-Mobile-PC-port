@@ -204,6 +204,7 @@ jobs:
           print("ENGINE_RESOURCE_0x2803E4_FULL",
                 json.dumps(report["windows"]["post_setup_direct_callee_0x2803e4"]["instructions"][:120],separators=(",",":")))
           for name in ("startup_global_direct_service_0x36fd38",
+                       "startup_global_direct_service_target_0x37000c",
                        "startup_registration_helper_first_0x2839c8"):
               print("ORIGINAL_ENGINE_DIRECT_DETAIL",name,
                     json.dumps(report["windows"][name]["instructions"][:40],separators=(",",":")))
