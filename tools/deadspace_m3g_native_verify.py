@@ -103,6 +103,9 @@ def analyze(apk: Path, native_probe: Path,
     image2d_failure_stages: Counter = Counter()
     image2d_unknown_formats: Counter = Counter()
     image_decoding_counts: Counter = Counter()
+    etc1_decoding_counts: Counter = Counter()
+    etc1_png_smoke_counts: Counter = Counter()
+    etc1_decoded_bytes = 0
     png_smoke_counts: Counter = Counter()
     decoded_rgba_bytes = 0
     image2d_objects = 0
@@ -234,6 +237,36 @@ def analyze(apk: Path, native_probe: Path,
                                                     target.unlink(missing_ok=True)
                                         else:
                                             image_decoding_counts["unsupported_image"] += 1
+                                if int((extra.get("image2d_unknown_format_counts") or {}).get("116", 0)) > 0:
+                                    etc_probe = subprocess.run(
+                                        [str(native_probe), str(stage), "--decode-image"],
+                                        capture_output=True, text=True, check=False, timeout=30)
+                                    if etc_probe.returncode != 0:
+                                        etc1_decoding_counts["native_error"] += 1
+                                    else:
+                                        res = json.loads(etc_probe.stdout)
+                                        if res.get("etc1_decoded") is True:
+                                            etc1_decoding_counts["etc1_base_level_decoded"] += 1
+                                            w, h = int(res["etc1_width"]), int(res["etc1_height"])
+                                            etc1_decoded_bytes += w*h*4
+                                            if (texture_exporter is not None and
+                                                    etc1_png_smoke_counts["tested"] < 3):
+                                                etc1_png_smoke_counts["tested"] += 1
+                                                output = Path(directory) / "temporary-owned-etc1.png"
+                                                try:
+                                                    converted = subprocess.run(
+                                                        [str(texture_exporter), str(stage),
+                                                         str(output)], capture_output=True,
+                                                        text=True, check=False, timeout=30)
+                                                    if converted.returncode == 0 and validate_rgba_png(
+                                                            output, w, h):
+                                                        etc1_png_smoke_counts["verified_png"] += 1
+                                                    else:
+                                                        etc1_png_smoke_counts["invalid_png"] += 1
+                                                finally:
+                                                    output.unlink(missing_ok=True)
+                                        else:
+                                            etc1_decoding_counts["unsupported_or_bad_etc1"] += 1
                                 for key, value in (extra.get("type_counts") or {}).items():
                                     if key.isdecimal() and 0 <= int(key) <= 255:
                                         diagnostic_types[key] += int(value)
@@ -272,6 +305,9 @@ def analyze(apk: Path, native_probe: Path,
         "image2d_unknown_format_values": dict(sorted(image2d_unknown_formats.items(), key=lambda item: int(item[0]))),
         "image_rgba_decode_outcomes": dict(sorted(image_decoding_counts.items())),
         "image_rgba_decoded_bytes": decoded_rgba_bytes,
+        "image_etc1_decode_outcomes": dict(sorted(etc1_decoding_counts.items())),
+        "image_etc1_decoded_bytes": etc1_decoded_bytes,
+        "temporary_etc1_png_smoke_test": dict(sorted(etc1_png_smoke_counts.items())),
         "temporary_png_smoke_test": dict(sorted(png_smoke_counts.items())),
         "limitations": "Strict JSR-184 results separate from diagnostic opaque object framing. Diagnostic passes are NOT validated model decoders or gameplay.",
     }
