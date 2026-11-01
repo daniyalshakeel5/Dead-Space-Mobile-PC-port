@@ -18,6 +18,12 @@ struct ImMenuSurface {
     std::uint32_t first_index=0;
     std::uint32_t triangle_count=0;
 };
+// Local-space bounds only; world transforms and camera are not implied.
+struct ImMenuMeshBounds {
+    std::uint32_t mesh_object_index=0;
+    float min_x=0,min_y=0,min_z=0;
+    float max_x=0,max_y=0,max_z=0;
+};
 struct ImMenuGeometry {
     bool decoded=false;
     std::string error;
@@ -25,6 +31,7 @@ struct ImMenuGeometry {
     std::vector<ImMenuVertex> vertices;
     std::vector<std::uint32_t> indices;
     std::vector<ImMenuSurface> surfaces;
+    std::vector<ImMenuMeshBounds> mesh_bounds;
 };
 ImMenuGeometry decode_im_menu_geometry(
     const std::uint8_t* original_im_m3g,std::size_t bytes);
