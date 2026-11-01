@@ -664,6 +664,16 @@ def observe(apk: Path) -> dict:
         data,sections,0x002807a4,0x34,0x002807b0)
     input_initial_table=(event_constructor_base+8)&0xffffffff
     input_final_table=(event_constructor_base+0x20)&0xffffffff
+    # Original 0x27E560 C++ static singleton guard and returned object
+    # are PC-relative original BSS addresses, not address-space guesses.
+    singleton_guard_va=resolve_arm_literal_based_global(
+        data,sections,0x0027e564,0x84,0x0027e56c)
+    singleton_got_base_va=resolve_arm_literal_based_global(
+        data,sections,0x0027e568,0x84,0x0027e574)
+    singleton_object_va=resolve_arm_literal_based_global(
+        data,sections,0x0027e580,0x70,0x0027e584)+4
+    if singleton_guard_va+4 != singleton_object_va:
+        raise ValueError("Original 0x27E560 guard/object address mismatch")
     # Original 0x280A34 third startup object constructor, with three
     # 0x27E560 calls and a 0x58-byte fully decoded field range.
     constructor_280a34_primary_base=resolve_arm_literal_based_global(
@@ -794,6 +804,13 @@ def observe(apk: Path) -> dict:
             "final_vtable_va":f"0x{input_final_table:08x}",
             "direct_helper_0x35194":"import-plt-target-still-unresolved",
             "required_event_bytes":48,
+            "verified":True,
+        },
+        "original_stage_zero_singleton_0x27e560":{
+            "guard_word_va":f"0x{singleton_guard_va:08x}",
+            "returned_object_va":f"0x{singleton_object_va:08x}",
+            "got_base_va":f"0x{singleton_got_base_va:08x}",
+            "singletons_per_call":1,
             "verified":True,
         },
         "original_constructor_280a34_literals":{

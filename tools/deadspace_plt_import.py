@@ -99,6 +99,7 @@ def main()->int:
     singleton_helpers={
         "0x0003580c":resolve_arm_plt_import(raw,0x0003580c),
         "0x00035a28":resolve_arm_plt_import(raw,0x00035a28),
+        "0x0003541c":resolve_arm_plt_import(raw,0x0003541c),
     }
     evidence["startup_singleton_imports"]=singleton_helpers
     args.output.parent.mkdir(parents=True,exist_ok=True)
