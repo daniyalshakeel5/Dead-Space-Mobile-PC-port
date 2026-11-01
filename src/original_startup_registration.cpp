@@ -1,4 +1,5 @@
 #include "ds_port/original_startup_registration.hpp"
+#include "ds_port/original_resource_registration.hpp"
 namespace ds_port::original_runtime {
 namespace {
 std::uint32_t load_u32(const void* ptr) noexcept {
@@ -14,7 +15,7 @@ OriginalRegistrationStatus original_register_stage_resources_0x27fd7c(
         return OriginalRegistrationStatus::InvalidOriginalContext;
     if(!in.resolve_original_global)
         return OriginalRegistrationStatus::MissingOriginalGlobalResolver;
-    if(!in.invoke_original_0x284178)
+    if(!in.invoke_original_0x284178 && !in.native_helper_0x284178)
         return OriginalRegistrationStatus::MissingOriginalRegistrationHelper;
     // The real original function does not branch between registrations.
     // Each BL 0x284178 is followed by the next call; final entry is a
@@ -38,7 +39,12 @@ OriginalRegistrationStatus original_register_stage_resources_0x27fd7c(
             item.descriptor_arm_va,
             item.tail_call
         };
-        if(!in.invoke_original_0x284178(args,in.callback_context))
+        if(in.native_helper_0x284178) {
+            if(original_execute_resource_registration_0x284178(
+                args,*in.native_helper_0x284178)!=
+               OriginalNativeRegistrationStatus::CompletedOriginalPath)
+                return OriginalRegistrationStatus::OriginalRegistrationRefused;
+        } else if(!in.invoke_original_0x284178(args,in.callback_context))
             return OriginalRegistrationStatus::OriginalRegistrationRefused;
     }
     return OriginalRegistrationStatus::CompletedOriginalSequence;

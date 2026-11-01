@@ -66,11 +66,15 @@ struct OriginalRegistrationCall {
 };
 using OriginalRegistrationInvoke=bool (*)(
     const OriginalRegistrationCall&,void* context) noexcept;
+struct OriginalNativeRegistrationServices;
 struct OriginalRegistrationInputs {
     std::uint32_t original_context_arm_va;
     OriginalRegistrationGlobalResolver resolve_original_global;
     OriginalRegistrationInvoke invoke_original_0x284178;
     void* callback_context;
+    // Recover native 0x284178 preprocessing, using actual mapped game
+    // source strings/locale table and explicit lower-level engine methods.
+    const OriginalNativeRegistrationServices* native_helper_0x284178=nullptr;
 };
 enum class OriginalRegistrationStatus : std::uint8_t {
     InvalidOriginalContext,
