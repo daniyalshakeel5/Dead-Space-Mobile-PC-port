@@ -16,6 +16,8 @@ on:
       - "tools/deadspace_m3g_native_verify.py"
       - "tools/deadspace_format116_probe.py"
       - "tests/test_deadspace_format116_probe.py"
+      - "tools/deadspace_ironmonkey_probe.py"
+      - "tests/test_deadspace_ironmonkey_probe.py"
       - "include/ds_port/m3g_container.hpp"
       - "src/m3g_container.cpp"
       - "apps/m3g_probe.cpp"
@@ -39,6 +41,8 @@ on:
       - "tools/deadspace_m3g_native_verify.py"
       - "tools/deadspace_format116_probe.py"
       - "tests/test_deadspace_format116_probe.py"
+      - "tools/deadspace_ironmonkey_probe.py"
+      - "tests/test_deadspace_ironmonkey_probe.py"
       - "include/ds_port/m3g_container.hpp"
       - "src/m3g_container.cpp"
       - "apps/m3g_probe.cpp"
@@ -134,6 +138,9 @@ jobs:
           python tools/deadspace_format116_probe.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
             --output report/deadspace-format116-evidence.json
+          python tools/deadspace_ironmonkey_probe.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-ironmonkey-evidence.json
           python -c 'import json; d=json.load(open("report/deadspace-public-evidence.json",encoding="utf-8")); assert d.get("real_apk_analyzed") and d.get("resources",{}).get("valid_zip"); print("Real upstream release analyzed; redacted aggregate report ready.")'
           echo "::group::Sanitized original-APK evidence (public metadata only)"
           python -m json.tool report/deadspace-public-evidence.json
@@ -147,6 +154,9 @@ jobs:
           echo "::group::Proprietary format-116 block-size hypotheses (aggregate only)"
           python -m json.tool report/deadspace-format116-evidence.json
           echo "::endgroup::"
+          echo "::group::IronMonkey model chunk framing evidence (aggregate only)"
+          python -m json.tool report/deadspace-ironmonkey-evidence.json
+          echo "::endgroup::"
 
       - name: Upload metadata report only
         uses: actions/upload-artifact@v4
@@ -157,5 +167,6 @@ jobs:
             report/deadspace-m3g-evidence.json
             report/deadspace-m3g-native-evidence.json
             report/deadspace-format116-evidence.json
+            report/deadspace-ironmonkey-evidence.json
           if-no-files-found: error
           retention-days: 7
