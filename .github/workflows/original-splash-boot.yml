@@ -37,9 +37,9 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           -DDS_BUILD_BOOT_SPLASH=ON -DDS_BUILD_INPUT_PROBE=ON
       - name: Compile native game executable and test UI decoder
-        run: cmake --build build --target deadspace_native ds_im_ui_image_tests ds_im_menu_scene_tests ds_im_menu_scene_probe --parallel 2
+        run: cmake --build build --target deadspace_native ds_im_ui_image_tests ds_im_menu_scene_tests ds_original_menu_draw_stream_tests ds_im_menu_scene_probe --parallel 2
       - name: Verify synthetic IM-M3G Image2D cases
-        run: ctest --test-dir build --output-on-failure -R "ds_original_im_m3g_(splash_ui_decoder|menu_uv_geometry)"
+        run: ctest --test-dir build --output-on-failure -R "ds_original_im_m3g_(splash_ui_decoder|menu_uv_geometry)|ds_original_menu_native_draw_batches"
       - name: Fetch original APK only into private ephemeral runner
         shell: bash
         run: |
