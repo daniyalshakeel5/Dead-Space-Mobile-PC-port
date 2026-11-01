@@ -44,7 +44,7 @@ def inspect(path, va, size, thumb=False):
         name = ins.mnemonic.lower()
         entry = {"at": f"0x{ins.address:08x}", "instruction": name,
                  "operands": ins.op_str}
-        if name.startswith("bl"):
+        if name in {"bl", "blx", "bleq", "blne", "blgt", "bllt", "blge", "blls", "blhi", "blcs", "blcc"}:
             for operand in ins.operands:
                 if operand.type == ARM_OP_IMM:
                     entry["target"] = f"0x{operand.imm & 0xffffffff:08x}"
