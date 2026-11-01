@@ -1,0 +1,71 @@
+name: Original APK resource-factory evidence
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/engine-resource-evidence.yml"
+      - "tools/deadspace_original_code_window.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-resource-factory:
+    if: github.repository == 'daniyalshakeel5/Dead-Space-Mobile-PC-port' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'work/deadspace-remote-preflight-2026-11-01'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install ELF decoder on remote runner only
+        run: python -m pip install --disable-pip-version-check capstone==5.0.6
+      - name: Recover original resource-factory instructions
+        shell: bash
+        run: |
+          set -euo pipefail
+          # User confirmed public upstream APK is identical to their owned APK.
+          curl --fail --silent --show-error --location --retry 3 --max-time 720 \
+            --max-filesize 400000000 \
+            --output "$RUNNER_TEMP/deadspace.apk" \
+            https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes/releases/download/dead_space_mobile_fixes/Deas.Space.Mobile.Fixes.apk
+          test "$(wc -c < "$RUNNER_TEMP/deadspace.apk" | tr -d ' ')" = 325769461
+          python tools/deadspace_original_code_window.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output "$RUNNER_TEMP/full-instruction-windows.json"
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          raw=json.loads((Path(os.environ["RUNNER_TEMP"])/"full-instruction-windows.json").read_text())
+          names=("post_setup_direct_callee_0x2803e4",
+                 "resource_lookup_0x28b3a4",
+                 "resource_lookup_0x28a5f4",
+                 "resource_lookup_0x28a4f8",
+                 "resource_lookup_0x283cb4",
+                 "resource_lookup_0x286918",
+                 "resource_lookup_0x284d38",
+                 "resource_lookup_0x284df8",
+                 "resource_lookup_0x28a644",
+                 "resource_cleanup_0x284f00")
+          windows={}
+          for name in names:
+              item=raw["windows"][name]
+              windows[name]={"address":item["address"],
+                             "instructions":item["instructions"],
+                             "complete_arm_decode":item["complete_arm_decode"]}
+              print("RESOURCE_FUNC",name,json.dumps(windows[name],separators=(",",":")))
+          outfile=Path(os.environ["RUNNER_TEMP"])/"resource-instructions.json"
+          outfile.write_text(json.dumps({"schema":1,"windows":windows},indent=2)+"\n")
+          PY
+      - name: Publish ARM instruction metadata only
+        uses: actions/upload-artifact@v4
+        with:
+          name: deadspace-resource-instruction-metadata
+          path: ${{ runner.temp }}/resource-instructions.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Delete temporary copyrighted APK
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/deadspace.apk" "$RUNNER_TEMP/full-instruction-windows.json"
