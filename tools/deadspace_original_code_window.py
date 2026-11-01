@@ -91,6 +91,41 @@ def mapping_comparison(raw: bytes, sections: list[tuple[int,int,int]],
     }
 
 
+def elf32_jni_symbols(raw: bytes, names: set[str]) -> dict[str, tuple[int, int, bool]]:
+    """Use original ELF dynamic symbols, not Ghidra's inferred function starts."""
+    shoff=struct.unpack_from("<I",raw,32)[0]
+    shsize,count=struct.unpack_from("<HH",raw,46)
+    if shsize<40 or count>4096 or shoff>len(raw) or shsize*count>len(raw)-shoff:
+        raise ValueError("Invalid original section table")
+    sections=[]
+    for i in range(count):
+        fields=struct.unpack_from("<IIIIIIIIII",raw,shoff+i*shsize)
+        _,typ,_,addr,offset,length,link,_,_,step=fields
+        if typ!=8 and (offset>len(raw) or length>len(raw)-offset):
+            raise ValueError("Corrupt section bounds")
+        sections.append((typ,addr,offset,length,link,step))
+    found={}
+    for typ,_,offset,length,link,step in sections:
+        if typ!=11 or link>=len(sections) or step<16 or step>128:
+            continue
+        _,_,name_offset,name_size,_,_=sections[link]
+        for at in range(offset,offset+length,step):
+            if at+16>offset+length:break
+            name_off,value,size,attr,_,sect=struct.unpack_from("<IIIBBH",raw,at)
+            if name_off>=name_size or (attr&15)!=2 or not size or sect>=len(sections):
+                continue
+            begin=name_offset+name_off
+            end=raw.find(b"\x00",begin,name_offset+name_size)
+            if end<0 or end-begin>240:continue
+            name=raw[begin:end].decode("ascii","ignore")
+            if name not in names:continue
+            sym=(value&~1,size,bool(value&1))
+            if name in found and found[name]!=sym:
+                raise ValueError("Conflicting ELF symbol values")
+            found[name]=sym
+    return found
+
+
 def observe(apk: Path) -> dict:
     try:
         from capstone import Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB
@@ -108,6 +143,33 @@ def observe(apk: Path) -> dict:
     arm=Cs(CS_ARCH_ARM,CS_MODE_ARM)
     thumb=Cs(CS_ARCH_ARM,CS_MODE_THUMB)
     out={}
+    symbols={
+        "on_draw_frame": "Java_com_ea_blast_AndroidRenderer_NativeOnDrawFrame",
+        "on_surface_changed": "Java_com_ea_blast_AndroidRenderer_NativeOnSurfaceChanged",
+        "on_surface_created": "Java_com_ea_blast_AndroidRenderer_NativeOnSurfaceCreated",
+        "game_entry": "Java_com_ea_DeadSpace_DeadSpace_runEntryPoint",
+        "on_create": "Java_com_ea_blast_MainActivity_NativeOnCreate",
+    }
+    located=elf32_jni_symbols(data,set(symbols.values()))
+    symbol_windows={}
+    for short,name in symbols.items():
+        sym=located.get(name)
+        if sym is None:
+            symbol_windows[short]={"present":False}
+            continue
+        addr,size,is_thumb=sym
+        count=min(size,64)
+        block=bounded_virtual_read(data,sections,addr,count)
+        decoder=thumb if is_thumb else arm
+        ins=list(decoder.disasm(block,addr))
+        symbol_windows[short]={
+            "present":True,
+            "address":f"0x{addr:08x}",
+            "symbol_size":size,
+            "thumb":is_thumb,
+            "instructions":[{"offset":i.address-addr,"op":i.mnemonic.lower(),
+                             "args":i.op_str.lower()} for i in ins[:14]],
+        }
     for key,(address,nbytes) in WINDOWS.items():
         evidence=mapping_comparison(data,sections,segs,address,nbytes)
         # The executable section table is the mapping used by the existing
@@ -134,6 +196,7 @@ def observe(apk: Path) -> dict:
         "schema": 1,
         "kind": "original-ARM-targeted-instruction-evidence",
         "windows": out,
+        "original_elf_jni_symbols":symbol_windows,
         "limitations": (
           "Short original instruction windows only, not decompiled code. "
           "Direct JNI -> frame target may land inside a shared runtime routine. "
