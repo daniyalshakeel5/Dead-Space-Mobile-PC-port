@@ -55,6 +55,42 @@ def bounded_virtual_read(raw: bytes, segs: list[tuple[int,int,int]],
     raise ValueError("Instruction address not covered by file-backed PT_LOAD")
 
 
+def elf32_executable_sections(raw: bytes) -> list[tuple[int,int,int]]:
+    """Map SHF_EXECINSTR SHT_PROGBITS sections independently of PT_LOAD."""
+    if len(raw)<52:raise ValueError("ELF too short")
+    shoff=struct.unpack_from("<I",raw,32)[0]
+    shsize,shcount=struct.unpack_from("<HH",raw,46)
+    if shsize<40 or shcount>4096 or shoff>len(raw) or shsize*shcount>len(raw)-shoff:
+        raise ValueError("Unsafe section header table")
+    sections=[]
+    for i in range(shcount):
+        _,typ,flags,addr,off,size,_,_,_,_=struct.unpack_from(
+            "<IIIIIIIIII",raw,shoff+i*shsize)
+        if typ!=1 or not(flags & 4):continue
+        if off>len(raw) or size>len(raw)-off:
+            raise ValueError("Executable ELF section outside file")
+        if size:sections.append((addr,addr+size,off))
+    if not sections:raise ValueError("No executable sections in ARM ELF")
+    return sections
+
+
+def mapping_comparison(raw: bytes, sections: list[tuple[int,int,int]],
+                       segments: list[tuple[int,int,int]],
+                       va: int, nbytes: int) -> dict:
+    section=bounded_virtual_read(raw,sections,va,nbytes)
+    segment_candidates=[]
+    for span in segments:
+        if span[0]<=va and va+nbytes<=span[1]:
+            data=bounded_virtual_read(raw,[span],va,nbytes)
+            segment_candidates.append(data==section)
+    return {
+        "executable_section_present": True,
+        "segment_candidate_count": len(segment_candidates),
+        "any_segment_matches_section": any(segment_candidates),
+        "all_segments_match_section": all(segment_candidates)
+    }
+
+
 def observe(apk: Path) -> dict:
     try:
         from capstone import Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB
@@ -68,11 +104,16 @@ def observe(apk: Path) -> dict:
         data=archive.read(libs[0])
         if len(data)!=libs[0].file_size:raise ValueError("Truncated ARM library")
     segs=elf32_load_ranges(data)
+    sections=elf32_executable_sections(data)
     arm=Cs(CS_ARCH_ARM,CS_MODE_ARM)
     thumb=Cs(CS_ARCH_ARM,CS_MODE_THUMB)
     out={}
     for key,(address,nbytes) in WINDOWS.items():
-        block=bounded_virtual_read(data,segs,address,nbytes)
+        evidence=mapping_comparison(data,sections,segs,address,nbytes)
+        # The executable section table is the mapping used by the existing
+        # symbol-level JNI verifier and independently by Ghidra. A PT_LOAD
+        # mismatch must be surfaced, never silently used for translation.
+        block=bounded_virtual_read(data,sections,address,nbytes)
         # The selected original library code paths are ARM instructions;
         # if a function uses Thumb, the address must come from an
         # independently verified Thumb symbol. Never infer instruction mode.
@@ -81,6 +122,7 @@ def observe(apk: Path) -> dict:
         out[key]={
             "address": f"0x{address:08x}",
             "file_backed": True,
+            "mapping_evidence": evidence,
             "complete_arm_decode": is_contiguous,
             "instructions":[
                 {"offset": i.address-address,
