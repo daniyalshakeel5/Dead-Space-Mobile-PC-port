@@ -217,6 +217,12 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
         28:("movne","r0, #1"),
         32:("pop","{r4, pc}"),
     })
+    conditional_clock=matched("frame_stage_zero_second_callee",{
+        24:("ldr","r1, [r4, #0x40]"),
+        28:("ldr","r3, [r4, #0x44]"),
+        32:("orrs","r1, r1, r3"),
+        36:("bne","#0x28056c"),
+    })
     signed_clock=matched("frame_stage_zero_second_callee",{
         48:("ldr","r2, [sp, #0xc]"),
         52:("ldr","r0, [sp, #8]"),
@@ -231,6 +237,7 @@ def proven_original_code_helpers(windows: dict) -> dict[str, bool]:
         "stage_zero_calls_both_native_routines_in_order":zero_chain,
         "stage_one_normalizes_virtual_return_to_zero_or_one":stage_one,
         "original_signed_time_math_and_store_at_0x40":signed_clock,
+        "original_clock_slot_zero_check_before_store":conditional_clock,
     }
 
 
