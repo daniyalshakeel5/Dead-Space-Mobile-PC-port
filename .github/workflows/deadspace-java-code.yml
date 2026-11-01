@@ -1,0 +1,82 @@
+name: Dead Space Mobile - original Java bootstrap recovery
+
+on:
+  push:
+    branches:
+      - work/deadspace-remote-preflight-2026-11-01
+    paths:
+      - "tools/deadspace_java_bootstrap.py"
+      - "tests/test_deadspace_java_bootstrap.py"
+      - ".github/workflows/deadspace-java-code.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  java-bootstrap:
+    name: Recover original Android lifecycle/JNI boundary on GitHub
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Java for JADX
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Verify independent source-recovery parser
+        run: |
+          python3 -m compileall -q tools/deadspace_java_bootstrap.py tests/test_deadspace_java_bootstrap.py
+          python3 -m unittest discover -s tests -p "test_deadspace_java_bootstrap.py" -v
+
+      - name: Decompile original APK only in ephemeral runner storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'rm -f "$RUNNER_TEMP/original.apk" "$RUNNER_TEMP/jadx.zip"' EXIT
+          curl -fsSL --retry 3 --max-time 720 \
+            -o "$RUNNER_TEMP/original.apk" \
+            "https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes/releases/download/dead_space_mobile_fixes/Deas.Space.Mobile.Fixes.apk"
+          test "$(wc -c < "$RUNNER_TEMP/original.apk" | tr -d ' ')" = "325769461"
+          curl -fsSL --retry 3 --max-time 480 \
+            -o "$RUNNER_TEMP/jadx.zip" \
+            "https://github.com/skylot/jadx/releases/download/v1.5.6/jadx-1.5.6.zip"
+          echo "545ea2be9c242511bc145755cf4bda2485ade42966e096f8b4d3da2a230e8974  $RUNNER_TEMP/jadx.zip" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/jadx" "$RUNNER_TEMP/jadx-out"
+          unzip -q "$RUNNER_TEMP/jadx.zip" -d "$RUNNER_TEMP/jadx"
+          "$RUNNER_TEMP/jadx/bin/jadx" \
+            --no-res --threads-count 2 \
+            -d "$RUNNER_TEMP/jadx-out" "$RUNNER_TEMP/original.apk" \
+            > "$RUNNER_TEMP/jadx-build.log" 2>&1 || {
+              tail -n 25 "$RUNNER_TEMP/jadx-build.log"
+              exit 1
+            }
+          python3 tools/deadspace_java_bootstrap.py \
+            --source-dir "$RUNNER_TEMP/jadx-out/sources" \
+            --output report/deadspace-android-bootstrap.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path("report/deadspace-android-bootstrap.json").read_text())
+          assert report["kind"] == "original-android-bootstrap-call-sequences"
+          assert report["java_sources_scanned"] > 0
+          print("Recovered verified Android callback/public API and native symbol boundaries.")
+          print(json.dumps(report,indent=2))
+          PY
+
+      - name: Erase all user-owned source inputs and decompiled Java
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/original.apk" "$RUNNER_TEMP/jadx.zip" "$RUNNER_TEMP/jadx-build.log"
+          rm -rf "$RUNNER_TEMP/jadx" "$RUNNER_TEMP/jadx-out"
+
+      - name: Publish ABI/call-sequence metadata only
+        uses: actions/upload-artifact@v4
+        with:
+          name: deadspace-android-native-bootstrap
+          path: report/deadspace-android-bootstrap.json
+          if-no-files-found: error
+          retention-days: 7
