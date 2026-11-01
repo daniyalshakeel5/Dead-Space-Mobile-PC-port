@@ -17,6 +17,7 @@ struct OriginalOwnerBindInputs0x278778 {
     OriginalActivationTreeClear release_original_tree=nullptr;
     void* context=nullptr;
     OriginalActivationProviderMode14 query_provider_mode_0x14=nullptr;
+    const OriginalReceiverActivationScratch0x278e58* native_scratch=nullptr;
 };
 enum class OriginalOwnerBindStatus0x278778:std::uint8_t {
     InvalidOriginalOwner,
