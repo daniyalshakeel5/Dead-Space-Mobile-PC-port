@@ -218,6 +218,14 @@ jobs:
                 json.dumps(report["windows"][
                     "stage_zero_owner_construction_tail_0x27f7e0"]["instructions"][:44],
                            separators=(",",":")))
+          for method_name in (
+              "verified_vtable_object34_slot0c_0x2876d0",
+              "verified_vtable_object58_slot24_0x281b40",
+              "verified_vtable_secondary_slot0c_0x2828e4",
+              "verified_vtable_embedded_slot18_0x2800e0"):
+              print("ORIGINAL_CONCRETE_VIRTUAL_METHOD",method_name,
+                    json.dumps(report["windows"][method_name]["instructions"][:44],
+                               separators=(",",":")))
           print("ORIGINAL_STARTUP_VTABLE_METHOD_TARGETS",
                 json.dumps(report.get("original_stage_zero_concrete_method_targets",{}),
                            sort_keys=True))
