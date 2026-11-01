@@ -23,6 +23,11 @@ WINDOWS = {
     "activity_native_create": (0x0027ee54, 64),
     "renderer_native_surface_changed": (0x0027ecf8, 64),
     "renderer_native_surface_created": (0x0027ec24, 84),
+    "frame_stage_zero_routine": (0x0027f870, 24),
+    "frame_stage_zero_first_callee": (0x0027f790, 80),
+    "frame_stage_zero_second_callee": (0x00280520, 96),
+    "frame_stage_one_routine": (0x0027fc68, 96),
+    "frame_state_one_zero_result_tail": (0x0027eecc, 128),
 }
 
 
