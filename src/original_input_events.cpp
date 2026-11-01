@@ -21,6 +21,7 @@ void store_float(std::uint8_t* p,float value) noexcept {
     std::uint32_t bits=0;
     std::memcpy(&bits,&value,4);
     store32(p,bits);
+}
 std::uint32_t read32(const std::uint8_t* p) noexcept {
     return std::uint32_t(p[0]) | (std::uint32_t(p[1])<<8) |
            (std::uint32_t(p[2])<<16) | (std::uint32_t(p[3])<<24);
@@ -42,7 +43,6 @@ bool resolve_owner(const OriginalInputMappedOwner& x,std::size_t slot_offset,
     return true;
 }
 
-}
 }
 bool original_resolve_input_virtual_owners(
     const OriginalInputMappedOwners& mapped,
