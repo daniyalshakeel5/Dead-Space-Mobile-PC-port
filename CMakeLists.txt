@@ -82,6 +82,10 @@ if(DS_BUILD_ASSET_INSTALLER)
     endif()
     add_executable(ds_asset_install apps/asset_install.cpp)
     target_link_libraries(ds_asset_install PRIVATE ds_port_assets)
+    # The native game executable imports *user-owned* APK assets directly
+    # when optional zlib support is enabled. No APK ships in artifacts.
+    target_link_libraries(deadspace_native PRIVATE ds_port_assets)
+    target_compile_definitions(deadspace_native PRIVATE DS_NATIVE_APK_IMPORT=1)
 endif()
 
 # Optional evidence-backed M3G container parser, NOT a scene renderer.
@@ -116,6 +120,7 @@ endif()
 
 if(DS_ENABLE_TESTS)
     enable_testing()
+    add_test(NAME ds_native_executable_help COMMAND deadspace_native --help)
     add_executable(ds_native_startup_gate_tests tests/native_startup_gate_tests.cpp)
     target_link_libraries(ds_native_startup_gate_tests PRIVATE ds_original_native_abi)
     add_test(NAME ds_native_startup_blocks_missing_game_code COMMAND ds_native_startup_gate_tests)

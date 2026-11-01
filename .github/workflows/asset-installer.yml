@@ -98,6 +98,7 @@ jobs:
         run: |
           mkdir -p dist
           cp build/ds_asset_install dist/
+          cp build/deadspace_native dist/
           cp build/ds_apk_probe dist/
           cp build/ds_m3g_probe dist/
           cp build/ds_m3g_texture_extract dist/
@@ -109,6 +110,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item build/Release/ds_asset_install.exe dist/
+          Copy-Item build/Release/deadspace_native.exe dist/
           Copy-Item build/Release/ds_apk_probe.exe dist/
           Copy-Item build/Release/ds_m3g_probe.exe dist/
           Copy-Item build/Release/ds_m3g_texture_extract.exe dist/
