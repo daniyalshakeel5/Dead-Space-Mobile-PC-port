@@ -10,7 +10,10 @@ import argparse
 import json
 from pathlib import Path
 from zipfile import ZipFile
-from tools.deadspace_im_geometry_probe import parse_objects, le32, MAX_SIZE
+if __package__:
+    from .deadspace_im_geometry_probe import parse_objects, le32, MAX_SIZE
+else:
+    from deadspace_im_geometry_probe import parse_objects, le32, MAX_SIZE
 
 
 def topology(data: bytes) -> tuple[bool, Counter]:
