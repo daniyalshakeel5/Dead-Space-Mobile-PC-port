@@ -543,6 +543,8 @@ def observe(apk: Path) -> dict:
     # virtual offset +0x18 with request identifier 0x10004.
     registry_got_va=resolve_arm_got_slot_from_pc_index(
         data,sections,0x0027e944,0x24,0x0027e950)
+    if registry_got_va != 0x0049caa0:
+        raise ValueError("Original service registry pointer address does not match native mapping")
     registry_got_in_file=any(
         begin<=registry_got_va and registry_got_va+4<=end
         for begin,end,_ in segs)
