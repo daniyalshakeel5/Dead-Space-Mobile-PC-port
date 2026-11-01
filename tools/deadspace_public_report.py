@@ -17,7 +17,8 @@ MAGIC_CATEGORIES = {
     "ogg", "flac", "id3", "wav", "webp", "riff-other", "gif", "bmp",
     "zip", "gzip", "sqlite", "elf", "dex", "unityfs", "glb", "bink",
     "xml-text", "possible-json-text", "unrecognized",
-    "m3g_jsr184", "m3g_im2", "m3g_im3", "possible-zlib",
+    "m3g_jsr184", "m3g_im2", "m3g_im3", "m3g_gzip_wrapper",
+    "inner_read_error", "possible-zlib",
 }
 GROUPS = {"assets", "res", "lib", "META-INF", "other"}
 METRIC_KEYS = ("count", "declared_bytes")
@@ -76,6 +77,11 @@ def publish(audit: dict, recon: dict | None = None) -> dict:
                 key: counts_only(value)
                 for key, value in (recon.get("magic_stats") or {}).items()
                 if key in MAGIC_CATEGORIES
+            },
+            "m3g_inner_magic_stats": {
+                kind: counts_only(v)
+                for kind, v in (recon.get("m3g_inner_magic_stats") or {}).items()
+                if kind in MAGIC_CATEGORIES
             },
             "extension_magic_stats": {
                 ext: {kind: counts_only(values)
