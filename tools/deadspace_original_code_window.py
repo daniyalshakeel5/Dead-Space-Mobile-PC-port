@@ -29,6 +29,7 @@ WINDOWS = {
     "original_time_pair_source": (0x000357c4, 12),
     "frame_stage_one_routine": (0x0027fc68, 96),
     "frame_state_one_zero_result_tail": (0x0027eecc, 128),
+    "frame_state_one_nonzero_continuation": (0x0027efc8, 80),
 }
 
 
