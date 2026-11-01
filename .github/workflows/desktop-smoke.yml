@@ -10,6 +10,8 @@ on:
       - "src/**"
       - "apps/**"
       - "tests/input_tests.cpp"
+      - "tests/timing_tests.cpp"
+      - "tests/apk_probe_tests.cpp"
       - ".github/workflows/desktop-smoke.yml"
   pull_request:
     paths:
@@ -18,6 +20,8 @@ on:
       - "src/**"
       - "apps/**"
       - "tests/input_tests.cpp"
+      - "tests/timing_tests.cpp"
+      - "tests/apk_probe_tests.cpp"
       - ".github/workflows/desktop-smoke.yml"
   workflow_dispatch:
 
@@ -75,13 +79,14 @@ jobs:
       - name: Stage Linux input diagnostic
         if: runner.os == 'Linux'
         shell: bash
-        run: mkdir -p dist && cp build/ds_input_probe dist/
+        run: mkdir -p dist && cp build/ds_input_probe build/ds_apk_probe dist/
       - name: Stage Windows input diagnostic
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item build/Release/ds_input_probe.exe dist/
+          Copy-Item build/Release/ds_apk_probe.exe dist/
           # Package SDL2.dll only if the setup-sdl package linked dynamically.
           $dll = Get-ChildItem -Path "${{ steps.sdl.outputs.prefix }}" -Filter SDL2.dll -File -Recurse | Select-Object -First 1
           if ($dll) { Copy-Item $dll.FullName dist/ }
