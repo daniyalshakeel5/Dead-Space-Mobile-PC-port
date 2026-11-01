@@ -23,7 +23,7 @@ using OriginalResolverLookup=bool (*)(std::uint32_t arg1,
     std::uint32_t arg2,std::uint32_t arg3,std::uint32_t stack0,
     void*,std::uint32_t*) noexcept; // 0x272DDC
 using OriginalResolverTransform=bool (*)(std::uint32_t size,
-    void*,std::uint32_t*) noexcept; // 0x2716F8
+    void*,std::uint32_t* result,std::uint32_t* scratch_token) noexcept; // 0x2716F8
 using OriginalResolverVirtual=bool (*)(std::uint32_t object,
     std::uint32_t slot,std::uint32_t first,std::uint32_t second,
     void*) noexcept; // vtable +0x3C, +0x2C
