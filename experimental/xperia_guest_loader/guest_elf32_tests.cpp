@@ -73,6 +73,35 @@ int main(){
     assert(image.writeable(0x1350,4)==nullptr);
     assert(!image.read(0xffffffff,16));
     assert(!image.writeable(0xffffffff,16));
+    // Synthetic original ARM startup: DT_INIT followed by two
+    // relocated DT_INIT_ARRAY entries and a real named JNI export.
+    auto startup=fixture();
+    put32(startup,100,13*8);put32(startup,104,13*8);
+    put32(startup,268,32); // four ARM REL records
+    put32(startup,0x290,0x1360);put32(startup,0x294,23);
+    put32(startup,0x298,0x1364);put32(startup,0x29c,23);
+    put32(startup,0x360,0x1400);put32(startup,0x364,0x1411);
+    put32(startup,328,25);put32(startup,332,0x1360); // DT_INIT_ARRAY
+    put32(startup,336,27);put32(startup,340,8); // DT_INIT_ARRAYSZ
+    put32(startup,344,12);put32(startup,348,0x1420); // DT_INIT
+    put32(startup,352,0);
+    const char jni[]="JNI_OnLoad";
+    for(std::size_t i=0;i<sizeof(jni);++i)
+        startup[0x241+i]=std::uint8_t(jni[i]);
+    put32(startup,0x234,0x1400); // original export st_value
+    put16(startup,0x23e,1); // now a defined symbol
+    GuestElf32 initialized;
+    assert(initialized.open(startup,error));
+    assert(initialized.initialization_order.size()==3);
+    assert(initialized.initialization_order[0]==0x10001420u);
+    assert(initialized.initialization_order[1]==0x10001400u);
+    assert(initialized.initialization_order[2]==0x10001411u);
+    assert(initialized.jni_exports.at("JNI_OnLoad")==0x10001400u);
+    // Incomplete init-array metadata must fail closed.
+    put32(startup,340,3);
+    assert(!initialized.open(startup,error));
+    assert(initialized.initialization_order.empty());
+    assert(initialized.jni_exports.empty());
     bytes[18]=62; // Reject native Windows/x86 ELF.
     assert(!image.open(bytes,error));
     assert(!error.empty());
