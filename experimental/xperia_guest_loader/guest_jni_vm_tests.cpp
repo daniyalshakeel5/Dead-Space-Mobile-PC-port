@@ -88,6 +88,64 @@ int main(){
            callback.arguments[0]==vm.env_address &&
            callback.arguments[2]==0xfaceu);
     assert(vm.take_callback().address==0);
+    struct AudioProbe { unsigned bytes=0,actions=0; } probe;
+    vm.set_audio_sink({&probe,
+        [](void* context,const std::uint8_t* data,std::size_t bytes,
+           std::string& failure)->bool {
+            if(!data||!bytes){failure="PCM missing";return false;}
+            auto& p=*static_cast<AudioProbe*>(context);
+            p.bytes+=static_cast<unsigned>(bytes);
+            failure.clear();return true;
+        },
+        [](void* context,unsigned action,std::string& failure)->bool {
+            if(action>2){failure="Audio command unknown";return false;}
+            auto& p=*static_cast<AudioProbe*>(context);
+            ++p.actions;failure.clear();return true;
+        }});
+    r.fill(0);r[0]=vm.env_address;r[1]=vm.audio_track_address;
+    assert(vm.dispatch(vm.env_svc_base+31,r,elf,error));
+    const auto audio_class=r[0];
+    assert(audio_class!=0u);
+    write_string(base+0x400,"write");
+    write_string(base+0x420,"([SII)I");
+    r.fill(0);r[0]=vm.env_address;r[1]=audio_class;
+    r[2]=base+0x400;r[3]=base+0x420;
+    assert(vm.dispatch(vm.env_svc_base+33,r,elf,error));
+    const auto write_id=r[0];
+    r.fill(0);r[0]=vm.env_address;r[1]=8;
+    assert(vm.dispatch(vm.env_svc_base+178,r,elf,error));
+    const auto arr=r[0];
+    assert(arr>=0x74600000u);
+    r.fill(0);r[0]=vm.env_address;r[1]=arr;
+    assert(vm.dispatch(vm.env_svc_base+186,r,elf,error));
+    auto* samples=elf.writeable(r[0],16u);
+    assert(samples);
+    for(unsigned i=0;i<16u;++i)samples[i]=static_cast<std::uint8_t>(i);
+    r.fill(0);r[0]=vm.env_address;r[1]=arr;
+    assert(vm.dispatch(vm.env_svc_base+171,r,elf,error)&&r[0]==8);
+    // Two JNI varargs after jshortArray travel on the ARM AAPCS stack.
+    const auto sp=base+0xa00;
+    auto* stack=elf.writeable(sp,8);
+    assert(stack);
+    std::memset(stack,0,8);
+    stack[4]=8; // offset 0, count 8 shorts
+    r.fill(0);r[0]=vm.env_address;r[1]=vm.audio_track_address;
+    r[2]=write_id;r[3]=arr;r[13]=sp;
+    assert(vm.dispatch(vm.env_svc_base+49,r,elf,error)&&r[0]==8);
+    assert(probe.bytes==16u);
+    stack[4]=9; // invalid count must never access guest memory
+    r.fill(0);r[0]=vm.env_address;r[1]=vm.audio_track_address;
+    r[2]=write_id;r[3]=arr;r[13]=sp;
+    assert(!vm.dispatch(vm.env_svc_base+49,r,elf,error));
+    write_string(base+0x400,"play");
+    write_string(base+0x420,"()V");
+    r.fill(0);r[0]=vm.env_address;r[1]=audio_class;
+    r[2]=base+0x400;r[3]=base+0x420;
+    assert(vm.dispatch(vm.env_svc_base+33,r,elf,error));
+    const auto play_id=r[0];
+    r.fill(0);r[0]=vm.env_address;r[1]=vm.audio_track_address;r[2]=play_id;
+    assert(vm.dispatch(vm.env_svc_base+61,r,elf,error));
+    assert(probe.actions==1u);
     write_string(base+0x300,"com/ea/UNKNOWN");
     r.fill(0);r[0]=vm.env_address;r[1]=base+0x300;
     assert(!vm.dispatch(vm.env_svc_base+6,r,elf,error));
