@@ -60,6 +60,13 @@ OriginalEmbeddedProviderResult original_embedded_provider_seek_file_0x273034(
     void* mapped_provider,std::size_t accessible_bytes,
     int native_fd,std::int32_t original_offset,
     std::uint32_t original_origin) noexcept;
+// Original provider +0x20 file-mode size (0x2763AC) is an actual
+// three-lseek sequence: SEEK_CUR, SEEK_END, restore SEEK_SET, returning
+// the end position. The caller must supply the explicitly bound live
+// host fd matching the original mapped descriptor at +0x10.
+// Original errno writes are retained at provider+0xA0 on failure.
+OriginalEmbeddedProviderResult original_embedded_provider_size_file_0x2763ac(
+    void* mapped_provider,std::size_t accessible_bytes,int native_fd) noexcept;
 // Original provider +0x28 file-mode selector=0 calls
 // lseek(fd,0,SEEK_CUR) via PLT 0x35350. The host fd is explicitly
 // bound and checked against provider+0x10, never inferred.

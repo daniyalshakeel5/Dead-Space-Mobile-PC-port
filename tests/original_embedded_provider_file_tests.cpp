@@ -62,6 +62,15 @@ int main(){
         provider.data(),provider.size(),fd,out.data(),3u);
     assert(read.status==S::Completed&&read.original_r0==3u);
     assert(std::memcmp(out.data(),"ONE",3)==0);
+    // Original file-backed size query restores the original read cursor.
+    auto length=original_embedded_provider_size_file_0x2763ac(
+        provider.data(),provider.size(),fd);
+    assert(length.status==S::Completed&&length.original_r0==n);
+    length=original_embedded_provider_size_file_0x2763ac(
+        provider.data(),provider.size(),fd+1);
+    assert(length.status==S::InvalidHostFileBinding);
+    // Reading after the size call must continue where the previous
+    // read ended, not restart or unexpectedly jump to EOF.
     // Original file position virtual +0x28 is a native
     // lseek(fd,0,SEEK_CUR) when selector=0.
     auto pos=original_embedded_provider_position_file_0x271794(
@@ -107,6 +116,9 @@ int main(){
         provider.data(),provider.size(),fd,nullptr,4u);
     assert(read.status==S::InvalidHostBuffer);
     put(provider.data()+0x10u,0xffffffffu);
+    length=original_embedded_provider_size_file_0x2763ac(
+        provider.data(),provider.size(),fd);
+    assert(length.status==S::Completed&&length.original_r0==0xffffffffu);
     pos=original_embedded_provider_position_file_0x271794(
         provider.data(),provider.size(),fd,0u);
     assert(pos.status==S::Completed&&pos.original_r0==0xffffffffu);

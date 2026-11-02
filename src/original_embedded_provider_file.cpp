@@ -85,6 +85,54 @@ OriginalEmbeddedProviderResult original_embedded_provider_seek_file_0x273034(
     }
     return {S::Completed,1};
 }
+OriginalEmbeddedProviderResult original_embedded_provider_size_file_0x2763ac(
+    void* mapped,std::size_t size,int host_fd) noexcept {
+    using S=OriginalEmbeddedProviderStatus;
+    if(!mapped||size<0xa8u)return {S::InvalidMappedProvider,0};
+    auto* p=static_cast<std::uint8_t*>(mapped);
+    if(load32(p+0xa4u)==1u)
+        return {S::NeedsOriginalMemoryService,0};
+    if(load32(p+0x10u)==0xffffffffu)
+        return {S::Completed,0xffffffffu};
+    if(!matches_explicit_host_fd(p,host_fd))
+        return {S::InvalidHostFileBinding,0};
+
+    // Original ELF 0x2763D0..0x276470: libc lseek(fd,0,SEEK_CUR)
+    // -> lseek(fd,0,SEEK_END) -> lseek(fd,prior,SEEK_SET).
+    // Its return value is the END offset, not the restored cursor;
+    // original ignores the last lseek return. Both original failure
+    // branches retrieve errno and store it at provider +0xA0.
+    errno=0;
+#ifdef _WIN32
+    const auto prior=::_lseek(host_fd,0L,SEEK_CUR);
+#else
+    const auto prior=::lseek(host_fd,static_cast<off_t>(0),SEEK_CUR);
+#endif
+    if(prior<0){
+        store32(p+0xa0u,static_cast<std::uint32_t>(errno));
+        return {S::Completed,0xffffffffu};
+    }
+    errno=0;
+#ifdef _WIN32
+    const auto end=::_lseek(host_fd,0L,SEEK_END);
+#else
+    const auto end=::lseek(host_fd,static_cast<off_t>(0),SEEK_END);
+#endif
+    if(end<0){
+        store32(p+0xa0u,static_cast<std::uint32_t>(errno));
+        return {S::Completed,0xffffffffu};
+    }
+#ifdef _WIN32
+    (void)::_lseek(host_fd,prior,SEEK_SET);
+#else
+    (void)::lseek(host_fd,prior,SEEK_SET);
+#endif
+    // Native off_t can be wider than original ARM32 return register.
+    // Refuse an unrepresentable successful file length.
+    if(static_cast<std::uint64_t>(end)>0xffffffffull)
+        return {S::NeedsOriginalFileService,0};
+    return {S::Completed,static_cast<std::uint32_t>(end)};
+}
 OriginalEmbeddedProviderResult original_embedded_provider_position_file_0x271794(
     const void* mapped,std::size_t size,
     int native_fd,std::uint32_t selector) noexcept {
