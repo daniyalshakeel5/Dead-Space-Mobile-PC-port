@@ -9,6 +9,15 @@ from that APK.
 
 ## Windows
 
+For a new Windows test ZIP, place your original
+`Deas.Space.Mobile.Fixes.apk` next to the executable and
+**double-click `Run-DeadSpace-Test.cmd`**. It saves
+`deadspace-test.log`, prints the process exit code, and
+reuses already installed assets when present. A normal exit 20
+means gameplay is not yet available, *not* a launcher crash.
+
+Alternatively, manually run the executable as described below.
+
 Place your APK beside `deadspace_native.exe`, open a terminal in that
 directory, and run:
 

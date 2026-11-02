@@ -12,6 +12,7 @@ on:
       - "src/etc1.cpp"
       - "src/original_splash_host.cpp"
       - "docs/NATIVE_MENU_PREVIEW.md"
+      - "tools/windows_native_test.cmd"
       - "CMakeLists.txt"
       - ".github/workflows/native-original-menu-preview.yml"
 permissions:
@@ -76,6 +77,7 @@ jobs:
           mkdir -p dist/deadspace-native-windows-x86_64
           cp build-menu/deadspace_native.exe dist/deadspace-native-windows-x86_64/
           cp docs/NATIVE_MENU_PREVIEW.md dist/deadspace-native-windows-x86_64/README.md
+          cp tools/windows_native_test.cmd dist/deadspace-native-windows-x86_64/Run-DeadSpace-Test.cmd
           for dll in SDL2.dll zlib1.dll libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll; do
             if [[ -f "/mingw64/bin/$dll" ]]; then
               cp "/mingw64/bin/$dll" dist/deadspace-native-windows-x86_64/
