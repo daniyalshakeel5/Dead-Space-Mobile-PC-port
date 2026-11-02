@@ -45,6 +45,9 @@ struct OriginalUiRuntime {
     void* context=nullptr;
     void (*on_activate)(void*,std::uint32_t)=nullptr;
     void (*on_hover)(void*,std::uint32_t)=nullptr;
+    // Desktop fallback uses an actual recovered BTN_BACK entity when the
+    // original native input queue is not yet operational.
+    void (*on_back)(void*)=nullptr;
 };
 bool validate_original_ui_draw_list(
     const OriginalUiSbin& database,
