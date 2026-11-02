@@ -105,6 +105,9 @@ bool load_original_external_textures(const std::string& root,
                 decoded=ds_port::decode_m3g_scene_texture_image(
                     payload.data(),payload.size());
             if(!decoded.decoded)
+                decoded=ds_port::decode_m3g_ironmonkey_uncompressed_image(
+                    payload.data(),payload.size());
+            if(!decoded.decoded)
                 decoded=ds_port::decode_m3g_etc1_image(
                     payload.data(),payload.size());
         }
