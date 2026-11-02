@@ -75,6 +75,14 @@ jobs:
           grep -F "MATERIALS appearances" "$RUNNER_TEMP/research-materials.log"
           grep -F "ANIMATION tracks" "$RUNNER_TEMP/research-animation.log"
           grep -F "INPUT_AUDIO native ELF" "$RUNNER_TEMP/research-input_audio.log"
+      - name: Publish four-way native research evidence (metadata only)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deadspace-native-recovery-evidence
+          path: ${{ runner.temp }}/research-*.log
+          if-no-files-found: warn
+          retention-days: 7
       - name: Stage original splash screens and main-menu resources
         shell: bash
         run: |
