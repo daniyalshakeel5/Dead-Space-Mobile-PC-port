@@ -16,6 +16,9 @@ struct OriginalM3gScene {
     OriginalSceneCamera camera;
     std::vector<OriginalSceneBinding> materials;
     std::vector<M3gRgbaImage> images;
+    // M3G Object3D parameter 900: texture dependency relative to the
+    // source scene file; one entry per image, possibly empty.
+    std::vector<std::string> image_sources;
     std::size_t groups=0;
     std::size_t group_links=0;
     std::size_t animation_references=0;
