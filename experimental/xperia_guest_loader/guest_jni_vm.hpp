@@ -26,7 +26,7 @@ public:
     bool handles(std::uint32_t id) const noexcept;
     std::uint32_t return_pc(std::uint32_t id) const noexcept;
     bool dispatch(std::uint32_t id,std::array<std::uint32_t,16>& regs,
-                  GuestElf32& guest,std::string& error) const noexcept;
+                  GuestElf32& guest,std::string& error) noexcept;
     // Called by the translated ARM runner after JNI dispatch. EAIO.Startup
     // is an actual Java-declared native function in the installed game ELF.
     struct NativeCallback {
