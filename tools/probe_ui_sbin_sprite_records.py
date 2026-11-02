@@ -41,3 +41,13 @@ while at<len(b)-4:
                 if name>0 and name<=len(names) and w>0 and h>0 and w<=2048 and h<=2048 and src<len(pointers) and dst<len(pointers):
                     found.append((i,off,names[name-1],tex,scale,w,h,src,dst))
             print("SBIN_IMAGE_CANDIDATES",method,len(found),"first15",found[:15])
+
+        for object_id in range(2,12):
+            rawptr=pointers[object_id]
+            off=rawptr//8
+            print("SBIN_SPRITE_OBJECT",object_id,"offset",off,"remainder",rawptr%8,
+                "raw",data[off:off+28].hex(" "))
+            if off+20<=len(data):
+                print("SBIN_SPRITE_FIELDS",object_id,
+                      "at0",struct.unpack_from("<HBBHHII",data,off),
+                      "at4",struct.unpack_from("<HBBHHII",data,off+4))
