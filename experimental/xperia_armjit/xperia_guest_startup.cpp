@@ -12,8 +12,8 @@
 #include <stdexcept>
 #include <vector>
 
-// Execute original user-supplied ARM constructor code only when every
-// relocation can be bound to an implemented guest service. No stubs.
+// Execute original user-supplied ARM ELF constructors with no-success
+// traps for unimplemented imported functions. Never fake Android services.
 int main(int argc,char** argv){
     if(argc!=3){
         std::cerr<<"Usage: xperia_guest_startup <installed libEAMGameDeadSpace.so> <installed root>\n";
@@ -37,18 +37,18 @@ int main(int argc,char** argv){
         if(!elf.open(data,error))
             throw std::runtime_error("ARM ELF load failed: "+error);
         xperia::GuestLibcBridge services;
-        std::map<std::string,unsigned> missing;
-        for(const auto& relocation:elf.pending_imports)
-            if(!services.symbols().count(relocation.name))
-                ++missing[relocation.name];
-        if(!missing.empty()){
-            std::cerr<<"XPERIA_STARTUP_BLOCKED: "<<missing.size()
-                     <<" Android/JNI/GLES import symbols not implemented:\n";
-            for(const auto& item:missing)
-                std::cerr<<"  "<<item.first<<" ("<<item.second<<" relocations)\n";
+        // Function imports not needed by early constructors become distinct
+        // error traps. Imported data and ambiguous symbols stay blocked.
+        auto planned=services.plan_guest_imports(elf,error);
+        if(planned.empty()) {
+            std::cerr<<"XPERIA_STARTUP_BLOCKED: "<<error<<"\n";
             return 4;
         }
-        if(!elf.bind_imports(services.symbols(),error))
+        std::cerr<<"Original ARM imports: "<<services.symbols().size()
+                 <<" implemented host services, "
+                 <<services.unresolved_import_count()
+                 <<" unimplemented functions bound to named failure traps.\n";
+        if(!elf.bind_imports(planned,error))
             throw std::runtime_error("ARM relocation binding failed: "+error);
         xperia::GuestHeap heap(elf);
         xperia::GuestFileSystem files(root);
