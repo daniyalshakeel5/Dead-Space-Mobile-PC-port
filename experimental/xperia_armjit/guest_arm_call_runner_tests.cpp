@@ -145,6 +145,40 @@ int main(){
         assert(strict.plan_guest_imports(unknown_global,error).empty());
         assert(error.find("stderr")!=std::string::npos);
     }
+    // A32 integration: actual guest instructions dereference the
+    // JavaVM vtable and enter its GetEnv function through an ARM SVC.
+    {
+        GuestElf32 vm_elf;
+        vm_elf.segments.push_back({base,std::vector<std::uint8_t>(4096,0)});
+        // LDR R3,[R0]; LDR R3,[R3,#24]; PUSH LR; BLX R3; POP PC.
+        put32(vm_elf,base+0xe00,0xe5903000u);
+        put32(vm_elf,base+0xe04,0xe5933018u);
+        put32(vm_elf,base+0xe08,0xe92d4000u);
+        put32(vm_elf,base+0xe0c,0xe12fff33u);
+        put32(vm_elf,base+0xe10,0xe8bd8000u);
+        GuestLibcBridge vm_libc;
+        GuestHeap vm_heap(vm_elf);
+        GuestJniVm jni;
+        assert(jni.install(vm_elf,error));
+        GuestArmCallRunner vm_runner(vm_elf,vm_libc,vm_heap,nullptr,&jni);
+        assert(vm_runner.invoke(base+0xe00,
+            {jni.vm(),base+0xe80,0x00010006u,0},result,error));
+        assert(result==0u && vm_elf.read_u32(base+0xe80)==jni.env_address);
+        assert(vm_runner.invoke(base+0xe00,
+            {jni.vm(),base+0xe80,0x00010009u,0},result,error));
+        assert(static_cast<std::int32_t>(result)==-3);
+        // JNIEnv->GetVersion uses index 4, offset 16.
+        put32(vm_elf,base+0xe04,0xe5933010u);
+        assert(vm_runner.invoke(base+0xe00,
+            {jni.env_address,0,0,0},result,error));
+        assert(result==0x00010006u);
+        // JNIEnv->FindClass index 6 must fail with its *actual* name,
+        // not issue a successful fake Java class handle.
+        put32(vm_elf,base+0xe04,0xe5933018u);
+        assert(!vm_runner.invoke(base+0xe00,
+            {jni.env_address,0,0,0},result,error));
+        assert(error.find("JNIEnv table entry 6")!=std::string::npos);
+    }
     // Fail closed rather than claim to boot unsupported game services.
     assert(!runner.invoke(0xffffffffu,{0,0,0,0},result,error));
     assert(!error.empty());
