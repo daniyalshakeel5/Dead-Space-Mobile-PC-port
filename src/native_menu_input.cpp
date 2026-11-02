@@ -1,4 +1,5 @@
 #include "ds_port/native_menu_input.hpp"
+#include "ds_port/original_input_events.hpp"
 #include <algorithm>
 namespace ds_port {
 namespace {
@@ -15,7 +16,10 @@ bool native_menu_pointer(NativeMenuInputState& state,
     const float u=std::clamp(float(x)/float(width),0.f,1.f);
     const float v=std::clamp(float(y)/float(height),0.f,1.f);
     state.last_u=u;state.last_v=v;
-    cb.pointer(cb.context,event,kMenuModule,kPointer,u,v);
+    const auto raw=event==0?original_runtime::kOriginalRawPointerDown:
+        event==1?original_runtime::kOriginalRawPointerUp:
+                 original_runtime::kOriginalRawPointerMove;
+    cb.pointer(cb.context,static_cast<int>(raw),kMenuModule,kPointer,u,v);
     return true;
 }
 bool native_menu_key(NativeMenuInputState& state,
@@ -34,7 +38,7 @@ void native_menu_focus_lost(NativeMenuInputState& state,
     const NativeMenuInputCallbacks& cb) noexcept {
     if(state.mouse_held && cb.pointer) {
         state.mouse_held=false;
-        cb.pointer(cb.context,1,kMenuModule,kPointer,
+        cb.pointer(cb.context,static_cast<int>(original_runtime::kOriginalRawPointerUp),kMenuModule,kPointer,
                    state.last_u,state.last_v);
     }
     if(state.enter_held && cb.key_up)
