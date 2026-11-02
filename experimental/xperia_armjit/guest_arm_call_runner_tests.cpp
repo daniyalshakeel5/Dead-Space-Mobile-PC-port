@@ -108,6 +108,44 @@ int main(){
         {base+0xb80,base+0xb00,0,libc.symbols().at("pthread_once")},
         result,error));
     put32(elf,base+0xb80,2u);
+    // Lazy binding allows ORIGINAL guest ARM constructors to execute
+    // without falsely implementing every unused GL/JNI function.
+    {
+        GuestElf32 lazy;
+        lazy.segments.push_back({base,std::vector<std::uint8_t>(4096,0)});
+        lazy.pending_imports.push_back({base+0xc80,22u,0u,"glDrawArrays",2u});
+        lazy.pending_imports.push_back({base+0xc84,22u,0u,"glClear",2u});
+        GuestLibcBridge lazy_bridge;
+        auto symbols=lazy_bridge.plan_guest_imports(lazy,error);
+        assert(error.empty() && lazy_bridge.unresolved_import_count()==2u);
+        assert(symbols.count("glDrawArrays") && symbols.count("glClear"));
+        assert(lazy.bind_imports(symbols,error));
+        assert(lazy.read_u32(base+0xc80)==symbols.at("glDrawArrays"));
+        put32(lazy,base+0xc00,0xe92d4000u);
+        put32(lazy,base+0xc04,0xe12fff33u);
+        put32(lazy,base+0xc08,0xe8bd8000u);
+        put32(lazy,base+0xd00,0xe3a00009u); // MOV R0,#9
+        put32(lazy,base+0xd04,0xe12fff1eu); // BX LR
+        lazy.initialization_order.push_back(base+0xd00);
+        GuestHeap lazy_heap(lazy);
+        GuestArmCallRunner lazy_runner(lazy,lazy_bridge,lazy_heap);
+        assert(lazy_runner.run_original_initializers(error));
+        assert(lazy_runner.invoke(base+0xc00,
+            {0,0,0,symbols.at("memcpy")},result,error)==false);
+        // The old test entry is missing memcpy arguments: failure is real.
+        assert(!error.empty());
+        assert(!lazy_runner.invoke(base+0xc00,
+            {0,0,0,symbols.at("glDrawArrays")},result,error));
+        assert(error.find("glDrawArrays")!=std::string::npos);
+        // Missing imported global data must not receive an SVC address.
+        GuestElf32 unknown_global;
+        unknown_global.segments.push_back({base,std::vector<std::uint8_t>(4096,0)});
+        unknown_global.pending_imports.push_back(
+            {base+0xc80,21u,0u,"stderr",1u}); // STT_OBJECT
+        GuestLibcBridge strict;
+        assert(strict.plan_guest_imports(unknown_global,error).empty());
+        assert(error.find("stderr")!=std::string::npos);
+    }
     // Fail closed rather than claim to boot unsupported game services.
     assert(!runner.invoke(0xffffffffu,{0,0,0,0},result,error));
     assert(!error.empty());
