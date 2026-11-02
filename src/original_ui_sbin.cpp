@@ -14,6 +14,42 @@ std::uint16_t u16(const std::uint8_t* p){
 }
 struct Span {const std::uint8_t* p=nullptr;std::size_t n=0;};
 }
+M3gRgbaImage reconstruct_original_ui_sprite(
+    const OriginalUiSprite& sprite,
+    const std::vector<M3gRgbaImage>& atlases){
+    M3gRgbaImage out{};
+    const auto fail=[&](const char* reason){
+        out.decoded=false;out.error=reason;out.pixels_rgba.clear();
+        return out;
+    };
+    if(sprite.atlas>=atlases.size())return fail("Missing original UI atlas");
+    const auto& source=atlases[sprite.atlas];
+    const auto& a=sprite.atlas_rect,&src=sprite.source_rect;
+    if(!source.decoded || !source.width || !source.height ||
+       source.pixels_rgba.size()!=std::size_t(source.width)*source.height*4 ||
+       !sprite.source_width || !sprite.source_height ||
+       sprite.source_width>4096 || sprite.source_height>4096 ||
+       !src.width || !src.height || !a.width || !a.height ||
+       src.width!=a.width || src.height!=a.height ||
+       std::uint32_t(src.x)+src.width>sprite.source_width ||
+       std::uint32_t(src.y)+src.height>sprite.source_height ||
+       std::uint32_t(a.x)+a.width>source.width ||
+       std::uint32_t(a.y)+a.height>source.height)
+        return fail("Invalid original UI atlas source/destination crop");
+    const std::size_t pixels=
+        std::size_t(sprite.source_width)*sprite.source_height;
+    if(pixels>16u*1024u*1024u)return fail("Original UI sprite exceeds pixel budget");
+    out.width=sprite.source_width;out.height=sprite.source_height;
+    out.pixels_rgba.assign(pixels*4,0);
+    for(std::uint32_t y=0;y<a.height;++y) {
+        const auto* in=source.pixels_rgba.data()+
+            (std::size_t(a.y+y)*source.width+a.x)*4u;
+        auto* dst=out.pixels_rgba.data()+
+            (std::size_t(src.y+y)*out.width+src.x)*4u;
+        std::copy(in,in+std::size_t(a.width)*4u,dst);
+    }
+    out.decoded=true;return out;
+}
 OriginalUiSbin decode_original_ui_sbin(const std::uint8_t* data,
                                       std::size_t size){
     OriginalUiSbin out{};
