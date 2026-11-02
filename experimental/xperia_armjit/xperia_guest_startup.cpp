@@ -76,6 +76,10 @@ int main(int argc,char** argv){
                std::string& message)->bool {
                 return static_cast<xperia::GuestSdlHost*>(ctx)
                     ->queue_pcm16(data,count,message);
+            },
+            [](void* ctx,unsigned action,std::string& message)->bool {
+                return static_cast<xperia::GuestSdlHost*>(ctx)
+                    ->audio_control(action,message);
             }});
 #endif
         java.set_content_ready(true); // verified installed assets/ mount
