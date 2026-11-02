@@ -7,7 +7,7 @@ on:
       - ".github/workflows/xperia-linux-portable-qemu.yml"
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   linux-x86_64:
     runs-on: ubuntu-24.04
@@ -117,6 +117,60 @@ jobs:
           du -sh "$dest"
           cd "$RUNNER_TEMP"
           zip -q -r "$GITHUB_WORKSPACE/DeadSpaceMobile-Xperia-Linux-x86_64-QEMU.zip" DeadSpaceMobile-Xperia-Linux
+      - name: Package small graphics repair for users of the original Linux download
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          original="$RUNNER_TEMP/DeadSpaceMobile-Xperia-Linux"
+          fix="$RUNNER_TEMP/DeadSpaceMobile-Xperia-Graphics-Fix"
+          mkdir -p "$fix/graphics-patch/lib" "$fix/graphics-patch/bin"
+          for name in libGL.so.1 libGLX.so.0 libGLX_mesa.so.0 libGLdispatch.so.0; do
+            src="$original/sysroot/usr/lib/arm-linux-gnueabihf/$name"
+            test -s "$src"
+            cp -L "$src" "$fix/graphics-patch/lib/$name"
+          done
+          cp "$RUNNER_TEMP/graphics-probe-armhf" "$fix/graphics-patch/bin/graphics-probe-armhf"
+          cp linux-portable/Apply-Graphics-Fix.sh "$fix/Apply-Graphics-Fix.sh"
+          chmod +x "$fix/Apply-Graphics-Fix.sh" "$fix/graphics-patch/bin/graphics-probe-armhf"
+          bash -n "$fix/Apply-Graphics-Fix.sh"
+          ! find "$fix" -type f | grep -E 'libEAMGameDeadSpace|deadspace[.]zip|Reanimated.*apk'
+          (cd "$fix" && zip -qr "$GITHUB_WORKSPACE/DeadSpaceMobile-Xperia-Graphics-Fix-2026-11-03.zip" .)
+          unzip -tqq "$GITHUB_WORKSPACE/DeadSpaceMobile-Xperia-Graphics-Fix-2026-11-03.zip"
+          ls -lh "$GITHUB_WORKSPACE/DeadSpaceMobile-Xperia-Graphics-Fix-2026-11-03.zip"
+      - name: Publish small no-reinstall graphics fix on GitHub Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          tag="xperia-linux-armhf-opengl-fix-2026-11-03"
+          archive="DeadSpaceMobile-Xperia-Graphics-Fix-2026-11-03.zip"
+          cat > "$RUNNER_TEMP/hotfix-notes.md" <<'NOTES'
+          ## Dead Space Mobile Linux QEMU — small OpenGL startup fix
+
+          Fixes the original portable QEMU release, whose missing 32-bit ARMHF
+          libGL.so.1 stops SDL_CreateWindow before the game can initialize.
+          The fix includes ARMHF libGL, GLX, Mesa GLX dispatch and a runnable
+          original-free ARM graphics probe.
+
+          Download only this small ZIP. Extract its contents into your
+          existing DeadSpaceMobile-Xperia-Linux folder, next to
+          Run Dead Space.sh (NOT into a new separate folder).
+          Right-click Apply-Graphics-Fix.sh and choose Run as Program.
+          It installs the missing 32-bit guest graphics libraries locally
+          and tests the SDL/OpenGL window. Then run the usual game launcher.
+
+          No need to download the original 289 MB package again.
+          No original game assets included. Linux x86-64 only.
+          NOTES
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$archive" --clobber
+          else
+            gh release create "$tag" "$archive" \
+              --title "Dead Space Mobile Linux QEMU — ARMHF OpenGL graphics fix" \
+              --notes-file "$RUNNER_TEMP/hotfix-notes.md" \
+              --target "$GITHUB_SHA" --prerelease
+          fi
       - name: Publish original-free Linux player test ZIP
         uses: actions/upload-artifact@v4
         with:
