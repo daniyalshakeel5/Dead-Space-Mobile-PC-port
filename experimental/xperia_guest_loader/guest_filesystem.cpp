@@ -29,11 +29,21 @@ GuestFileSystem::~GuestFileSystem(){
 bool GuestFileSystem::resolve_asset(const std::string& name,fs::path& out) const {
     try {
         if(name.empty()||name.size()>4096||name.find('\\')!=std::string::npos||
-           name.find(':')!=std::string::npos||name.find('\0')!=std::string::npos)
+           name.find('\0')!=std::string::npos)
             return false;
         std::string path=name;
-        if(path.rfind("/assets/",0)==0)path.erase(0,1);
-        if(path.rfind("assets/",0)!=0)return false;
+        // The original Xperia engine uses Android appbundle:/ asset names.
+        // Only the exact supported schemes are converted, within assets/.
+        if(path.rfind("appbundle:/",0)==0)
+            path="assets/"+path.substr(sizeof("appbundle:/")-1);
+        else if(path.rfind("deadspace/published/",0)==0)
+            path="assets/"+path.substr(sizeof("deadspace/")-1);
+        else if(path.rfind("published/",0)==0)
+            path="assets/"+path;
+        else if(path.rfind("/assets/",0)==0)
+            path.erase(0,1);
+        if(path.find(':')!=std::string::npos ||
+           path.rfind("assets/",0)!=0)return false;
         // Only the exact original assets subtree is allowed. No device,
         // network, symlink escape, arbitrary absolute or traversal paths.
         fs::path relative;
