@@ -102,8 +102,8 @@ std::uint32_t GuestJniVm::store_string(
     if(text.size()>254||next_string_>=128u){
         error="JNI guest string allocation limit";return 0;
     }
-    if(!guest.read(kBase,1)) {
-        if(guest.read(kBase+65535u,1)){
+    if(next_string_==0) {
+        if(guest.read(kBase,1)||guest.read(kBase+65535u,1)){
             error="JNI string arena overlaps guest ELF";return 0;
         }
         guest.segments.push_back({kBase,std::vector<std::uint8_t>(65536,0)});
