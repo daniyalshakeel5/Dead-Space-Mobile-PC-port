@@ -21,6 +21,12 @@ public:
     }
     // SVC #id; BX LR, as little-endian A32 instructions.
     bool code_byte(std::uint32_t address,std::uint8_t& value) const noexcept;
+    // Registered by the actual ARM constructors; executes ONLY through the
+    // guest-call runner's translated ARM callback path, in reverse order.
+    struct Destructor { std::uint32_t function, argument, dso; };
+    std::vector<Destructor> take_destructors(std::uint32_t dso);
+    static constexpr unsigned last_svc=32;
+    static constexpr unsigned finalize_svc=32;
     // Called AFTER Dynarmic's SVC callback halts JIT execution.
     bool dispatch(std::uint32_t id,std::array<std::uint32_t,16>& registers,
                   GuestElf32& image,std::string& failure,
@@ -30,5 +36,6 @@ private:
     std::unordered_map<std::string,std::uint32_t> symbols_;
     std::vector<std::uint8_t> code_;
     mutable std::unordered_set<std::uint32_t> initializing_guards_;
+    std::vector<Destructor> destructors_;
 };
 }
