@@ -207,10 +207,10 @@ OriginalMenuGpuStatus run_original_menu_gl(
         while(SDL_PollEvent(&e)) {
             if(e.type==SDL_QUIT)quit_requested=true;
             else if(e.type==SDL_WINDOWEVENT &&
-                    e.window.event==SDL_WINDOWEVENT_FOCUS_LOST)
+                    e.window.event==SDL_WINDOWEVENT_FOCUS_LOST) {
                 native_menu_focus_lost(input,callbacks);
                 ui_pointer(OriginalUiPointerAction::Cancel,0,0);
-            else if(e.type==SDL_KEYDOWN && !e.key.repeat) {
+            }else if(e.type==SDL_KEYDOWN && !e.key.repeat) {
                 if(e.key.keysym.sym==SDLK_ESCAPE)
                     native_menu_key(input,callbacks,4,true);
                 else if(e.key.keysym.sym==SDLK_RETURN)
