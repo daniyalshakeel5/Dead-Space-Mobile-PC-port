@@ -11,7 +11,7 @@ struct NativeMenuInputState {
     bool mouse_held=false;
     bool enter_held=false;
     bool escape_held=false;
-    int last_x=0,last_y=0;
+    float last_u=0.f,last_v=0.f;
 };
 // Dispatches desktop events using the ORIGINAL JNI callback signatures.
 // Android event constants: ACTION_DOWN=0, ACTION_UP=1, ACTION_MOVE=2.
