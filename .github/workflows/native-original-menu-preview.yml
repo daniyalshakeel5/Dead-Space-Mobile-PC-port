@@ -1,0 +1,89 @@
+name: Native Dead Space original 3D menu preview (asset-free)
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - work/deadspace-remote-preflight-2026-11-01
+    paths:
+      - "apps/deadspace_native.cpp"
+      - "src/original_menu_gl.cpp"
+      - "src/original_m3g_scene.cpp"
+      - "src/m3g_container.cpp"
+      - "src/etc1.cpp"
+      - "src/original_splash_host.cpp"
+      - "docs/NATIVE_MENU_PREVIEW.md"
+      - "CMakeLists.txt"
+      - ".github/workflows/native-original-menu-preview.yml"
+permissions:
+  contents: read
+jobs:
+  linux-native-original-menu:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native SDL2, OpenGL and zlib
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libsdl2-dev libgl-dev zlib1g-dev
+      - name: Compile original native menu executable
+        run: |
+          cmake -S . -B build-menu -DCMAKE_BUILD_TYPE=Release \
+            -DDS_BUILD_BOOT_SPLASH=ON -DDS_BUILD_ASSET_INSTALLER=ON \
+            -DDS_BUILD_INPUT_PROBE=OFF -DDS_ENABLE_TESTS=OFF
+          cmake --build build-menu --target deadspace_native --parallel 2
+      - name: Verify native GL and user-APK installer are linked
+        run: |
+          build-menu/deadspace_native --help | grep -F -- '--boot-apk'
+          ldd build-menu/deadspace_native | grep -E 'libSDL2|libGL|libz'
+      - name: Stage asset-free Linux executable
+        run: |
+          mkdir -p dist/deadspace-native-linux-x86_64
+          cp build-menu/deadspace_native dist/deadspace-native-linux-x86_64/
+          cp docs/NATIVE_MENU_PREVIEW.md dist/deadspace-native-linux-x86_64/README.md
+          chmod +x dist/deadspace-native-linux-x86_64/deadspace_native
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deadspace-native-original-menu-linux-x86_64
+          path: dist/deadspace-native-linux-x86_64/
+          retention-days: 14
+  windows-native-original-menu:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-SDL2
+            mingw-w64-x86_64-zlib
+      - name: Compile native original menu Windows x86-64 executable
+        run: |
+          cmake -S . -B build-menu -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DDS_BUILD_BOOT_SPLASH=ON -DDS_BUILD_ASSET_INSTALLER=ON \
+            -DDS_BUILD_INPUT_PROBE=OFF -DDS_ENABLE_TESTS=OFF
+          cmake --build build-menu --target deadspace_native --parallel 2
+      - name: Stage asset-free Windows executable and runtime DLLs
+        run: |
+          mkdir -p dist/deadspace-native-windows-x86_64
+          cp build-menu/deadspace_native.exe dist/deadspace-native-windows-x86_64/
+          cp docs/NATIVE_MENU_PREVIEW.md dist/deadspace-native-windows-x86_64/README.md
+          for dll in SDL2.dll zlib1.dll libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll; do
+            if [[ -f "/mingw64/bin/$dll" ]]; then
+              cp "/mingw64/bin/$dll" dist/deadspace-native-windows-x86_64/
+            fi
+          done
+          test -f dist/deadspace-native-windows-x86_64/deadspace_native.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deadspace-native-original-menu-windows-x86_64
+          path: dist/deadspace-native-windows-x86_64/
+          retention-days: 14
