@@ -2,6 +2,9 @@
 #undef NDEBUG
 #endif
 #include "guest_arm_call_runner.hpp"
+#include "guest_filesystem.hpp"
+#include <filesystem>
+#include <fstream>
 #include <array>
 #include <cassert>
 #include <cstdint>
@@ -52,6 +55,48 @@ int main(){
     // Fail closed rather than claim to boot unsupported game services.
     assert(!runner.invoke(0xffffffffu,{0,0,0,0},result,error));
     assert(!error.empty());
+    // Actual translated ARM32 instructions exercise a host Windows/Linux
+    // read-only game-asset mount: BLX open -> read -> close. The guest
+    // program is original-free synthetic A32 and doesn't import EA bytes.
+    namespace fs=std::filesystem;
+    auto root=fs::temp_directory_path()/"xperia_a32_guest_file_call";
+    fs::remove_all(root);
+    fs::create_directories(root/"assets/published/data");
+    {std::ofstream out(root/"assets/published/data/level.sb",std::ios::binary);
+     out<<"ISHIMURA";}
+    {
+        GuestElf32 file_elf;
+        file_elf.segments.push_back({base,std::vector<std::uint8_t>(4096,0)});
+        put32(file_elf,base,0xe92d4000u); // PUSH LR
+        put32(file_elf,base+4,0xe12fff33u); // BLX R3
+        put32(file_elf,base+8,0xe8bd8000u); // POP PC
+        const char path[]="assets/published/data/level.sb";
+        std::memcpy(file_elf.writeable(base+0x300,sizeof(path)),path,sizeof(path));
+        GuestHeap file_heap(file_elf);
+        GuestFileSystem mount(root);
+        GuestArmCallRunner file_runner(file_elf,libc,file_heap,&mount);
+        u32 fd=0;
+        assert(file_runner.invoke(base,{base+0x300,0,0,
+            libc.symbols().at("open")},fd,error));
+        assert(fd>=3);
+        u32 nread=0;
+        assert(file_runner.invoke(base,{fd,base+0x380,8,
+            libc.symbols().at("read")},nread,error));
+        assert(nread==8);
+        assert(std::memcmp(file_elf.read(base+0x380,8),"ISHIMURA",8)==0);
+        u32 closed=UINT32_MAX;
+        assert(file_runner.invoke(base,{fd,0,0,
+            libc.symbols().at("close")},closed,error));
+        assert(closed==0&&mount.handle_count()==0);
+        const char traversal[]="assets/../private.txt";
+        std::memcpy(file_elf.writeable(base+0x300,sizeof(traversal)),
+                    traversal,sizeof(traversal));
+        assert(file_runner.invoke(base,{base+0x300,0,0,
+            libc.symbols().at("open")},fd,error));
+        assert(static_cast<std::int32_t>(fd)==-1);
+    }
+    fs::remove_all(root);
+    std::cout<<"ARM32 translated host open/read/close sandbox: PASS\\n";
     std::cout<<"ARM32 guest function call + libc + ordered constructors: PASS\n";
     return 0;
 }
