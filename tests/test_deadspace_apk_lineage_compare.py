@@ -38,7 +38,7 @@ class LineageTests(unittest.TestCase):
             self.assertEqual(assets["matching_size_and_crc32_count"], 1)
             self.assertEqual(assets["changed_size_or_crc32_count"], 1)
             self.assertEqual(assets["original_only_count"], 1)
-            self.assertEqual(assets["reference_only_count"], 1)
+            self.assertEqual(assets["reference_only_count"], 2)  # new asset plus native ELF moved under assets/
             self.assertEqual(assets["changed_extensions"], {".bin": 1})
             self.assertEqual(len(result["native_elf_byte_identical_matches"]), 1)
             self.assertEqual(result["reference"]["native_libraries"][-1]["elf_machine"], "AArch64" if result["reference"]["native_libraries"][-1]["path"].startswith("lib/arm64") else "ARM32")
