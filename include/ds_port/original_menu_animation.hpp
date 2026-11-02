@@ -32,6 +32,15 @@ struct OriginalMenuMotion {
     std::vector<OriginalMotionTrack> tracks;
     std::size_t assigned_tracks=0;
 };
+// Renderer re-evaluates source animation keyframes and scene hierarchy every
+// frame. No fabricated transforms are supplied by the host.
+struct OriginalMenuAnimationRuntime {
+    const OriginalMenuMotion* motion=nullptr;
+    const std::vector<OriginalSceneNode>* nodes=nullptr;
+    const OriginalSceneCamera* camera=nullptr;
+    const std::vector<OriginalSceneBinding>* materials=nullptr;
+    bool preview_activate_controllers=true;
+};
 OriginalMenuMotion decode_original_menu_motion(const std::uint8_t* data,std::size_t size);
 // Evaluate the exact keyframe data; default respects the file's serialized
 // controller active intervals. The preview_enable flag explicitly opts in
