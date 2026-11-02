@@ -124,6 +124,13 @@ if(DS_BUILD_BOOT_SPLASH AND TARGET SDL2::SDL2)
         if(TARGET ds_port_m3g)
             target_link_libraries(deadspace_native PRIVATE ds_port_m3g)
             target_compile_definitions(deadspace_native PRIVATE DS_NATIVE_EXTERNAL_M3G_TEXTURES=1)
+            if(DS_ENABLE_TESTS)
+                add_executable(ds_original_m3g_scene_texture_tests
+                    tests/original_m3g_scene_texture_tests.cpp)
+                target_link_libraries(ds_original_m3g_scene_texture_tests PRIVATE ds_port_m3g)
+                add_test(NAME ds_original_menu_external_rgb_rgba_texture
+                    COMMAND ds_original_m3g_scene_texture_tests)
+            endif()
         endif()
         add_library(ds_original_menu_gl STATIC src/original_menu_gl.cpp src/original_menu_scene_graph.cpp src/original_m3g_scene.cpp src/native_menu_input.cpp)
         target_include_directories(ds_original_menu_gl PUBLIC include)
