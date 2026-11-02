@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Assemble Dead Space Linux download
+Comment=Verify all downloaded parts and extract the Linux QEMU tester
+Exec=sh -c 'cd "$(dirname "$1")" && exec bash ./Assemble-DeadSpace-Linux.sh' _ %k
+Terminal=true
+Categories=Utility;
+Icon=applications-games
+StartupNotify=false
