@@ -13,6 +13,7 @@ on:
       - "tools/probe_ui_sbin_blocks.py"
       - "tools/probe_ui_sbin_sprite_records.py"
       - "tools/probe_ui_menu_resources.py"
+      - "tools/probe_original_ui_layout.py"
       - "src/original_splash_host.cpp"
       - "src/im_ui_image.cpp"
       - "src/original_ui_sbin.cpp"
@@ -65,6 +66,8 @@ jobs:
             --output "$RUNNER_TEMP/deadspace.apk" \
             https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes/releases/download/dead_space_mobile_fixes/Deas.Space.Mobile.Fixes.apk
           test "$(wc -c < "$RUNNER_TEMP/deadspace.apk" | tr -d ' ')" = 325769461
+      - name: Recover original compiled UI layout hierarchy and widget metadata
+        run: python tools/probe_original_ui_layout.py "$RUNNER_TEMP/deadspace.apk"
       - name: Discover original menu UI scripts and layout resources
         run: python tools/probe_ui_menu_resources.py "$RUNNER_TEMP/deadspace.apk"
       - name: Decode original frontend SBIN sprite rectangle references
