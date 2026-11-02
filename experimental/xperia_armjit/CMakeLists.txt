@@ -33,6 +33,7 @@ add_test(NAME xperia_elf_mapped_a32_jit COMMAND xperia_elf_jit_synthetic)
 # -> guest BX LR; service code is original-free and fail-closed.
 add_library(xperia_arm_guest_libc STATIC ../xperia_guest_loader/guest_libc_bridge.cpp ../xperia_guest_loader/guest_heap.cpp ../xperia_guest_loader/guest_filesystem.cpp)
 target_include_directories(xperia_arm_guest_libc PUBLIC ../xperia_guest_loader)
+target_compile_features(xperia_arm_guest_libc PUBLIC cxx_std_17)
 target_link_libraries(xperia_arm_guest_libc PUBLIC xperia_guest_elf32)
 add_executable(xperia_guest_libc_jit_smoke guest_libc_jit_smoke.cpp)
 target_compile_features(xperia_guest_libc_jit_smoke PRIVATE cxx_std_20)
