@@ -15,6 +15,16 @@ FetchContent_Declare(
   GIT_PROGRESS TRUE
 )
 FetchContent_MakeAvailable(dynarmic)
+if(WIN32)
+  # Windows-only original Xperia graphics/audio/controller runtime.
+  set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+  set(SDL_STATIC ON CACHE BOOL "" FORCE)
+  set(SDL_TEST OFF CACHE BOOL "" FORCE)
+  FetchContent_Declare(sdl2
+    URL https://www.libsdl.org/release/SDL2-2.30.12.tar.gz)
+  FetchContent_MakeAvailable(sdl2)
+  find_package(OpenGL REQUIRED)
+endif()
 add_executable(xperia_arm32_jit_smoke arm32_jit_smoke.cpp)
 target_compile_features(xperia_arm32_jit_smoke PRIVATE cxx_std_20)
 target_link_libraries(xperia_arm32_jit_smoke PRIVATE dynarmic)
@@ -70,7 +80,18 @@ add_test(NAME xperia_guest_jni_vm_aapcs_tables COMMAND xperia_guest_jni_vm_tests
 
 # Reusable original ARM lifecycle call runner with explicit exit trampoline,
 # a real stack and service-trap dispatcher. No copyrighted ARM code.
-add_library(xperia_arm_call_runner STATIC guest_arm_call_runner.cpp)
+add_library(xperia_arm_call_runner STATIC
+    guest_arm_call_runner.cpp guest_xperia_input.cpp
+    ../../src/dualshock4_input.cpp ../../src/original_ui_interaction.cpp)
+target_include_directories(xperia_arm_call_runner PUBLIC ../../include)
+if(WIN32)
+  target_sources(xperia_arm_call_runner PRIVATE guest_sdl_host.cpp)
+  target_link_libraries(xperia_arm_call_runner PUBLIC SDL2::SDL2 OpenGL::GL)
+endif()
+add_executable(xperia_guest_input_tests guest_xperia_input_tests.cpp)
+target_link_libraries(xperia_guest_input_tests PRIVATE xperia_arm_call_runner)
+add_test(NAME xperia_ds4_real_arm_jni_input_delivery
+    COMMAND xperia_guest_input_tests)
 target_compile_features(xperia_arm_call_runner PUBLIC cxx_std_20)
 target_link_libraries(xperia_arm_call_runner PUBLIC xperia_arm_guest_libc dynarmic)
 add_executable(xperia_arm_call_runner_tests guest_arm_call_runner_tests.cpp)
