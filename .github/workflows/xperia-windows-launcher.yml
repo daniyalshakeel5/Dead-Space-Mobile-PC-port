@@ -5,6 +5,9 @@ on:
       - work/deadspace-xperia-arm-wrapper-2026-11-02
     paths:
       - "launcher/**"
+      - "include/ds_port/dualshock4_input.hpp"
+      - "src/dualshock4_input.cpp"
+      - "tests/dualshock4_input_tests.cpp"
       - "tools/xperia_qemu_boot.py"
       - "docs/XPERIA_PC_BOOT_BACKEND.md"
       - "tests/test_xperia_qemu_boot.py"
@@ -26,6 +29,12 @@ jobs:
       - name: Test installer extraction against 222 synthetic KTX resources
         shell: powershell
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/Test-Installer-Synthetic.ps1
+      - name: Compile Xperia DualShock 4 input subsystem on Windows
+        shell: pwsh
+        run: |
+          cmake -S . -B build/ds4 -A x64 -DDS_BUILD_BOOT_SPLASH=OFF -DDS_BUILD_INPUT_PROBE=OFF -DDS_FETCH_SDL2=OFF -DDS_ENABLE_TESTS=ON
+          cmake --build build/ds4 --config Release --target ds_port_ds4_input_tests
+          ctest --test-dir build/ds4 -C Release -R "^ds4_vita_analog_touchpad_mapping$" --output-on-failure
       - name: Compile Windows GUI entry stub, without a console window
         shell: powershell
         run: |
