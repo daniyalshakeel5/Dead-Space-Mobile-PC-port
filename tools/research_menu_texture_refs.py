@@ -3,7 +3,7 @@
 import pathlib,struct,sys
 def objects(path):
     data=pathlib.Path(path).read_bytes()
-    assert data[:12]==b'\\xabIM-M3G\\xbb\\r\\n\\x1a\\n'
+    assert data[:12]==b'\xabIM-M3G\xbb\r\n\x1a\n'
     pos=21;end=len(data)-4;result=[]
     while pos<end:
         typ=data[pos];n=struct.unpack_from('<I',data,pos+1)[0];pos+=5
@@ -27,7 +27,7 @@ def meta(payload):
         key,length=struct.unpack_from('<II',payload,pos);pos+=8
         if length>len(payload)-pos:return None
         raw=payload[pos:pos+length];pos+=length
-        trimmed=raw.rstrip(b'\\x00')
+        trimmed=raw.rstrip(b'\x00')
         if len(trimmed)<=100 and all(32<=b<=126 for b in trimmed):
             label=trimmed.decode('ascii')
         else:label='<binary>'
