@@ -234,6 +234,10 @@ if(DS_ENABLE_TESTS)
     target_link_libraries(ds_original_host_asset_io_tests PRIVATE ds_original_host_asset_io)
     add_test(NAME ds_original_arm_file_provider_boot_loader
              COMMAND ds_original_host_asset_io_tests)
+    add_executable(ds_original_host_asset_stream_tests tests/original_host_asset_stream_tests.cpp)
+    target_link_libraries(ds_original_host_asset_stream_tests PRIVATE ds_original_host_asset_io)
+    add_test(NAME ds_original_arm_file_stream_text_decoder
+             COMMAND ds_original_host_asset_stream_tests)
     add_executable(ds_native_lifecycle_tests tests/native_lifecycle_tests.cpp)
     target_link_libraries(ds_native_lifecycle_tests PRIVATE ds_native_lifecycle)
     add_test(NAME ds_native_original_lifecycle_order COMMAND ds_native_lifecycle_tests)
