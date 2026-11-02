@@ -1,0 +1,236 @@
+#include "guest_sdl_host.hpp"
+#include <SDL_opengl.h>
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <iostream>
+#include <stdexcept>
+namespace xperia {
+namespace {
+float number(std::uint32_t bits){float x;std::memcpy(&x,&bits,4);return x;}
+constexpr int kDown=0x6000c,kMove=0x4000c,kUp=0x8000c;
+const char* const names[]={
+"glClear","glClearColor","glViewport","glEnable","glDisable",
+"glBlendFunc","glBindTexture","glGenTextures","glDeleteTextures",
+"glTexParameteri","glTexImage2D","glTexSubImage2D","glMatrixMode",
+"glLoadIdentity","glTranslatef","glRotatef","glScalef","glOrthof",
+"glEnableClientState","glDisableClientState","glVertexPointer",
+"glTexCoordPointer","glColorPointer","glDrawArrays","glDrawElements",
+"glGetError","glColor4f","glDepthFunc","glDepthMask","glFinish",
+"glFlush","glClearDepthf","glFrustumf","glTexEnvf","glTexEnvi",
+"glAlphaFunc","glShadeModel","glHint","glScissor","glPixelStorei",
+"glTexParameterf","glLineWidth","glCullFace","glFrontFace"
+};
+constexpr std::size_t count=sizeof(names)/sizeof(names[0]);
+unsigned element_bytes(unsigned type){
+    if(type==GL_FLOAT)return 4;
+    if(type==GL_SHORT||type==GL_UNSIGNED_SHORT)return 2;
+    if(type==GL_UNSIGNED_BYTE||type==GL_BYTE)return 1;
+    return 0;
+}
+} // namespace
+GuestSdlHost::GuestSdlHost(){
+    for(unsigned i=0;i<count;++i){
+        symbols_.emplace(names[i],veneer_base+static_cast<std::uint32_t>(veneers_.size()));
+        for(auto word:{std::uint32_t(0xef000000u|(svc_base+i)),std::uint32_t(0xe12fff1eu)})
+            for(unsigned b=0;b<4;++b)veneers_.push_back(std::uint8_t(word>>(8*b)));
+    }
+}
+GuestSdlHost::~GuestSdlHost(){stop();}
+bool GuestSdlHost::start(std::string& error,int width,int height){
+    if(window_||width<320||height<240||width>4096||height>4096){
+        error="Invalid or duplicate Xperia SDL display";return false;
+    }
+    if(SDL_InitSubSystem(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_GAMECONTROLLER)){
+        error=std::string("SDL initialisation: ")+SDL_GetError();return false;
+    }
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION,2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,1);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE,24);
+    window_=SDL_CreateWindow("Dead Space Mobile - Xperia ARM",
+        SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,width,height,
+        SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE|SDL_WINDOW_SHOWN);
+    if(!window_){error=SDL_GetError();stop();return false;}
+    context_=SDL_GL_CreateContext(window_);
+    if(!context_){error=std::string("OpenGL compatibility context: ")+SDL_GetError();stop();return false;}
+    SDL_GL_MakeCurrent(window_,context_);
+    SDL_GL_SetSwapInterval(1);
+    SDL_AudioSpec want{},got{};
+    want.freq=44100;want.format=AUDIO_S16SYS;want.channels=2;want.samples=2048;
+    audio_device_=SDL_OpenAudioDevice(nullptr,0,&want,&got,0);
+    if(audio_device_){
+        if(got.freq==44100&&got.channels==2&&got.format==AUDIO_S16SYS)
+            SDL_PauseAudioDevice(audio_device_,0);
+        else {SDL_CloseAudioDevice(audio_device_);audio_device_=0;}
+    }
+    if(!audio_device_)std::clog<<"Xperia 44100Hz stereo PCM unavailable: "<<SDL_GetError()<<"\n";
+    for(int i=0;i<SDL_NumJoysticks();++i)controller_open(i);
+    last_tick_ms_=SDL_GetTicks64();
+    error.clear();return true;
+}
+void GuestSdlHost::stop() noexcept{
+    if(controller_){SDL_GameControllerClose(controller_);controller_=nullptr;}
+    controller_id_=-1;
+    if(audio_device_){SDL_ClearQueuedAudio(audio_device_);SDL_CloseAudioDevice(audio_device_);audio_device_=0;}
+    if(context_){SDL_GL_DeleteContext(context_);context_=nullptr;}
+    if(window_){SDL_DestroyWindow(window_);window_=nullptr;}
+    SDL_QuitSubSystem(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_GAMECONTROLLER);
+}
+void GuestSdlHost::controller_open(int index) noexcept{
+    if(controller_||!SDL_IsGameController(index))return;
+    controller_=SDL_GameControllerOpen(index);
+    if(controller_){
+        controller_id_=SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controller_));
+        std::clog<<"Controller: "<<SDL_GameControllerName(controller_)<<"\n";
+    }
+}
+void GuestSdlHost::button(GuestXperiaInput& input,int code,bool pressed) noexcept{
+    using B=ds_port::Ds4Button;
+    B b=B::Unknown;
+    switch(code){
+    case SDL_CONTROLLER_BUTTON_A:b=B::Cross;break;
+    case SDL_CONTROLLER_BUTTON_B:b=B::Circle;break;
+    case SDL_CONTROLLER_BUTTON_X:b=B::Square;break;
+    case SDL_CONTROLLER_BUTTON_Y:b=B::Triangle;break;
+    case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:b=B::L1;break;
+    case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:b=B::R1;break;
+    case SDL_CONTROLLER_BUTTON_START:b=B::Options;break;
+    case SDL_CONTROLLER_BUTTON_BACK:b=B::Share;break;
+    case SDL_CONTROLLER_BUTTON_DPAD_UP:b=B::DpadUp;break;
+    case SDL_CONTROLLER_BUTTON_DPAD_DOWN:b=B::DpadDown;break;
+    case SDL_CONTROLLER_BUTTON_DPAD_LEFT:b=B::DpadLeft;break;
+    case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:b=B::DpadRight;break;
+    default:break;
+    }
+    if(b!=B::Unknown)input.button(b,pressed);
+    // Xperia menus are touch operated; Cross taps the d-pad cursor.
+    if(b==B::Cross){
+        input.pointer(pressed?kDown:kUp,1000,3,cursor_x_,cursor_y_);
+        cursor_down_=pressed;
+    }
+    if(code==SDL_CONTROLLER_BUTTON_DPAD_LEFT)cursor_dx_+=pressed?-1:1;
+    if(code==SDL_CONTROLLER_BUTTON_DPAD_RIGHT)cursor_dx_+=pressed?1:-1;
+    if(code==SDL_CONTROLLER_BUTTON_DPAD_UP)cursor_dy_+=pressed?-1:1;
+    if(code==SDL_CONTROLLER_BUTTON_DPAD_DOWN)cursor_dy_+=pressed?1:-1;
+    cursor_dx_=std::clamp(cursor_dx_,-1,1);
+    cursor_dy_=std::clamp(cursor_dy_,-1,1);
+}
+void GuestSdlHost::pump(GuestXperiaInput& input,bool& quit) noexcept{
+    SDL_Event e{};
+    while(SDL_PollEvent(&e)){
+        switch(e.type){
+        case SDL_QUIT:quit=true;break;
+        case SDL_CONTROLLERDEVICEADDED:controller_open(e.cdevice.which);break;
+        case SDL_CONTROLLERDEVICEREMOVED:
+            if(e.cdevice.which==controller_id_){
+                input.disconnect();
+                SDL_GameControllerClose(controller_);
+                controller_=nullptr;controller_id_=-1;axes_.fill(0);
+                cursor_dx_=cursor_dy_=0;
+                for(int i=0;i<SDL_NumJoysticks();++i)controller_open(i);
+            }
+            break;
+        case SDL_CONTROLLERBUTTONDOWN:case SDL_CONTROLLERBUTTONUP:
+            if(e.cbutton.which==controller_id_)
+                button(input,e.cbutton.button,e.type==SDL_CONTROLLERBUTTONDOWN);
+            break;
+        case SDL_CONTROLLERAXISMOTION:
+            if(e.caxis.which==controller_id_&&e.caxis.axis<4u)
+                axes_[e.caxis.axis]=e.caxis.value;
+            break;
+        case SDL_CONTROLLERTOUCHPADDOWN:
+        case SDL_CONTROLLERTOUCHPADMOTION:
+        case SDL_CONTROLLERTOUCHPADUP:
+            if(e.ctouchpad.which==controller_id_)
+                input.pointer(e.type==SDL_CONTROLLERTOUCHPADDOWN?kDown:
+                    e.type==SDL_CONTROLLERTOUCHPADUP?kUp:kMove,
+                    1000,4+e.ctouchpad.finger,
+                    std::clamp(e.ctouchpad.x,0.f,1.f)*960.f,
+                    std::clamp(e.ctouchpad.y,0.f,1.f)*544.f);
+            break;
+        case SDL_MOUSEBUTTONDOWN:case SDL_MOUSEBUTTONUP:
+            if(e.button.button==SDL_BUTTON_LEFT){
+                int w=960,h=544;SDL_GetWindowSize(window_,&w,&h);
+                cursor_x_=e.button.x*960.f/std::max(1,w);
+                cursor_y_=e.button.y*544.f/std::max(1,h);
+                mouse_down_=e.type==SDL_MOUSEBUTTONDOWN;
+                input.pointer(mouse_down_?kDown:kUp,1000,5,cursor_x_,cursor_y_);
+            }
+            break;
+        case SDL_MOUSEMOTION:
+            if(mouse_down_){
+                int w=960,h=544;SDL_GetWindowSize(window_,&w,&h);
+                input.pointer(kMove,1000,5,e.motion.x*960.f/std::max(1,w),
+                              e.motion.y*544.f/std::max(1,h));
+            }
+            break;
+        case SDL_WINDOWEVENT:
+            if(e.window.event==SDL_WINDOWEVENT_FOCUS_LOST){
+                input.disconnect();
+                if(cursor_down_)input.pointer(kUp,1000,3,cursor_x_,cursor_y_);
+                if(mouse_down_)input.pointer(kUp,1000,5,cursor_x_,cursor_y_);
+                mouse_down_=cursor_down_=false;cursor_dx_=cursor_dy_=0;
+            }
+            break;
+        default:break;
+        }
+    }
+    const auto now=SDL_GetTicks64();
+    const auto dt=std::min<double>(0.05,double(now-last_tick_ms_)/1000.);
+    last_tick_ms_=now;
+    cursor_x_=std::clamp(cursor_x_+float(420.*dt*cursor_dx_),0.f,959.f);
+    cursor_y_=std::clamp(cursor_y_+float(420.*dt*cursor_dy_),0.f,543.f);
+    if(cursor_down_&&(cursor_dx_||cursor_dy_))
+        input.pointer(kMove,1000,3,cursor_x_,cursor_y_);
+    input.sticks(axes_[0],axes_[1],axes_[2],axes_[3]);
+}
+void GuestSdlHost::swap() noexcept{if(window_&&context_)SDL_GL_SwapWindow(window_);}
+bool GuestSdlHost::queue_pcm16(const std::uint8_t* data,std::size_t bytes,
+                               std::string& error) noexcept{
+    if(!audio_device_||(!data&&bytes)||bytes%4u||bytes>2u*1024u*1024u||
+       SDL_GetQueuedAudioSize(audio_device_)>2u*1024u*1024u-bytes){
+        error="PCM audio device missing or queue full/invalid";return false;
+    }
+    if(bytes&&SDL_QueueAudio(audio_device_,data,static_cast<Uint32>(bytes))!=0){
+        error=std::string("SDL queued PCM: ")+SDL_GetError();return false;
+    }
+    error.clear();return true;
+}
+bool GuestSdlHost::code_byte(std::uint32_t addr,std::uint8_t& value) const noexcept{
+    if(addr<veneer_base||std::uint64_t(addr)-veneer_base>=veneers_.size())return false;
+    value=veneers_[addr-veneer_base];return true;
+}
+bool GuestSdlHost::handles(std::uint32_t id) const noexcept{
+    return id>=svc_base&&id<svc_base+count;
+}
+std::uint32_t GuestSdlHost::return_pc(std::uint32_t id) const noexcept{
+    return handles(id)?veneer_base+(id-svc_base)*8u+4u:0u;
+}
+std::uint32_t GuestSdlHost::get_arg(const std::array<std::uint32_t,16>& r,
+                                   GuestElf32& g,unsigned i){
+    if(i<4)return r[i];
+    if(i>15)throw std::runtime_error("GLES1 ARM argument count cap");
+    return g.read_u32(r[13]+(i-4)*4u);
+}
+bool GuestSdlHost::apply_arrays(GuestElf32& g,std::uint32_t last,
+                                std::string& error) noexcept {
+    const auto bind=[&](const ArrayDesc& d,int which) {
+        if(!d.enabled)return true;
+        const auto bytes=element_bytes(d.type);
+        if(!bytes||d.size<1||d.size>4||d.stride<0)return false;
+        const std::uint64_t stride=d.stride?d.stride:d.size*bytes;
+        const auto n=std::uint64_t(last)*stride+d.size*bytes;
+        if(n>64u*1024u*1024u)return false;
+        const auto* ptr=g.read(d.ptr,static_cast<std::size_t>(n));
+        if(!ptr)return false;
+        if(which==0)glVertexPointer(d.size,d.type,d.stride,ptr);
+        if(which==1)glColorPointer(d.size,d.type,d.stride,ptr);
+        if(which==2)glTexCoordPointer(d.size,d.type,d.stride,ptr);
+        return true;
+    };
+    if(!bind(vertex_,0)||!bind(color_,1)||!bind(texcoord_,2)){
+        error="OpenGL client vertex array unmapped in ARM guest";return false;
+    }
+    return true;
+}
