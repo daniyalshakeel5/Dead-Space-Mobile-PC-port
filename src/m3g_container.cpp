@@ -364,10 +364,13 @@ M3gRgbaImage decode_m3g_scene_texture_image(
                 Image2dEvidence evidence{};
                 if(!parse_image2d_payload(objects+offset,length,evidence) ||
                    evidence.is_mutable||evidence.palette_bytes!=0 ||
-                   (evidence.format!=99&&evidence.format!=100) ||
+                   evidence.format<96 || evidence.format>100 ||
                    evidence.width>4096||evidence.height>4096)
                     return fail("unsupported original Image2D encoding");
-                const unsigned channels=evidence.format==100?4u:3u;
+                // JSR-184 constants: ALPHA=96, LUMINANCE=97,
+                // LUMINANCE_ALPHA=98, RGB=99, RGBA=100.
+                const unsigned channels=evidence.format<=97?1u:
+                    evidence.format==98?2u:evidence.format==99?3u:4u;
                 const std::size_t pixel_count=std::size_t(evidence.width)*evidence.height;
                 if(pixel_count>16u*1024u*1024u ||
                    evidence.pixel_bytes!=pixel_count*channels ||
@@ -381,8 +384,16 @@ M3gRgbaImage decode_m3g_scene_texture_image(
                 for(std::size_t i=0;i<pixel_count;++i) {
                     const auto* src=pixel+i*channels;
                     auto* dst=out.pixels_rgba.data()+i*4u;
-                    dst[0]=src[0];dst[1]=src[1];dst[2]=src[2];
-                    dst[3]=channels==4?src[3]:255;
+                    if(evidence.format==96) { // ALPHA: white with transparency
+                        dst[0]=255;dst[1]=255;dst[2]=255;dst[3]=src[0];
+                    }else if(evidence.format==97) { // LUMINANCE
+                        dst[0]=src[0];dst[1]=src[0];dst[2]=src[0];dst[3]=255;
+                    }else if(evidence.format==98) { // LUMINANCE_ALPHA
+                        dst[0]=src[0];dst[1]=src[0];dst[2]=src[0];dst[3]=src[1];
+                    }else{
+                        dst[0]=src[0];dst[1]=src[1];dst[2]=src[2];
+                        dst[3]=channels==4?src[3]:255;
+                    }
                 }
             }
             offset+=length;
