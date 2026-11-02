@@ -117,4 +117,15 @@ OriginalUiPointerResult dispatch_original_ui_pointer(
     }
     return {state.hovered,0};
 }
+OriginalUiPointerResult dispatch_original_ui_window_pointer(
+    OriginalUiInteractionState& state,
+    const std::vector<OriginalUiDraw>& commands,
+    OriginalUiPointerAction action,int window_width,int window_height,
+    int pointer_x,int pointer_y) {
+    int canvas_x=-1,canvas_y=-1;
+    if(action!=OriginalUiPointerAction::Cancel)
+        original_ui_window_to_canvas(window_width,window_height,
+            pointer_x,pointer_y,canvas_x,canvas_y);
+    return dispatch_original_ui_pointer(state,commands,action,canvas_x,canvas_y);
+}
 }
