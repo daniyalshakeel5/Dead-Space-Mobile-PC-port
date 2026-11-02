@@ -83,13 +83,8 @@ def prepare_source(source):
         if not (source/file).is_file():raise BootError("Missing GPL loader build file: "+file)
 
 def run_logged(argv,timeout,path):
-    try:
-        proc=subprocess.run(argv,capture_output=True,stderr=subprocess.STDOUT,
-                            text=True,timeout=timeout,check=False)
-    except ValueError:
-        # Python forbids capture_output and stderr together; use PIPE.
-        proc=subprocess.run(argv,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
-                            text=True,errors="replace",timeout=timeout,check=False)
+    proc=subprocess.run(argv,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
+                        text=True,errors="replace",timeout=timeout,check=False)
     path.write_text(proc.stdout[:8_000_000],encoding="utf-8")
     return proc.returncode
 
