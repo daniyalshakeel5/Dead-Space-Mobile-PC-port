@@ -71,14 +71,16 @@ int main(int argc,char** argv){
             int((std::int64_t(x)*viewport.width+viewport.width/2)/480);
         const int window_y=viewport.y+
             int((std::int64_t(y)*viewport.height+viewport.height/2)/320);
-        int cx=-1,cy=-1;
-        if(!ds_port::original_ui_window_to_canvas(
-                1280,720,window_x,window_y,cx,cy))return 10;
+        // Feed the ORIGINAL APK's buttons real SDL-style window pixels
+        // through the same single-conversion path as the native renderer.
+        // This would have caught the old double-scaling regression.
         ds_port::OriginalUiInteractionState state{};
-        const auto down=ds_port::dispatch_original_ui_pointer(state,main.draws,
-            ds_port::OriginalUiPointerAction::Down,cx,cy);
-        const auto up=ds_port::dispatch_original_ui_pointer(state,main.draws,
-            ds_port::OriginalUiPointerAction::Up,cx,cy);
+        const auto down=ds_port::dispatch_original_ui_window_pointer(
+            state,main.draws,ds_port::OriginalUiPointerAction::Down,
+            1280,720,window_x,window_y);
+        const auto up=ds_port::dispatch_original_ui_window_pointer(
+            state,main.draws,ds_port::OriginalUiPointerAction::Up,
+            1280,720,window_x,window_y);
         // If buttons overlap, the foremost original hit region wins.
         if(down.hovered==action.first && up.activated==action.first) {
             ++clicked;
