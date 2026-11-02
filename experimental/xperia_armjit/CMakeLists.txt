@@ -56,6 +56,10 @@ target_link_libraries(xperia_guest_abi_tests PRIVATE xperia_arm_guest_libc)
 add_test(NAME xperia_guest_bionic_cpp_lifetime_and_errno
     COMMAND xperia_guest_abi_tests)
 
+add_executable(xperia_guest_filesystem_tests ../xperia_guest_loader/guest_filesystem_tests.cpp)
+target_link_libraries(xperia_guest_filesystem_tests PRIVATE xperia_arm_guest_libc)
+add_test(NAME xperia_guest_original_appbundle_asset_io COMMAND xperia_guest_filesystem_tests)
+
 add_executable(xperia_guest_bionic_data_tests ../xperia_guest_loader/guest_bionic_data_tests.cpp)
 target_link_libraries(xperia_guest_bionic_data_tests PRIVATE xperia_arm_guest_libc)
 add_test(NAME xperia_guest_bionic_data_symbols COMMAND xperia_guest_bionic_data_tests)
