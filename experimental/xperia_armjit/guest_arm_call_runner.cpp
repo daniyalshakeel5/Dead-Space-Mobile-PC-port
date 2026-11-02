@@ -22,14 +22,17 @@ constexpr u32 kStackStride=0x00100000u;
 struct Host final : Dynarmic::A32::UserCallbacks {
     GuestElf32& image;
     const GuestLibcBridge& bridge;
+    const GuestJniVm* java=nullptr;
     Dynarmic::A32::Jit* jit=nullptr;
     u64 budget=0;
     u32 trapped=0;
     bool fault=false;
-    Host(GuestElf32& elf,const GuestLibcBridge& svc):image(elf),bridge(svc){}
+    Host(GuestElf32& elf,const GuestLibcBridge& svc,const GuestJniVm* jni)
+        :image(elf),bridge(svc),java(jni){}
     u8 MemoryRead8(u32 p) override {
         u8 value=0;
         if(bridge.code_byte(p,value))return value;
+        if(java && java->code_byte(p,value))return value;
         if(p>=kReturnTrap && p<kReturnTrap+4u){
             const u32 word=0xef000000u|kReturnSvc;
             return u8(word>>(8u*(p-kReturnTrap)));
@@ -82,11 +85,12 @@ struct GuestArmCallRunner::Impl {
     GuestLibcBridge& bridge;
     GuestHeap& heap;
     GuestFileSystem* files;
+    GuestJniVm* java;
     Host host;
     Dynarmic::A32::Jit jit;
     Impl(GuestElf32& elf,GuestLibcBridge& services,GuestHeap& memory,
-         GuestFileSystem* mount)
-        :image(elf),bridge(services),heap(memory),files(mount),host(elf,services),
+         GuestFileSystem* mount,GuestJniVm* jni)
+        :image(elf),bridge(services),heap(memory),files(mount),java(jni),host(elf,services,jni),
          jit(config(host)){
         // One owned 256 KiB guest stack, disjoint from game code/heap
         // and import veneers, allocated only once for the runner.
@@ -131,6 +135,14 @@ struct GuestArmCallRunner::Impl {
                 }
                 if(id==0)
                     throw std::runtime_error("ARM guest exceeded bounded instruction budget");
+                if(java && java->handles(id)) {
+                    std::array<u32,16> regs=jit.Regs();
+                    if(!java->dispatch(id,regs,image,error))
+                        return false;
+                    jit.Regs()[0]=regs[0];
+                    jit.Regs()[15]=java->return_pc(id);
+                    continue;
+                }
                 const auto expected=GuestLibcBridge::veneer_base+
                     std::uint64_t(id-1u)*8u;
                 if(expected>UINT32_MAX)
@@ -200,8 +212,8 @@ struct GuestArmCallRunner::Impl {
     }
 };
 GuestArmCallRunner::GuestArmCallRunner(GuestElf32& image,
-       GuestLibcBridge& services,GuestHeap& heap,GuestFileSystem* files)
-    :impl_(std::make_unique<Impl>(image,services,heap,files)){}
+       GuestLibcBridge& services,GuestHeap& heap,GuestFileSystem* files,GuestJniVm* java)
+    :impl_(std::make_unique<Impl>(image,services,heap,files,java)){}
 GuestArmCallRunner::~GuestArmCallRunner()=default;
 bool GuestArmCallRunner::invoke(u32 address,const std::array<u32,4>& args,
                                u32& result,std::string& error){
