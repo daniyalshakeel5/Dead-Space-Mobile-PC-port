@@ -169,12 +169,14 @@ int main(){
         assert(static_cast<std::int32_t>(result)==-3);
         // JNIEnv->GetVersion uses index 4, offset 16.
         put32(vm_elf,base+0xe04,0xe5933010u);
+        vm_runner.invalidate_code(base+0xe04,4);
         assert(vm_runner.invoke(base+0xe00,
             {jni.env_address,0,0,0},result,error));
         assert(result==0x00010006u);
         // JNIEnv->FindClass index 6 must fail with its *actual* name,
         // not issue a successful fake Java class handle.
         put32(vm_elf,base+0xe04,0xe5933018u);
+        vm_runner.invalidate_code(base+0xe04,4);
         assert(!vm_runner.invoke(base+0xe00,
             {jni.env_address,0,0,0},result,error));
         assert(error.find("JNIEnv table entry 6")!=std::string::npos);
