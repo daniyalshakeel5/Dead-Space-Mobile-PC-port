@@ -278,6 +278,9 @@ bool GuestArmCallRunner::invoke_aapcs(u32 address,
         stack.assign(arguments.begin()+4,arguments.end());
     return impl_->invoke(address,first,result,error,0,stack);
 }
+void GuestArmCallRunner::invalidate_code(std::uint32_t start,std::size_t length){
+    impl_->jit.InvalidateCacheRange(start,length);
+}
 bool GuestArmCallRunner::run_original_initializers(std::string& error){
     // Original ELF parser returned ordered DT_INIT and DT_INIT_ARRAY,
     // already relocated to the exact guest ARM32 address space.
