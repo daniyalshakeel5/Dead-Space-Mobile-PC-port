@@ -1,0 +1,34 @@
+name: Reanimated v1.3 public APK HD layout verification
+on:
+  push:
+    branches: [work/deadspace-xperia-arm-wrapper-2026-11-02]
+    paths:
+      - tools/xperia_reanimated_hd_install.py
+      - .github/workflows/xperia-reanimated-real-apk.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect-public-hd-layout:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 28
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Retrieve public Reanimated release into ephemeral runner only
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'rm -f "$RUNNER_TEMP/reanimated.apk"' EXIT
+          curl --fail --location --silent --show-error --retry 3 --retry-delay 3 --max-time 1100 --max-filesize 800000000 \
+            -o "$RUNNER_TEMP/reanimated.apk" \
+            https://github.com/GINESTR0/DeadSpaceReanimated/releases/download/v1.3/DeadSpaceReanimated-1.3.apk
+          test "$(wc -c < "$RUNNER_TEMP/reanimated.apk" | tr -d ' ')" = 715366829
+          python -m tools.xperia_reanimated_hd_install --apk "$RUNNER_TEMP/reanimated.apk" --verify-only
+          rm -f "$RUNNER_TEMP/reanimated.apk"
+      - name: Confirm no copyrighted game files or textures persisted
+        run: |
+          test ! -e reanimated.apk
+          test ! -d texture_hd
