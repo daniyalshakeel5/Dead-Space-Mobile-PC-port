@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <cassert>
 #include <algorithm>
+#include <unordered_set>
 static std::vector<std::uint8_t> read_file(const char* path,std::size_t limit) {
     std::ifstream f(path,std::ios::binary|std::ios::ate);
     if(!f)return {};
@@ -90,12 +91,31 @@ int main(int argc,char** argv){
                  <<"\\n";
     }
     if(clicked<3)return 12;
+    // Navigate every genuine UI_MAIN button in source layout order and
+    // prove the keyboard traversal wraps exactly once, without fake IDs.
+    std::uint32_t focused=0;
+    std::unordered_set<std::uint32_t> visited;
+    for(std::size_t i=0;i<main.actions.size();++i){
+        focused=ds_port::cycle_original_ui_focus(main.draws,focused,false);
+        if(!main.actions.count(focused) || !visited.insert(focused).second)
+            return 14;
+    }
+    if(visited.size()!=main.actions.size() ||
+       ds_port::cycle_original_ui_focus(main.draws,focused,false)==0)
+        return 15;
+    std::cout<<"Original APK keyboard menu traversal verified: "
+             <<visited.size()<<" named UI_MAIN controls\\n";
     for(const char* screen:{"UI_PROFILE","UI_OPTIONS_MAIN","UI_EXTRAS"}){
         const auto sub=ds_port::compose_original_ui_screen(ui_layout,db,screen);
         std::cout<<"Original menu screen "<<screen<<" valid "<<sub.valid
                  <<" sprites "<<sub.draws.size()<<" controls "
                  <<sub.actions.size()<<"\\n";
         if(!sub.valid)return 13;
+        const auto back=std::find_if(sub.actions.begin(),sub.actions.end(),
+            [](const auto& action){return action.second=="BTN_BACK";});
+        std::cout<<"Original submenu "<<screen
+                 <<" Back control "<<(back!=sub.actions.end())<<"\\n";
+        if(back==sub.actions.end())return 16;
     }
     std::cout<<"Original APK native menu click mapping verified: "<<clicked
              <<" buttons, 480x320 original UI canvas, "
