@@ -1,4 +1,4 @@
-name: Xperia Windows ARM guest runtime
+name: Xperia Windows ARM guest runtime and WPF wrapper
 on:
   workflow_dispatch:
   push:
@@ -7,47 +7,72 @@ on:
     paths:
       - 'experimental/xperia_armjit/**'
       - 'experimental/xperia_guest_loader/**'
-      - 'launcher/GuestPreflight.ps1'
+      - 'launcher/**'
+      - 'tests/Test-Launcher.ps1'
+      - 'tests/Test-Installer-Synthetic.ps1'
       - '.github/workflows/xperia-windows-arm-runtime.yml'
 permissions:
   contents: read
 jobs:
-  arm-runtime:
+  windows-xperia-wrapper:
     runs-on: windows-2022
     timeout-minutes: 70
     steps:
       - uses: actions/checkout@v4
+      - name: Validate existing Windows WPF launcher and installed-file importer
+        shell: powershell
+        run: |
+          powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File tests/Test-Launcher.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'WPF launcher tests failed' }
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/Test-Installer-Synthetic.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Installer archive tests failed' }
       - name: Configure Windows x64 Dynarmic guest runtime
         shell: pwsh
         run: cmake -S experimental/xperia_armjit -B build/armjit -A x64 -DCMAKE_BUILD_TYPE=Release
-      - name: Compile ARM32 JIT, ELF loader and libc bridge
+      - name: Compile ARM32 JIT, ELF loader, Bionic and guest callbacks
         shell: pwsh
         run: cmake --build build/armjit --config Release --parallel 4
-      - name: Run actual ARM guest execution tests (synthetic original-free)
+      - name: Run translated ARM execution and Bionic regression suite
         shell: pwsh
         run: ctest --test-dir build/armjit -C Release --output-on-failure
-      - name: Package Windows guest preflight executable
+      - name: Compile no-console Windows WPF launcher executable
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $source=Get-Content -LiteralPath launcher/LauncherStub.cs -Raw
+          Add-Type -TypeDefinition $source -Language CSharp -ReferencedAssemblies 'System.Windows.Forms' -OutputAssembly 'dist/DeadSpaceLauncher.exe' -OutputType WindowsApplication
+          if(-not (Test-Path 'dist/DeadSpaceLauncher.exe')){throw 'WPF launcher executable missing'}
+      - name: Package one Windows wrapper with guest runtime binaries
         shell: pwsh
         run: |
-          $root='dist/XperiaWindowsGuestRuntime'
-          New-Item -ItemType Directory -Force $root | Out-Null
-          Copy-Item build/armjit/Release/xperia_guest_import_report.exe $root/
-          Copy-Item build/armjit/Release/xperia_guest_startup.exe $root/
-          Copy-Item launcher/GuestPreflight.ps1 $root/
+          $root='dist/DeadSpaceMobile-Xperia-Windows'
+          $launch=Join-Path $root 'launcher'
+          New-Item -ItemType Directory -Force $launch | Out-Null
+          Copy-Item 'dist/DeadSpaceLauncher.exe' $root
+          Copy-Item 'launcher/Core.ps1','launcher/Installer.ps1','launcher/Launcher.ps1','launcher/Launcher.xaml','launcher/GuestPreflight.ps1' $launch
+          Copy-Item 'build/armjit/Release/xperia_guest_import_report.exe','build/armjit/Release/xperia_guest_startup.exe' $launch
           @'
-          Xperia Play guest runtime developer package
-          The included import-report tool checks an original, locally installed Xperia
-          ARM32 library. It does NOT start the game.
-          Run from PowerShell:
-          ./GuestPreflight.ps1 -GameDir "PATH_TO_INSTALLED_XPERIA"
-          JNI startup, rendering, audio and controller forwarding still
-          require full Android/JNI/GLES host services.
-          No original game data is included.
-          '@ | Set-Content "$root/README.txt"
-          Compress-Archive -Path "$root/*" -DestinationPath 'dist/XperiaWindowsGuestRuntime.zip' -Force
+          Dead Space Mobile Xperia Play - Windows ARM wrapper (engineering build)
+
+          1. Launch DeadSpaceLauncher.exe and install your own Xperia Play ZIP.
+          2. Runtime -> Check installed ARM game imports uses the bundled native
+             Windows ELF scanner. It produces guest-preflight.json in launcher logs.
+          3. The actual original ARM constructor experiment is available at
+             launcher/xperia_guest_startup.exe. It loads your own installed .so
+             and can stop at the first unsupported Android host service.
+          4. PLAY IS STILL DISABLED. A successful diagnostic or synthetic JIT
+             test does not mean the game renders or is playable.
+
+          No WSL2, Docker, Linux packaging, Python or original EA game files are
+          required for the launcher or included in this archive.
+          '@ | Set-Content -Encoding utf8 (Join-Path $root 'README.txt')
+          if(Get-ChildItem $root -Recurse -File | Where-Object { $_.Extension -in @('.apk','.so','.ktx','.m3g','.sb','.jar') }){
+            throw 'User-owned copyrighted Xperia game bytes leaked into the package'
+          }
+          Compress-Archive -Path "$root/*" -DestinationPath 'dist/DeadSpaceMobile-Xperia-Windows-Wrapper.zip' -Force
       - uses: actions/upload-artifact@v4
         with:
-          name: xperia-windows-arm-guest-runtime
-          path: dist/XperiaWindowsGuestRuntime.zip
+          name: deadspace-xperia-windows-arm-wrapper
+          path: dist/DeadSpaceMobile-Xperia-Windows-Wrapper.zip
           retention-days: 20
           if-no-files-found: error
