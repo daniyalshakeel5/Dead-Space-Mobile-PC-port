@@ -140,7 +140,7 @@ OriginalMenuGpuStatus run_original_menu_gl(
         if(!validate_original_ui_draw_list(*ui_runtime->database,
                 *ui_runtime->atlases,*ui_runtime->draw_commands,reason)){
             diagnostic="Original frontend draw commands rejected: "+reason;
-            release_all_textures();return OriginalMenuGpuStatus::InvalidScene;
+            free_textures();return OriginalMenuGpuStatus::InvalidScene;
         }
         ui_textures.resize(ui_runtime->atlases->size(),0);
         glGenTextures(static_cast<GLsizei>(ui_textures.size()),ui_textures.data());
