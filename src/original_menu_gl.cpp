@@ -166,8 +166,11 @@ OriginalMenuGpuStatus run_original_menu_gl(
     };
     const auto ui_pointer=[&](OriginalUiPointerAction action,int x,int y){
         if(!has_ui_layer)return;
+        const auto previous=ui_input.hovered;
         const auto result=dispatch_original_ui_pointer(ui_input,
             *ui_runtime->draw_commands,action,x,y);
+        if(result.hovered!=previous && ui_runtime->on_hover)
+            ui_runtime->on_hover(ui_runtime->context,result.hovered);
         if(result.activated && ui_runtime->on_activate)
             ui_runtime->on_activate(ui_runtime->context,result.activated);
     };
@@ -225,14 +228,25 @@ OriginalMenuGpuStatus run_original_menu_gl(
                     e.type==SDL_MOUSEMOTION) {
                 int width=0,height=0;
                 SDL_GetWindowSize(window.get(),&width,&height);
+                // The original compiled UI vertices use a 480x320
+                // logical viewport. SDL positions are window pixels.
+                const auto lx=[&](int x) {
+                    return width>0?int(double(x)*480.0/width):0;
+                };
+                const auto ly=[&](int y) {
+                    return height>0?int(double(y)*320.0/height):0;
+                };
                 if(e.type==SDL_MOUSEMOTION)
-                    ui_pointer(OriginalUiPointerAction::Move,e.motion.x,e.motion.y);
+                    ui_pointer(OriginalUiPointerAction::Move,
+                               lx(e.motion.x),ly(e.motion.y));
                 else if(e.type==SDL_MOUSEBUTTONDOWN &&
                         e.button.button==SDL_BUTTON_LEFT)
-                    ui_pointer(OriginalUiPointerAction::Down,e.button.x,e.button.y);
+                    ui_pointer(OriginalUiPointerAction::Down,
+                               lx(e.button.x),ly(e.button.y));
                 else if(e.type==SDL_MOUSEBUTTONUP &&
                         e.button.button==SDL_BUTTON_LEFT)
-                    ui_pointer(OriginalUiPointerAction::Up,e.button.x,e.button.y);
+                    ui_pointer(OriginalUiPointerAction::Up,
+                               lx(e.button.x),ly(e.button.y));
                 if(e.type==SDL_MOUSEMOTION && input.mouse_held)
                     native_menu_pointer(input,callbacks,2,e.motion.x,e.motion.y,width,height);
                 else if(e.type==SDL_MOUSEBUTTONDOWN &&
@@ -374,9 +388,10 @@ OriginalMenuGpuStatus run_original_menu_gl(
             glDisableClientState(GL_VERTEX_ARRAY);
             glDisableClientState(GL_TEXTURE_COORD_ARRAY);
             glMatrixMode(GL_PROJECTION);glPushMatrix();glLoadIdentity();
-            glOrtho(0,w,h,0,-1,1);
+            glOrtho(0,480,320,0,-1,1);
             glMatrixMode(GL_MODELVIEW);glPushMatrix();glLoadIdentity();
             for(const auto& cmd:*ui_runtime->draw_commands){
+                if(cmd.hit_only)continue;
                 auto sprite=std::find_if(ui_runtime->database->sprites.begin(),
                     ui_runtime->database->sprites.end(),
                     [&](const OriginalUiSprite& x){
