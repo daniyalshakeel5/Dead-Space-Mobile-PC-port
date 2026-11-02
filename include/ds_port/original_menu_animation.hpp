@@ -39,7 +39,9 @@ struct OriginalMenuAnimationRuntime {
     const std::vector<OriginalSceneNode>* nodes=nullptr;
     const OriginalSceneCamera* camera=nullptr;
     const std::vector<OriginalSceneBinding>* materials=nullptr;
-    bool preview_activate_controllers=true;
+    // Disabled for production: forcing inactive controllers on causes
+    // unrelated button animations to play autonomously.
+    bool preview_activate_controllers=false;
 };
 OriginalMenuMotion decode_original_menu_motion(const std::uint8_t* data,std::size_t size);
 // Evaluate the exact keyframe data; default respects the file's serialized

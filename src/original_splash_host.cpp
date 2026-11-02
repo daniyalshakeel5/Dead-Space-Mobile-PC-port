@@ -25,6 +25,18 @@ bool read_bounded_original_image(
     image=std::move(decoded.images.front());
     return image.decoded&&image.width&&image.height;
 }
+} // namespace
+// The original game's splash Image2D RGBA rows are bottom-origin.
+// Only correct the SDL 2D splash presentation, not generic decoders
+// or the original OpenGL texture coordinates.
+bool original_splash_render_upright(
+    SDL_Renderer* renderer,SDL_Texture* texture,
+    const SDL_Rect& destination) noexcept {
+    return renderer&&texture &&
+           SDL_RenderCopyEx(renderer,texture,nullptr,&destination,0.0,
+                            nullptr,SDL_FLIP_VERTICAL)==0;
+}
+namespace {
 bool show_image(SDL_Renderer* renderer,SDL_Window* window,
                 const M3gRgbaImage& image,bool& stopped) {
     Texture texture(SDL_CreateTexture(
@@ -78,7 +90,7 @@ bool show_image(SDL_Renderer* renderer,SDL_Window* window,
         SDL_SetTextureAlphaMod(texture.get(),alpha);
         SDL_SetRenderDrawColor(renderer,0,0,0,255);
         if(SDL_RenderClear(renderer)!=0 ||
-           SDL_RenderCopy(renderer,texture.get(),nullptr,&dest)!=0)
+           !original_splash_render_upright(renderer,texture.get(),dest))
             return false;
         SDL_RenderPresent(renderer);
         SDL_Delay(12);

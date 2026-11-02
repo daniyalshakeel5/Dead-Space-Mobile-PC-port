@@ -114,6 +114,16 @@ if(DS_BUILD_BOOT_SPLASH AND TARGET SDL2::SDL2)
     target_sources(deadspace_native PRIVATE src/original_splash_host.cpp)
     target_link_libraries(deadspace_native PRIVATE ds_port_im_ui ds_port_im_menu SDL2::SDL2)
     target_compile_definitions(deadspace_native PRIVATE DS_NATIVE_SPLASH_PRESENTATION=1)
+    if(DS_ENABLE_TESTS)
+        add_executable(ds_original_splash_orientation_tests
+            tests/original_splash_orientation_tests.cpp
+            src/original_splash_host.cpp)
+        target_include_directories(ds_original_splash_orientation_tests PRIVATE include)
+        target_link_libraries(ds_original_splash_orientation_tests PRIVATE
+            ds_port_im_ui ds_original_host_asset_io SDL2::SDL2)
+        add_test(NAME ds_original_splash_upright_rgba_rows
+            COMMAND ds_original_splash_orientation_tests)
+    endif()
     message(STATUS "Original EA and Dead Space native splash stage enabled")
 elseif(DS_BUILD_BOOT_SPLASH)
     message(STATUS "SDL2 missing: original splash stage disabled in this build")

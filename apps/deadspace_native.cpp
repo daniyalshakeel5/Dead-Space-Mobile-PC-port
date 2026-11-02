@@ -302,7 +302,7 @@ bool load_original_menu_stage(const std::string& root) {
         std::string renderer_error;
         const ds_port::OriginalMenuAnimationRuntime animation_runtime{
             &motion,&native_scene.nodes,&native_scene.camera,
-            &native_scene.materials,true};
+            &native_scene.materials,false}; // Respect original controller active intervals.
         const ds_port::OriginalUiRuntime ui_runtime{
             &frontend,&ui.images,&menu_ui.commands,&menu_ui,
             &NativeOriginalMenuUi::activate,&NativeOriginalMenuUi::hover,

@@ -53,5 +53,25 @@ int main(){
     motion.tracks={{25,23,18,256}};
     assert(sample_original_menu_motion(motion,base,500,out,true));
     assert(std::fabs(out[0].alpha-0.6f)<1e-5f);
+    // Windows field regression: the runtime mistakenly opted into
+    // unconditional preview of all menu action controllers.
+    OriginalMenuMotion gating{};
+    gating.decoded=true;
+    gating.sequences={{99,1000,176,192,{{0,{0,0,0}},{1000,{10,0,0}}}}};
+    OriginalMotionController ambient{};
+    ambient.object_id=10;ambient.active_start=0;ambient.active_end=2000;
+    OriginalMotionController action=ambient;
+    action.object_id=11;action.active_end=0;
+    gating.controllers={ambient,action};
+    gating.tracks={{25,99,10,275},{26,99,11,275}};
+    OriginalMenuAnimationRuntime actual_menu{};
+    assert(!actual_menu.preview_activate_controllers);
+    assert(sample_original_menu_motion(gating,base,500,out,
+                                      actual_menu.preview_activate_controllers));
+    assert(std::fabs(out[0].local[12]-5.f)<1e-5f);
+    assert(out[1].local[12]==0.f);
+    // The old debug preview disregards action-controller inactivity.
+    assert(sample_original_menu_motion(gating,base,500,out,true));
+    assert(std::fabs(out[1].local[12]-5.f)<1e-5f);
     return 0;
 }
