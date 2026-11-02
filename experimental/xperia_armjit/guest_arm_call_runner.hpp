@@ -2,6 +2,7 @@
 #include "guest_elf32.hpp"
 #include "guest_libc_bridge.hpp"
 #include "guest_heap.hpp"
+#include "guest_jni_vm.hpp"
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -13,7 +14,8 @@ class GuestFileSystem;
 class GuestArmCallRunner {
 public:
     GuestArmCallRunner(GuestElf32& image,GuestLibcBridge& services,
-                       GuestHeap& heap,GuestFileSystem* files=nullptr);
+                       GuestHeap& heap,GuestFileSystem* files=nullptr,
+                       GuestJniVm* java=nullptr);
     ~GuestArmCallRunner();
     GuestArmCallRunner(const GuestArmCallRunner&)=delete;
     GuestArmCallRunner& operator=(const GuestArmCallRunner&)=delete;
