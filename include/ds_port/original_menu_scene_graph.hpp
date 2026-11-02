@@ -20,6 +20,8 @@ struct OriginalSceneNode {
     std::uint32_t object_id=0;
     std::uint32_t parent_id=0; // zero = root
     std::array<float,16> local{};
+    bool rendering_enabled=true;
+    float alpha=1.f;
 };
 struct OriginalSceneCamera {
     std::uint32_t node_id=0;
@@ -29,6 +31,11 @@ struct OriginalSceneBinding {
     std::uint32_t appearance_id=0;
     std::uint32_t image_index=0;
     bool textured=false;
+    std::uint8_t blending=68;
+    std::uint8_t alpha_threshold=0;
+    bool depth_test=true,depth_write=true,color_write=true,alpha_write=true;
+    std::uint8_t culling=160,winding=168;
+    float depth_offset_factor=0.f,depth_offset_units=0.f;
 };
 struct OriginalSceneResolveResult {
     bool valid=false;
