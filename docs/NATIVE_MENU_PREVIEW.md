@@ -74,3 +74,26 @@ simulation and full menu interaction behavior remain incomplete.
 The builds contain no game assets, ARM emulator or translation runtime.
 Headless Mesa OpenGL and real-APK tests validate the native menu render
 and UI layout; real hardware compatibility still requires testing.
+
+## Windows field-test package — November 2, 2026
+
+This package is built by the `Native Dead Space original 3D menu preview`
+GitHub Actions workflow from the current development branch. Keep
+`deadspace_native.exe`, `SDL2.dll`, `zlib1.dll`,
+`libstdc++-6.dll`, `libgcc_s_seh-1.dll`, and
+`libwinpthread-1.dll` together in the same directory.
+The project now uses the original ARM-verified file-backed read/seek/size
+semantics through native Windows file APIs for both the splash and
+menu assets. It still cannot boot into gameplay; collect crashes,
+missing textures, incorrect menu layouts, and input failures for fixes.
+
+To record diagnostic output in PowerShell (while keeping the executable
+in the extracted ZIP directory), run:
+
+```powershell
+.\deadspace_native.exe --boot-apk --apk ".\Deas.Space.Mobile.Fixes.apk" --assets-dir ".\installed-deadspace" *> ".\deadspace-test.log"
+```
+
+Share `deadspace-test.log` and a screenshot of the window if something
+does not display correctly. No proprietary game data should be uploaded
+to public GitHub issues or release artifacts.
