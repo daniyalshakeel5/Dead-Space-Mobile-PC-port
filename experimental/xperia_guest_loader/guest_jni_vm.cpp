@@ -284,27 +284,63 @@ bool GuestJniVm::dispatch(std::uint32_t id,
         error="Unimplemented Xperia static method execution: "+
               std::string(methods[index].name);return false;
     }
+    if(slot==27 || slot==28 || slot==29 || slot==30){ // AllocObject/NewObject/V/A
+        if(r1<kClassBase || (r1-kClassBase)%16u){
+            error="JNI allocate with invalid class";return false;
+        }
+        const auto owner=(r1-kClassBase)/16u;
+        if(owner<5u||owner>7u){
+            error="JNI object allocation requires a registered Xperia delegate";
+            return false;
+        }
+        if(slot!=27){
+            if(r2<kMethodBase || (r2-kMethodBase)%16u ||
+               (r2-kMethodBase)/16u>=sizeof(methods)/sizeof(methods[0])){
+                error="JNI object constructor method ID invalid";return false;
+            }
+            const auto& ctor=methods[(r2-kMethodBase)/16u];
+            if(ctor.owner!=owner || std::string(ctor.name)!="<init>"){
+                error="JNI constructor does not match requested Xperia class";
+                return false;
+            }
+        }
+        if(next_instance_>=32u){error="JNI Xperia delegate object cap";return false;}
+        const auto object=vm_address+0x3b00u+next_instance_*16u;
+        ++next_instance_;
+        auto* ptr=guest.writeable(object,4u);
+        if(!ptr){error="JNI delegate object unmapped";return false;}
+        put32(ptr,r1);
+        instances_.emplace(object,owner);
+        regs[0]=object;error.clear();return true;
+    }
     if(slot==31){ // GetObjectClass
-        if(r1!=audio_track_address){
+        if(r1==audio_track_address){
+            regs[0]=kClassBase+4u*16u;error.clear();return true;
+        }
+        const auto instance=instances_.find(r1);
+        if(instance==instances_.end()){
             error="JNI GetObjectClass unknown guest Java object";return false;
         }
-        regs[0]=kClassBase+4u*16u;error.clear();return true;
+        regs[0]=kClassBase+16u*instance->second;error.clear();return true;
     }
     if(slot==33){ // GetMethodID(jclass, method, signature)
-        if(r1!=kClassBase+4u*16u){
-            error="JNI GetMethodID unsupported non-AudioTrack class";return false;
+        if(r1<kClassBase || (r1-kClassBase)%16u ||
+           (r1-kClassBase)/16u>=sizeof(classes)/sizeof(classes[0])){
+            error="JNI GetMethodID invalid class";return false;
         }
+        const auto owner=(r1-kClassBase)/16u;
         std::string name,sig;
         if(!guest_string(guest,r2,name)||
            !guest_string(guest,regs[3],sig)){
             error="JNI GetMethodID invalid name/signature";return false;
         }
         for(unsigned i=0;i<sizeof(methods)/sizeof(methods[0]);++i)
-            if(methods[i].owner==4 && !methods[i].is_static &&
+            if(methods[i].owner==owner && !methods[i].is_static &&
                name==methods[i].name && sig==methods[i].signature){
                 regs[0]=kMethodBase+16u*i;error.clear();return true;
             }
-        error="Original AudioTrack method missing: "+name+sig;return false;
+        error=std::string("Original Xperia instance method missing: ")+
+              classes[owner].name+"."+name+sig;return false;
     }
     if(slot==178){ // NewShortArray(jsize)
         if(static_cast<std::int32_t>(r1)<0||r1>524288u ||
@@ -352,7 +388,56 @@ bool GuestJniVm::dispatch(std::uint32_t id,
         std::memmove(to,from,amount*2u);
         regs[0]=0;error.clear();return true;
     }
-    if(slot==49){ // AudioTrack.write(short[], offsetInShorts, sizeInShorts)
+    const auto method_index=[&]()->int {
+        if(r2<kMethodBase || (r2-kMethodBase)%16u ||
+           (r2-kMethodBase)/16u>=sizeof(methods)/sizeof(methods[0]))
+            return -1;
+        return static_cast<int>((r2-kMethodBase)/16u);
+    };
+    if(slot==34){ // CallObjectMethod() - Xperia hardware / data path strings
+        const auto obj=instances_.find(r1);
+        const int index=method_index();
+        if(obj==instances_.end() || index<0 ||
+           methods[index].owner!=obj->second || !methods[index].value){
+            error="JNI CallObjectMethod unknown delegate/string getter";return false;
+        }
+        const auto cached=cached_method_strings_.find(static_cast<unsigned>(index));
+        if(cached!=cached_method_strings_.end()){
+            regs[0]=cached->second;error.clear();return true;
+        }
+        const auto ref=store_string(guest,methods[index].value,error);
+        if(!ref)return false;
+        cached_method_strings_.emplace(static_cast<unsigned>(index),ref);
+        regs[0]=ref;error.clear();return true;
+    }
+    if(slot==55){ // CallFloatMethod() - device pixel density
+        const int index=method_index();
+        const auto obj=instances_.find(r1);
+        if(index<0||obj==instances_.end()||obj->second!=6u||
+           methods[index].owner!=6u ||
+           (std::string(methods[index].name)!="GetDpiX" &&
+            std::string(methods[index].name)!="GetDpiY")){
+            error="JNI CallFloatMethod unknown Xperia display property";
+            return false;
+        }
+        constexpr float dpi=200.f;
+        static_assert(sizeof(dpi)==4,"ARM32 float must occupy one register");
+        std::uint32_t bits=0;
+        std::memcpy(&bits,&dpi,4);
+        regs[0]=bits;error.clear();return true;
+    }
+    if(slot==49){ // Xperia Display delegate integers / AudioTrack.write
+        const auto instance=instances_.find(r1);
+        const int index=method_index();
+        if(instance!=instances_.end() && instance->second==6u &&
+           index>=0 && methods[index].owner==6u){
+            const std::string name=methods[index].name;
+            if(name=="GetDefaultWidth")regs[0]=544u;
+            else if(name=="GetDefaultHeight")regs[0]=960u;
+            else if(name=="GetStdOrientation")regs[0]=0u;
+            else {error="Unknown Xperia display int getter";return false;}
+            error.clear();return true;
+        }
         if(r1!=audio_track_address || r2!=kMethodBase+4u*16u){
             error="Unknown JNI CallIntMethod receiver/method";return false;
         }
@@ -374,7 +459,15 @@ bool GuestJniVm::dispatch(std::uint32_t id,
         if(!audio_.enqueue(audio_.context,pcm,number*2u,error))return false;
         regs[0]=number;error.clear();return true;
     }
-    if(slot==61){ // AudioTrack.play/stop/release
+    if(slot==61){ // Display orientation / AudioTrack.play-stop-release
+        const auto obj=instances_.find(r1);
+        const int index=method_index();
+        if(obj!=instances_.end()&&obj->second==6u &&
+           index>=0 && methods[index].owner==6u &&
+           std::string(methods[index].name)=="SetStdOrientation"){
+            // This is a fixed-landscape SDL window; orientation cannot rotate.
+            regs[0]=0;error.clear();return true;
+        }
         if(r1!=audio_track_address || r2<kMethodBase+5u*16u ||
            r2>kMethodBase+7u*16u || (r2-kMethodBase)%16u){
             error="Unknown JNI CallVoidMethod receiver/method";return false;
@@ -388,17 +481,27 @@ bool GuestJniVm::dispatch(std::uint32_t id,
         regs[0]=0;error.clear();return true;
     }
     if(slot==168){ // GetStringUTFLength
-        if(r1!=kString){error="Unknown original JNI String instance";return false;}
-        regs[0]=6;error.clear();return true;
+        const auto found=strings_.find(r1);
+        const auto addr=r1==kString?kVersion:
+            found!=strings_.end()?found->second:0u;
+        if(!addr){error="Unknown original JNI String instance";return false;}
+        const auto* bytes=guest.read(addr,255);
+        if(!bytes){error="JNI String UTF buffer not mapped";return false;}
+        regs[0]=static_cast<std::uint32_t>(std::strlen(
+            reinterpret_cast<const char*>(bytes)));
+        error.clear();return true;
     }
     if(slot==169){ // GetStringUTFChars
-        if(r1!=kString){error="Unknown original JNI String instance";return false;}
+        const auto found=strings_.find(r1);
+        const auto addr=r1==kString?kVersion:
+            found!=strings_.end()?found->second:0u;
+        if(!addr){error="Unknown original JNI String instance";return false;}
         if(r2){
             auto* is_copy=guest.writeable(r2,1);
             if(!is_copy){error="Unmapped JNI GetStringUTFChars isCopy";return false;}
             *is_copy=0;
         }
-        regs[0]=kVersion;error.clear();return true;
+        regs[0]=addr;error.clear();return true;
     }
     error="Unsupported original JNIEnv table entry "+std::to_string(slot);
     return false;
