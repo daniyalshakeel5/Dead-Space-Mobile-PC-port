@@ -210,8 +210,9 @@ OriginalM3gScene decode_original_m3g_scene(const std::uint8_t* data,std::size_t 
                 for(std::uint32_t n=0;n<count;++n){
                     std::uint32_t child=0;
                     if(!c.word(child)||child==0||child>=id ||
-                       objects[child-1].type!=5&&objects[child-1].type!=9&&
-                       objects[child-1].type!=14 ||
+                       (objects[child-1].type!=5 &&
+                        objects[child-1].type!=9 &&
+                        objects[child-1].type!=14) ||
                        !parents.emplace(child,id).second)
                         return fail("Invalid or duplicate M3G child node");
                     ++out.group_links;
