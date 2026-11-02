@@ -123,7 +123,7 @@ bool GuestLibcBridge::code_byte(std::uint32_t address,
 bool GuestLibcBridge::dispatch(
     std::uint32_t id,std::array<std::uint32_t,16>& regs,
     GuestElf32& image,std::string& failure,GuestHeap* heap,
-    GuestFileSystem* files) const noexcept {
+    GuestFileSystem* files) noexcept {
     try {
         if(id<1||id>last_svc)
             throw std::runtime_error("Unknown Android libc SVC service");
