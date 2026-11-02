@@ -8,6 +8,7 @@ on:
       - "tools/research_original_scene_records.py"
       - "tools/research_four_native_subsystems.py"
       - "tools/research_menu_particle_checksum.py"
+      - "tools/probe_menu_animation_ui.py"
       - "src/original_splash_host.cpp"
       - "src/im_ui_image.cpp"
       - "src/im_menu_scene.cpp"
@@ -57,6 +58,8 @@ jobs:
             --output "$RUNNER_TEMP/deadspace.apk" \
             https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes/releases/download/dead_space_mobile_fixes/Deas.Space.Mobile.Fixes.apk
           test "$(wc -c < "$RUNNER_TEMP/deadspace.apk" | tr -d ' ')" = 325769461
+      - name: Recover original menu animation and frontend metadata
+        run: python tools/probe_menu_animation_ui.py "$RUNNER_TEMP/deadspace.apk"
       - name: Analyze all four original engine subsystems in parallel
         shell: bash
         run: |
