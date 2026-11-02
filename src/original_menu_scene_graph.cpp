@@ -92,6 +92,8 @@ OriginalSceneResolveResult resolve_original_menu_scene(
     if(!by_id.count(camera.node_id))
         return fail("Original camera node absent from recovered hierarchy");
     std::unordered_map<std::uint32_t,Matrix> world;
+    std::unordered_map<std::uint32_t,bool> visible;
+    std::unordered_map<std::uint32_t,float> alpha;
     std::unordered_map<std::uint32_t,int> color;
     std::function<bool(std::uint32_t)> visit=[&](std::uint32_t id)->bool {
         if(color[id]==2)return true;
@@ -101,8 +103,15 @@ OriginalSceneResolveResult resolve_original_menu_scene(
         if(node.parent_id) {
             if(!by_id.count(node.parent_id)||!visit(node.parent_id))return false;
             world[id]=mul(world.at(node.parent_id),node.local);
-        }else world[id]=node.local;
-        color[id]=2;return finite(world.at(id));
+            visible[id]=visible.at(node.parent_id)&&node.rendering_enabled;
+            alpha[id]=alpha.at(node.parent_id)*node.alpha;
+        }else {
+            world[id]=node.local;
+            visible[id]=node.rendering_enabled;
+            alpha[id]=node.alpha;
+        }
+        color[id]=2;return finite(world.at(id)) &&
+            std::isfinite(alpha.at(id)) && alpha.at(id)>=0.f && alpha.at(id)<=1.f;
     };
     for(const auto& node:nodes)
         if(!visit(node.object_id))return fail("Original scene has invalid parent link or cycle");
@@ -113,14 +122,28 @@ OriginalSceneResolveResult resolve_original_menu_scene(
         if(!world.count(bounds.mesh_object_index))
             return fail("Original mesh missing recovered world hierarchy node");
         out.frame.mesh_transforms.push_back(
-            {bounds.mesh_object_index,world.at(bounds.mesh_object_index)});
+            {bounds.mesh_object_index,world.at(bounds.mesh_object_index),
+             visible.at(bounds.mesh_object_index),alpha.at(bounds.mesh_object_index)});
     }
     std::unordered_set<std::uint32_t> seen;
     for(const auto& m:material) {
         if(!m.appearance_id||!seen.insert(m.appearance_id).second)
             return fail("Original material binding duplicated or invalid");
-        out.frame.material_bindings.push_back(
-            {m.appearance_id,m.image_index,m.textured});
+        OriginalMenuGpuSurface binding{};
+        binding.appearance_object_index=m.appearance_id;
+        binding.image_index=m.image_index;
+        binding.use_texture=m.textured;
+        binding.blending=m.blending;
+        binding.alpha_threshold=m.alpha_threshold;
+        binding.depth_test=m.depth_test;
+        binding.depth_write=m.depth_write;
+        binding.color_write=m.color_write;
+        binding.alpha_write=m.alpha_write;
+        binding.culling=m.culling;
+        binding.winding=m.winding;
+        binding.depth_offset_factor=m.depth_offset_factor;
+        binding.depth_offset_units=m.depth_offset_units;
+        out.frame.material_bindings.push_back(binding);
     }
     std::string validation;
     if(!validate_original_menu_gpu_frame(geometry,stream,images,out.frame,validation)){
