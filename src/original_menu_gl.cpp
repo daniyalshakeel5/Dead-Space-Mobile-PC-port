@@ -1,5 +1,6 @@
 #define SDL_MAIN_HANDLED
 #include "ds_port/original_menu_gl.hpp"
+#include "ds_port/original_menu_animation.hpp"
 #include "ds_port/native_menu_input.hpp"
 #include "ds_port/original_input_jni_bridge.hpp"
 #include <SDL.h>
@@ -92,7 +93,8 @@ bool validate_original_menu_gpu_frame(
 OriginalMenuGpuStatus run_original_menu_gl(
     const ImMenuGeometry& geometry,const OriginalMenuDrawStream& stream,
     const std::vector<M3gRgbaImage>& images,
-    const OriginalMenuGpuFrame& frame,std::string& diagnostic) {
+    const OriginalMenuGpuFrame& frame,std::string& diagnostic,
+    const OriginalMenuAnimationRuntime* motion_runtime) {
     if(!validate_original_menu_gpu_frame(geometry,stream,images,frame,diagnostic))
         return OriginalMenuGpuStatus::IncompleteOriginalScene;
     if(SDL_InitSubSystem(SDL_INIT_VIDEO)!=0){
@@ -156,6 +158,7 @@ OriginalMenuGpuStatus run_original_menu_gl(
             nullptr,nullptr,module,key,alt);
     };
     bool quit_requested=false;
+    const std::uint32_t animation_start=SDL_GetTicks();
     bool reported_unbound_input=false;
     while(!quit_requested){
         SDL_Event e{};
@@ -217,7 +220,36 @@ OriginalMenuGpuStatus run_original_menu_gl(
             last_center=std::uint32_t(clear_pixel[0])<<16u|
                         std::uint32_t(clear_pixel[1])<<8u|clear_pixel[2];
         }
-        glMatrixMode(GL_PROJECTION);glLoadMatrixf(frame.projection.data());
+        // Use the original keyframe sequences and recompute all world
+        // matrices from the real M3G hierarchy, rather than moving a
+        // synthetic menu object. Controller preview activation is
+        // explicitly separated from the original runtime's activation.
+        OriginalMenuGpuFrame animated_frame{};
+        const OriginalMenuGpuFrame* draw_frame=&frame;
+        if(motion_runtime && motion_runtime->motion &&
+           motion_runtime->nodes && motion_runtime->camera &&
+           motion_runtime->materials) {
+            std::vector<OriginalSceneNode> animated_nodes;
+            const std::int64_t elapsed=std::int64_t(SDL_GetTicks()-animation_start);
+            if(!sample_original_menu_motion(*motion_runtime->motion,
+                    *motion_runtime->nodes,elapsed,animated_nodes,
+                    motion_runtime->preview_activate_controllers)){
+                diagnostic="Original menu keyframe sampling failed";
+                free_textures();return OriginalMenuGpuStatus::InvalidScene;
+            }
+            auto resolved=resolve_original_menu_scene(geometry,stream,images,
+                animated_nodes,*motion_runtime->camera,*motion_runtime->materials);
+            if(!resolved.valid){
+                diagnostic="Animated original hierarchy rejected: "+resolved.error;
+                free_textures();return OriginalMenuGpuStatus::InvalidScene;
+            }
+            animated_frame=std::move(resolved.frame);
+            draw_frame=&animated_frame;
+            transforms.clear();
+            for(const auto& m:draw_frame->mesh_transforms)
+                transforms.emplace(m.mesh_object_index,&m);
+        }
+        glMatrixMode(GL_PROJECTION);glLoadMatrixf(draw_frame->projection.data());
         for(const auto& batch:stream.batches){
             const auto& object=*transforms.at(batch.mesh_object_index);
             const auto& mat=*materials.at(batch.appearance_object_index);
@@ -256,7 +288,7 @@ OriginalMenuGpuStatus run_original_menu_gl(
                 glPolygonOffset(mat.depth_offset_factor,mat.depth_offset_units);
             }else glDisable(GL_POLYGON_OFFSET_FILL);
             glMatrixMode(GL_MODELVIEW);
-            glLoadMatrixf(frame.view.data());
+            glLoadMatrixf(draw_frame->view.data());
             glMultMatrixf(object.model_matrix.data());
             if(mat.use_texture){
                 glEnable(GL_TEXTURE_2D);
