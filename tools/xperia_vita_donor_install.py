@@ -101,8 +101,23 @@ def verify(path,spec=EXACT):
             "requires_arm_wrapper":True
         }
 
-def install(source,destination,spec=EXACT):
+def install(source,destination,spec=EXACT,reanimated_apk=None,hd_spec=None):
+    """Atomic combined installation. Never replace Xperia assets with HD ones."""
     report=verify(source,spec)
+    # Verify BOTH user-owned archives before changing the filesystem.
+    if reanimated_apk is not None:
+        from tools.xperia_reanimated_hd_install import (
+            HdSpec,inspect as verify_reanimated,install as install_reanimated)
+        hd_spec=hd_spec or HdSpec()
+        hd_report=verify_reanimated(reanimated_apk,hd_spec)
+        report["reanimated_hd"]={
+            "release":hd_report["release"],
+            "resource_count":hd_report["hd_file_count"],
+            "enabled_in_runtime":False,
+            "compatibility":"sidecar; not yet mounted by original Xperia renderer"
+        }
+    else:
+        report["reanimated_hd"]={"status":"not selected"}
     destination=Path(destination).absolute()
     if destination.exists() or destination.is_symlink():
         raise DonorError("Destination already exists; refusing overwrite")
@@ -125,6 +140,12 @@ def install(source,destination,spec=EXACT):
         for name,sha in spec.signatures:
             with (stage/name).open("rb") as f:
                 if digest(f)!=sha:raise DonorError("Post-install checksum mismatch")
+        if reanimated_apk is not None:
+            # Staged entirely beneath the not-yet-committed installation.
+            # The Reanimated engine/older-edition assets are NEVER mixed
+            # into /assets or /lib; only the HD texture sidecar is extracted.
+            install_reanimated(
+                reanimated_apk,stage/"enhancements"/"reanimated",hd_spec)
         (stage/".xperia-donor-info.json").write_text(
             json.dumps(report,indent=2,sort_keys=True)+"\n",encoding="utf-8")
         if destination.exists() or destination.is_symlink():
@@ -136,14 +157,67 @@ def install(source,destination,spec=EXACT):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--zip",type=Path,required=True)
+    parser.add_argument("--zip",type=Path,help="Owned Xperia Play deadspace.zip")
+    parser.add_argument("--reanimated-apk",type=Path,
+                        help="Owned Reanimated v1.2 or v1.3 APK for HD textures")
+    parser.add_argument("--no-hd",action="store_true",
+                        help="Explicitly install original graphics only")
+    parser.add_argument("--gui",action="store_true",
+                        help="Open file selection dialogs for game ZIP and HD APK")
     parser.add_argument("--destination",type=Path)
     parser.add_argument("--verify-only",action="store_true")
     args=parser.parse_args()
+    if args.no_hd and args.reanimated_apk:
+        parser.error("--no-hd and --reanimated-apk are mutually exclusive")
+
+    # GUI file selection is optional, uses Python's standard Tk dialogs;
+    # headless CI and explicit CLI arguments never start a window.
+    if args.gui:
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            ui=tk.Tk()
+            ui.withdraw()
+            if not args.zip:
+                picked=filedialog.askopenfilename(
+                    title="1 of 2 — Select Xperia Play Dead Space ZIP",
+                    filetypes=[("ZIP archive","*.zip"),("All files","*.*")])
+                if picked:args.zip=Path(picked)
+            if not args.no_hd and not args.reanimated_apk:
+                picked=filedialog.askopenfilename(
+                    title="2 of 2 — Select Dead Space Reanimated APK (HD textures)",
+                    filetypes=[("Android APK","*.apk"),("All files","*.*")])
+                if picked:args.reanimated_apk=Path(picked)
+            if not args.verify_only and not args.destination:
+                parent=filedialog.askdirectory(
+                    title="Select parent folder for new Dead Space Xperia installation")
+                if parent:args.destination=Path(parent)/"DeadSpaceMobile-Xperia"
+            ui.destroy()
+        except (ImportError,RuntimeError) as err:
+            parser.error("GUI file selector unavailable: "+str(err))
+    elif sys.stdin.isatty():
+        if args.zip is None:
+            picked=input("Select Xperia Play deadspace.zip path: ").strip().strip('"')
+            if picked:args.zip=Path(picked)
+        if not args.no_hd and args.reanimated_apk is None:
+            picked=input(
+                "Select Dead Space Reanimated APK path for HD textures "
+                "(Enter to skip HD): ").strip().strip('"')
+            if picked:args.reanimated_apk=Path(picked)
+
+    if args.zip is None:
+        parser.error("Xperia deadspace.zip is required (--zip or --gui)")
     if not args.verify_only and args.destination is None:
         parser.error("--destination is required unless --verify-only is used")
     try:
-        report=verify(args.zip) if args.verify_only else install(args.zip,args.destination)
+        if args.verify_only:
+            report=verify(args.zip)
+            if args.reanimated_apk:
+                from tools.xperia_reanimated_hd_install import inspect as inspect_hd
+                report["reanimated_hd"]=inspect_hd(args.reanimated_apk)
+        else:
+            report=install(args.zip,args.destination,
+                           reanimated_apk=args.reanimated_apk)
         print(json.dumps(report,indent=2,sort_keys=True))
         return 0
     except (OSError,ValueError) as err:
