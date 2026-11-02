@@ -28,11 +28,13 @@ bool original_bind_input_mapped_runtime(
     const void* frame_state,std::size_t frame_bytes,
     OriginalInputAllocate allocator,OriginalInputQueue queue,
     void* ctx) noexcept {
-    if(!frame_state || frame_bytes<4)return false;
+    if(!frame_state || frame_bytes<4 || !allocator || !queue)return false;
     OriginalInputServices services{};
     if(!original_resolve_input_virtual_owners(
         mapped,allocator,queue,ctx,&services))
         return false;
+    if(!services.pool_owner_arm_va || !services.allocator_method_arm_va ||
+       !services.queue_owner_arm_va || !services.queue_method_arm_va)return false;
     original_bind_input_services({services,frame_state,frame_bytes});
     return true;
 }
