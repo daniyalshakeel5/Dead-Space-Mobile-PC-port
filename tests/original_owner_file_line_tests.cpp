@@ -95,7 +95,9 @@ int main() {
     assert(line.status==S::LineTooLong&&out.contents==u"preserved");
     const auto original=original_embedded_provider_position_file_0x271794(
         // Engine's owned provider is original owner+0x804.
-        engine.mapped_bytes()+0x804u,
+        // This original owner owns mutable mapped storage; selector 2
+        // may write original errno to the embedded provider's +0xA0.
+        const_cast<std::uint8_t*>(engine.mapped_bytes())+0x804u,
         engine.mapped_size()-0x804u,other,0u);
     assert(original.status==OriginalEmbeddedProviderStatus::Completed);
     assert(original.original_r0==0u);
