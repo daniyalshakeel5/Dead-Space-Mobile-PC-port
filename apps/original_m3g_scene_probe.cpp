@@ -27,5 +27,28 @@ int main(int argc,char** argv) {
              <<"Original textured appearances: "<<textured<<"\n"
              <<"Original scene images: "<<original.images.size()<<"\n"
              <<"Original animation track references: "<<original.animation_references<<"\n";
+    for(std::size_t i=0;i<original.images.size();++i) {
+        const auto& img=original.images[i];
+        std::size_t white=0,nonwhite=0;
+        for(std::size_t j=0;j<img.pixels_rgba.size();j+=4) {
+            if(img.pixels_rgba[j]==255&&img.pixels_rgba[j+1]==255&&
+               img.pixels_rgba[j+2]==255)++white;
+            else ++nonwhite;
+        }
+        std::cout<<"Original texture "<<i<<": "<<img.width<<"x"<<img.height
+                 <<", white pixels "<<white<<", nonwhite "<<nonwhite<<"\\n";
+    }
+    for(const auto& m:original.materials)
+        std::cout<<"Original appearance "<<m.appearance_id
+                 <<": texture="<<m.textured
+                 <<", image="<<m.image_index
+                 <<", framebuffer_blend="<<int(m.blending)
+                 <<", culling="<<int(m.culling)
+                 <<", depth_test="<<m.depth_test
+                 <<", depth_write="<<m.depth_write
+                 <<", color_write="<<m.color_write<<"\\n";
+    std::size_t hidden=0;
+    for(const auto& n:original.nodes)if(!n.rendering_enabled||n.alpha==0)++hidden;
+    std::cout<<"Original explicitly hidden nodes: "<<hidden<<"\\n";
     return 0;
 }
