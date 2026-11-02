@@ -53,6 +53,11 @@ bool validate_original_ui_draw_list(
     const OriginalUiSbin& database,
     const std::vector<M3gRgbaImage>& atlases,
     const std::vector<OriginalUiDraw>& commands,std::string& reason);
+// Desktop keyboard focus uses only original clickable layout objects,
+ // in their recovered on-screen layout order. No fake menu entries.
+std::uint32_t cycle_original_ui_focus(
+    const std::vector<OriginalUiDraw>& commands,
+    std::uint32_t current,bool backwards) noexcept;
 OriginalUiHit hit_test_original_ui(
     const std::vector<OriginalUiDraw>& commands,int x,int y);
 OriginalUiPointerResult dispatch_original_ui_pointer(
