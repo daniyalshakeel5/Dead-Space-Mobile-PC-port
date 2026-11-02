@@ -32,6 +32,7 @@ jobs:
           $root='dist/XperiaWindowsGuestRuntime'
           New-Item -ItemType Directory -Force $root | Out-Null
           Copy-Item build/armjit/Release/xperia_guest_import_report.exe $root/
+          Copy-Item build/armjit/Release/xperia_guest_startup.exe $root/
           Copy-Item launcher/GuestPreflight.ps1 $root/
           @'
           Xperia Play guest runtime developer package
@@ -39,7 +40,7 @@ jobs:
           ARM32 library. It does NOT start the game.
           Run from PowerShell:
           ./GuestPreflight.ps1 -GameDir "PATH_TO_INSTALLED_XPERIA"
-          Actual game execution, rendering, audio and controller forwarding still
+          JNI startup, rendering, audio and controller forwarding still
           require full Android/JNI/GLES host services.
           No original game data is included.
           '@ | Set-Content "$root/README.txt"
