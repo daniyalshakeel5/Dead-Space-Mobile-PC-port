@@ -86,6 +86,61 @@ OriginalUiSbin decode_original_ui_sbin(const std::uint8_t* data,
     const auto& records=chunks.at("DATA");
     if(hdr.n>128u*1024u || records.n>4u*1024u*1024u)
         return fail("SBIN record byte budget exceeded");
+    // The original frontend's DATA root at OHDR[1] is a counted list of
+    // Image objects. Object pointers are encoded as byte-offset * 8.
+    // Each Image is a two-byte class tag + 16-byte record + padding;
+    // Rectangle records use the matching class tag and four UInt16s.
+    const auto pointer=[&](std::uint32_t id,std::size_t record_bytes,
+                           std::uint16_t type,std::size_t& offset)->bool {
+        if(id>=hdr.n/4)return false;
+        const std::uint32_t encoded=u32(hdr.p+std::size_t(id)*4);
+        if(encoded%8)return false;
+        offset=encoded/8u;
+        return offset<=records.n && record_bytes<=records.n-offset &&
+            u16(records.p+offset)==type;
+    };
+    std::size_t root=0;
+    if(hdr.n/4<2 || u32(hdr.p+4)%8 ||
+       (root=u32(hdr.p+4)/8u)>records.n ||
+       records.n-root<8)
+        return fail("Original UI image root missing");
+    const std::uint32_t count=u32(records.p+root+4);
+    if(count==0 || count>2000 || count>(records.n-root-8)/4)
+        return fail("Invalid original sprite reference count");
+    out.sprites.reserve(count);
+    for(std::uint32_t n=0;n<count;++n) {
+        const std::uint32_t id=u32(records.p+root+8+4u*n);
+        std::size_t image_at=0;
+        if(!pointer(id,20,0,image_at))
+            return fail("Invalid original frontend Image object pointer");
+        const auto* image=records.p+image_at+2;
+        const unsigned name=u16(image);
+        const unsigned atlas=image[2],scale=image[3];
+        const unsigned source_width=u16(image+4),source_height=u16(image+6);
+        const std::uint32_t source_id=u32(image+8),dest_id=u32(image+12);
+        if(!name||name>out.names.size()||atlas>1 || !scale ||
+           !source_width||!source_height || source_width>4096 ||
+           source_height>4096)
+            return fail("Original frontend sprite descriptor invalid");
+        std::size_t source_at=0,dest_at=0;
+        if(!pointer(source_id,12,1,source_at) ||
+           !pointer(dest_id,12,1,dest_at))
+            return fail("Original frontend source/destination rectangle missing");
+        const auto read_rect=[&](std::size_t at) {
+            const auto* b=records.p+at+2;
+            return OriginalUiRectangle{u16(b),u16(b+2),u16(b+4),u16(b+6)};
+        };
+        const auto src=read_rect(source_at),dst=read_rect(dest_at);
+        if(!src.width||!src.height||!dst.width||!dst.height ||
+           std::uint32_t(src.x)+src.width>source_width ||
+           std::uint32_t(src.y)+src.height>source_height ||
+           std::uint32_t(dst.x)+dst.width>1024u ||
+           std::uint32_t(dst.y)+dst.height>1024u)
+            return fail("Original sprite rectangle exceeds original asset bounds");
+        out.sprites.push_back({id,out.names[name-1],
+            std::uint8_t(atlas),std::uint8_t(scale),
+            std::uint16_t(source_width),std::uint16_t(source_height),src,dst});
+    }
     out.object_headers.assign(hdr.p,hdr.p+hdr.n);
     out.object_data.assign(records.p,records.p+records.n);
     out.decoded=true;return out;
