@@ -202,6 +202,7 @@ jobs:
       - name: Remove original game bytes from runner
         if: always()
         shell: bash
-        run: rm -f "$RUNNER_TEMP"/research-*.log
-        rm -f "$RUNNER_TEMP/original-scene-decoded.txt"
-        rm -rf "$RUNNER_TEMP/native-installed" "$RUNNER_TEMP/native-boot-apk.txt" "$RUNNER_TEMP/boot-assets" "$RUNNER_TEMP/deadspace.apk" "$RUNNER_TEMP/native-splash-exit.txt" "$RUNNER_TEMP/menu-inventory.json"
+        run: |
+          rm -f "$RUNNER_TEMP"/research-*.log
+          rm -f "$RUNNER_TEMP/original-scene-decoded.txt"
+          rm -rf "$RUNNER_TEMP/native-installed" "$RUNNER_TEMP/native-boot-apk.txt" "$RUNNER_TEMP/boot-assets" "$RUNNER_TEMP/deadspace.apk" "$RUNNER_TEMP/native-splash-exit.txt" "$RUNNER_TEMP/menu-inventory.json"
