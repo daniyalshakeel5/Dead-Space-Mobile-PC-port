@@ -5,6 +5,9 @@ on:
       - work/deadspace-xperia-arm-wrapper-2026-11-02
     paths:
       - "launcher/**"
+      - "tools/xperia_qemu_boot.py"
+      - "docs/XPERIA_PC_BOOT_BACKEND.md"
+      - "tests/test_xperia_qemu_boot.py"
       - "tests/Test-Launcher.ps1"
       - "docs/XPERIA_LAUNCHER.md"
       - ".github/workflows/xperia-windows-launcher.yml"
@@ -34,10 +37,13 @@ jobs:
         shell: powershell
         run: |
           $root='dist/DeadSpaceMobile-Xperia-Launcher'
-          New-Item -ItemType Directory -Force "$root/launcher" | Out-Null
+          New-Item -ItemType Directory -Force "$root/launcher","$root/tools" | Out-Null
           Copy-Item 'dist/DeadSpaceLauncher.exe' "$root/DeadSpaceLauncher.exe"
-          Copy-Item 'launcher/Core.ps1','launcher/Installer.ps1','launcher/Launcher.ps1','launcher/Launcher.xaml' "$root/launcher/"
+          Copy-Item 'launcher/Core.ps1','launcher/Installer.ps1','launcher/Launcher.ps1','launcher/Launcher.xaml','launcher/QemuBoot.ps1' "$root/launcher/"
+          Copy-Item 'tools/xperia_qemu_boot.py' "$root/tools/xperia_qemu_boot.py"
           Copy-Item 'docs/XPERIA_LAUNCHER.md' "$root/README.md"
+          Copy-Item 'docs/XPERIA_PC_BOOT_BACKEND.md' "$root/QEMU-BOOT-NOTES.md"
+          if(-not (Test-Path "$root/tools/xperia_qemu_boot.py") -or -not (Test-Path "$root/launcher/QemuBoot.ps1")){throw 'QEMU boot backend missing from Windows installer package'}
           if(Get-ChildItem $root -Recurse -File | Where-Object {$_.Extension -in @('.apk','.zip','.so','.ktx','.m3g','.sb','.jar')}){throw 'Copyrighted original assets in launcher package'}
           Compress-Archive -Path "$root/*" -DestinationPath 'dist/DeadSpaceMobile-Xperia-Launcher-Windows-x64.zip' -Force
           Write-Output ('Launcher ZIP bytes: '+(Get-Item 'dist/DeadSpaceMobile-Xperia-Launcher-Windows-x64.zip').Length)
