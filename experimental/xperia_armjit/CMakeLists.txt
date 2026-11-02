@@ -42,6 +42,14 @@ target_link_libraries(xperia_guest_libc_jit_smoke PRIVATE
 add_test(NAME xperia_jit_bionic_libc_a32_svc_roundtrip
     COMMAND xperia_guest_libc_jit_smoke)
 
+# Exercise the same Bionic/ELF/host-filesystem implementation directly
+# alongside the translated ARM call-runner on the Windows CI target.
+add_executable(xperia_guest_abi_tests
+    ../xperia_guest_loader/guest_libc_bridge_tests.cpp)
+target_link_libraries(xperia_guest_abi_tests PRIVATE xperia_arm_guest_libc)
+add_test(NAME xperia_guest_bionic_cpp_lifetime_and_errno
+    COMMAND xperia_guest_abi_tests)
+
 # Reusable original ARM lifecycle call runner with explicit exit trampoline,
 # a real stack and service-trap dispatcher. No copyrighted ARM code.
 add_library(xperia_arm_call_runner STATIC guest_arm_call_runner.cpp)
