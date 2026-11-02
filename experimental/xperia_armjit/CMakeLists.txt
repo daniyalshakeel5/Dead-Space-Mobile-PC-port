@@ -40,3 +40,14 @@ target_link_libraries(xperia_guest_libc_jit_smoke PRIVATE
     xperia_arm_guest_libc dynarmic)
 add_test(NAME xperia_jit_bionic_libc_a32_svc_roundtrip
     COMMAND xperia_guest_libc_jit_smoke)
+
+# Reusable original ARM lifecycle call runner with explicit exit trampoline,
+# a real stack and service-trap dispatcher. No copyrighted ARM code.
+add_library(xperia_arm_call_runner STATIC guest_arm_call_runner.cpp)
+target_compile_features(xperia_arm_call_runner PUBLIC cxx_std_20)
+target_link_libraries(xperia_arm_call_runner PUBLIC xperia_arm_guest_libc dynarmic)
+add_executable(xperia_arm_call_runner_tests guest_arm_call_runner_tests.cpp)
+target_compile_features(xperia_arm_call_runner_tests PRIVATE cxx_std_20)
+target_link_libraries(xperia_arm_call_runner_tests PRIVATE xperia_arm_call_runner)
+add_test(NAME xperia_arm32_call_runner_and_constructor_order
+    COMMAND xperia_arm_call_runner_tests)
