@@ -10,6 +10,7 @@
 #include <iterator>
 #include <map>
 #include <string>
+#include <stdexcept>
 #include <vector>
 namespace {
 void quote(const std::string& v){

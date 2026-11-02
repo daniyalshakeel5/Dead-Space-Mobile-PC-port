@@ -21,7 +21,7 @@ jobs:
         run: cmake -S experimental/xperia_armjit -B build-jit -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: Build JIT and run only user-owned synthetic A32 instructions
         run: |
-          cmake --build build-jit --target xperia_arm32_jit_smoke xperia_elf_jit_synthetic xperia_guest_libc_jit_smoke xperia_arm_call_runner_tests --parallel 2
+          cmake --build build-jit --target xperia_arm32_jit_smoke xperia_elf_jit_synthetic xperia_guest_libc_jit_smoke xperia_arm_call_runner_tests xperia_guest_import_report --parallel 2
           ctest --test-dir build-jit --output-on-failure -R 'xperia_arm32_jit_synthetic_a32|xperia_elf_mapped_a32_jit|xperia_jit_bionic_libc_a32_svc_roundtrip|xperia_arm32_call_runner_and_constructor_order'
 
   windows-host:
@@ -57,7 +57,7 @@ jobs:
       - name: Package Windows-native original-free runtime tests
         run: |
           New-Item -ItemType Directory -Force 'dist/Windows-Arm-Runtime-Tests' | Out-Null
-          $bins=@('xperia_arm32_jit_smoke','xperia_elf_jit_synthetic','xperia_guest_libc_jit_smoke','xperia_arm_call_runner_tests')
+          $bins=@('xperia_arm32_jit_smoke','xperia_elf_jit_synthetic','xperia_guest_libc_jit_smoke','xperia_arm_call_runner_tests','xperia_guest_import_report')
           foreach ($name in $bins) {
             Copy-Item "build-jit-windows/Release/$name.exe" 'dist/Windows-Arm-Runtime-Tests/' -ErrorAction Stop
           }

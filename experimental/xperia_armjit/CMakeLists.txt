@@ -51,3 +51,9 @@ target_compile_features(xperia_arm_call_runner_tests PRIVATE cxx_std_20)
 target_link_libraries(xperia_arm_call_runner_tests PRIVATE xperia_arm_call_runner)
 add_test(NAME xperia_arm32_call_runner_and_constructor_order
     COMMAND xperia_arm_call_runner_tests)
+
+# Loads the user's original Xperia Play ELF from THEIR disk at runtime
+# and reports the exact missing Android/JNI/GLES import names.
+add_executable(xperia_guest_import_report xperia_guest_import_report.cpp)
+target_compile_features(xperia_guest_import_report PRIVATE cxx_std_20)
+target_link_libraries(xperia_guest_import_report PRIVATE xperia_arm_guest_libc)
