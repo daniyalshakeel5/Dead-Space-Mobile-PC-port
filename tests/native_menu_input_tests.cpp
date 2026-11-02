@@ -22,12 +22,16 @@ int main(){
         static_cast<Trace*>(p)->events.push_back({3,key,module,0,0});
     };
     NativeMenuInputState state{};
+    assert(!native_menu_pointer(state,cb,2,320,240,640,480));
+    assert(!state.mouse_held&&trace.events.empty());
     assert(native_menu_pointer(state,cb,0,320,240,640,480));
     assert(!native_menu_pointer(state,cb,0,320,240,640,480));
     assert(native_menu_pointer(state,cb,2,640,480,640,480));
     assert(trace.events.back().x==1.f&&trace.events.back().y==1.f);
     assert(native_menu_pointer(state,cb,1,640,480,640,480));
     assert(!native_menu_pointer(state,cb,1,640,480,640,480));
+    assert(!native_menu_pointer(state,cb,2,640,480,640,480));
+    assert(!state.mouse_held&&trace.events.size()==3);
     assert(native_menu_key(state,cb,66,true));
     assert(!native_menu_key(state,cb,66,true));
     assert(native_menu_key(state,cb,4,true));

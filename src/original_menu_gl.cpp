@@ -215,6 +215,12 @@ OriginalMenuGpuStatus run_original_menu_gl(
                     e.window.event==SDL_WINDOWEVENT_FOCUS_LOST) {
                 native_menu_focus_lost(input,callbacks);
                 ui_pointer(OriginalUiPointerAction::Cancel,0,0);
+            }else if(e.type==SDL_WINDOWEVENT &&
+                    e.window.event==SDL_WINDOWEVENT_LEAVE) {
+                // Losing the mouse should not preserve a pressed or hovered
+                // menu button. Cancel both original and desktop event paths.
+                if(input.mouse_held)native_menu_focus_lost(input,callbacks);
+                ui_pointer(OriginalUiPointerAction::Cancel,0,0);
             }else if(e.type==SDL_KEYDOWN && !e.key.repeat) {
                 const auto key=e.key.keysym.sym;
                 if(key==SDLK_ESCAPE) {

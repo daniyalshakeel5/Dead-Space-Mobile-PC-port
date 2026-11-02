@@ -12,7 +12,11 @@ bool native_menu_pointer(NativeMenuInputState& state,
     if(!cb.pointer||width<=0||height<=0||event<0||event>2)return false;
     if(event==0 && state.mouse_held)return false;
     if(event==1 && !state.mouse_held)return false;
-    state.mouse_held=(event!=1);
+    // An Android ACTION_MOVE is part of an active touch sequence; do not
+    // turn a free mouse hover into a held pointer or enqueue stray drags.
+    if(event==2 && !state.mouse_held)return false;
+    if(event==0)state.mouse_held=true;
+    else if(event==1)state.mouse_held=false;
     const float u=std::clamp(float(x)/float(width),0.f,1.f);
     const float v=std::clamp(float(y)/float(height),0.f,1.f);
     state.last_u=u;state.last_v=v;
