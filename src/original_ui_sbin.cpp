@@ -136,7 +136,7 @@ OriginalUiSbin decode_original_ui_sbin(const std::uint8_t* data,
             u16(records.p+offset)==type;
     };
     std::size_t root=0;
-    if(hdr.n/4<2 || u32(hdr.p+4)%8 ||
+    if(hdr.n/4<2 || u32(hdr.p+4)%8!=2 ||
        (root=u32(hdr.p+4)/8u)>records.n ||
        records.n-root<8)
         return fail("Original UI image root missing");
