@@ -15,7 +15,7 @@ target_link_libraries(xperia_guest_heap PUBLIC xperia_guest_elf32)
 target_include_directories(xperia_guest_heap PUBLIC .)
 add_library(xperia_guest_filesystem STATIC guest_filesystem.cpp)
 target_include_directories(xperia_guest_filesystem PUBLIC .)
-add_library(xperia_guest_libc_bridge STATIC guest_libc_bridge.cpp)
+add_library(xperia_guest_libc_bridge STATIC guest_libc_bridge.cpp guest_jni_vm.cpp guest_bionic_data.cpp)
 target_link_libraries(xperia_guest_libc_bridge PUBLIC xperia_guest_elf32 xperia_guest_heap xperia_guest_filesystem)
 target_include_directories(xperia_guest_libc_bridge PUBLIC .)
 add_executable(xperia_guest_libc_bridge_tests guest_libc_bridge_tests.cpp)
@@ -29,3 +29,13 @@ add_test(NAME xperia_guest_bionic_heap_allocation COMMAND xperia_guest_heap_test
 add_executable(xperia_guest_filesystem_tests guest_filesystem_tests.cpp)
 target_link_libraries(xperia_guest_filesystem_tests PRIVATE xperia_guest_filesystem)
 add_test(NAME xperia_guest_original_asset_io_sandbox COMMAND xperia_guest_filesystem_tests)
+
+# Fast Windows tests: no Dynarmic/Boost/SDL dependency.
+add_executable(xperia_guest_jni_vm_tests guest_jni_vm_tests.cpp)
+target_link_libraries(xperia_guest_jni_vm_tests PRIVATE xperia_guest_libc_bridge)
+add_test(NAME xperia_guest_jni_classes_audio_and_device_profile
+    COMMAND xperia_guest_jni_vm_tests)
+add_executable(xperia_guest_bionic_data_tests guest_bionic_data_tests.cpp)
+target_link_libraries(xperia_guest_bionic_data_tests PRIVATE xperia_guest_libc_bridge)
+add_test(NAME xperia_guest_bionic_elf_global_objects
+    COMMAND xperia_guest_bionic_data_tests)
