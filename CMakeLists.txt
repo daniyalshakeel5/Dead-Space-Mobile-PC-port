@@ -33,6 +33,8 @@ add_library(ds_port_im_ui STATIC src/im_ui_image.cpp src/original_ui_sbin.cpp sr
 target_include_directories(ds_port_im_ui PUBLIC include)
 add_executable(ds_im_ui_probe apps/im_ui_probe.cpp)
 target_link_libraries(ds_im_ui_probe PRIVATE ds_port_im_ui)
+add_executable(ds_original_ui_layout_probe apps/original_ui_layout_probe.cpp)
+target_link_libraries(ds_original_ui_layout_probe PRIVATE ds_port_im_ui)
 
 add_library(ds_port_game_paths STATIC src/deadspace_paths.cpp)
 target_include_directories(ds_port_game_paths PUBLIC include)
