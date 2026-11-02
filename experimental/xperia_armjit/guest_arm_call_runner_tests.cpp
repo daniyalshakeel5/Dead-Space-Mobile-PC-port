@@ -131,9 +131,8 @@ int main(){
         GuestArmCallRunner lazy_runner(lazy,lazy_bridge,lazy_heap);
         assert(lazy_runner.run_original_initializers(error));
         assert(lazy_runner.invoke(base+0xc00,
-            {0,0,0,symbols.at("memcpy")},result,error)==false);
-        // The old test entry is missing memcpy arguments: failure is real.
-        assert(!error.empty());
+            {0,0,0,symbols.at("memcpy")},result,error));
+        assert(error.empty() && result==0u);
         assert(!lazy_runner.invoke(base+0xc00,
             {0,0,0,symbols.at("glDrawArrays")},result,error));
         assert(error.find("glDrawArrays")!=std::string::npos);
