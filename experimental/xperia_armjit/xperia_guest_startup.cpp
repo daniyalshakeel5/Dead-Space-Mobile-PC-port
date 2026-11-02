@@ -58,6 +58,7 @@ int main(int argc,char** argv){
         xperia::GuestHeap heap(elf);
         xperia::GuestFileSystem files(root);
         xperia::GuestJniVm java;
+        java.set_content_ready(true); // verified installed assets/ mount
         if(!java.install(elf,error))
             throw std::runtime_error("ARM32 JNI guest environment failed: "+error);
         xperia::GuestArmCallRunner guest(elf,services,heap,&files,&java);
