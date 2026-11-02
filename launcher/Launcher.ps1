@@ -63,6 +63,8 @@ function Refresh-Setup {
  $busy=$null -ne $script:task
  $ui.InstallAssets.IsEnabled= -not $busy -and -not $isInstalled
  $ui.QemuBoot.IsEnabled=$false # no WSL/Docker requirement in the player build
+ $ui.GuestPreflight.IsEnabled=$isInstalled -and (-not $busy) -and
+   (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'xperia_guest_import_report.exe') -PathType Leaf)
  foreach($name in @('BrowseZip','BrowseApk','ClearApk','Recheck','BrowseApkGraphics')){$ui[$name].IsEnabled= -not $busy}
  $ui.OpenOriginal.IsEnabled=$isInstalled
  $ui.OpenHd.IsEnabled=$hdInstalled
@@ -128,6 +130,18 @@ $ui.OpenOriginal.Add_Click({Safe-Action {Start-Process explorer.exe -ArgumentLis
 $ui.OpenHd.Add_Click({Safe-Action {Start-Process explorer.exe -ArgumentList (Quote-Argument (Join-Path $install 'enhancements\reanimated\texture_hd'))}})
 $ui.OpenInstall.Add_Click({Safe-Action {Start-Process explorer.exe -ArgumentList (Quote-Argument $install)}})
 $ui.OpenLogs.Add_Click({Start-Process explorer.exe -ArgumentList (Quote-Argument $logs)})
+$ui.GuestPreflight.Add_Click({Safe-Action {
+ if(-not (Test-Installed)){throw 'Install the verified Xperia Play files first.'}
+ $helper=Join-Path $PSScriptRoot 'GuestPreflight.ps1'
+ if(-not (Test-Path -LiteralPath $helper -PathType Leaf)){throw 'ARM guest diagnostic helper missing.'}
+ $argsList=@('-NoProfile','-ExecutionPolicy','Bypass','-File',$helper,
+  '-GameDir',$install,
+  '-ToolPath',(Join-Path $PSScriptRoot 'xperia_guest_import_report.exe'),
+  '-ReportPath',(Join-Path $logs 'guest-preflight.json'))
+ $script:task=Start-Tracked (Join-Path $PSHOME 'powershell.exe') $argsList 'Xperia ARM guest preflight'
+ Write-Activity 'Checking actual installed Xperia ARM library relocation and JNI import requirements.'
+ Refresh-Setup
+}})
 $ui.OpenBootLogs.Add_Click({Safe-Action {
  if(-not (Test-Path -LiteralPath $qemuLogs -PathType Container)){
   throw 'No QEMU boot logs yet. Run the boot check after installing the original Xperia ZIP.'
