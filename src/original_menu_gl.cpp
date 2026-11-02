@@ -6,6 +6,9 @@
 #include <SDL_opengl.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
 #include <limits>
 #include <iostream>
 #include <memory>
@@ -205,6 +208,32 @@ OriginalMenuGpuStatus run_original_menu_gl(
             }else glDisable(GL_TEXTURE_2D);
             glDrawElements(GL_TRIANGLES,static_cast<GLsizei>(batch.index_count),
                 GL_UNSIGNED_INT,geometry.indices.data()+batch.first_index);
+        }
+        // Optional one-frame production renderer smoke for GitHub's
+        // software OpenGL runner. No framebuffer image is persisted.
+        const char* smoke=std::getenv("DS_NATIVE_MENU_SMOKE_FRAMES");
+        if(smoke && std::strcmp(smoke,"1")==0) {
+            if(w>4096||h>4096) {
+                diagnostic="OpenGL smoke window dimensions exceeded";free_textures();
+                return OriginalMenuGpuStatus::InvalidScene;
+            }
+            std::vector<std::uint8_t> rgba(std::size_t(w)*h*4u);
+            glPixelStorei(GL_PACK_ALIGNMENT,1);
+            glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,rgba.data());
+            const auto error=glGetError();
+            std::size_t nonblack=0;
+            for(std::size_t index=0;index<rgba.size();index+=4u)
+                if(rgba[index]>12||rgba[index+1]>12||rgba[index+2]>12)
+                    ++nonblack;
+            std::cerr<<"Original 3D menu GPU frame: "<<w<<"x"<<h
+                     <<", nonblack pixels "<<nonblack<<"\\n";
+            free_textures();
+            if(error!=GL_NO_ERROR || nonblack==0) {
+                diagnostic="Original GPU scene generated no visible pixels or GL error";
+                return OriginalMenuGpuStatus::InvalidScene;
+            }
+            diagnostic.clear();
+            return OriginalMenuGpuStatus::Rendered;
         }
         SDL_GL_SwapWindow(window.get());
     }
