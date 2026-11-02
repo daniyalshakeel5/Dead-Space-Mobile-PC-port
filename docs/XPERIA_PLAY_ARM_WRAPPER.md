@@ -115,6 +115,65 @@ WSL2/Wine-style adaptation would need its own compatibility testing.
 The independent Dynarmic path above avoids copying the GPL ARM-specific
 loader while establishing a portable x86 JIT boundary.
 
+## Latest actual-source and synthetic runtime progress
+
+The user's private deadspace.zip was verified directly:
+
+- Archive length: 145903794 bytes; SHA256
+  04a71b975d0a9aa81b0388aee080f927903507cfbebddc8b57b8959f3eae2d31.
+- Embedded exact Xperia 1.1.33 libEAMGameDeadSpace.so and campaign assets.
+- EapRules' known vita-rip-atc profile: 1745 asset files, 254747912
+  uncompressed asset bytes, 22 map scene files. ATC, not original full PVRTC.
+- The data remains private. No source archive, EA library, textures, font
+  bytes, maps or audio were uploaded to or committed in GitHub.
+
+Changes implemented on this experimental branch:
+
+1. tools/xperia_vita_donor_install.py — integrity-checked,
+   no-overwrite transactional ZIP installer. Checks complete exact ZIP
+   SHA256, ARM library SHA256, seven critical original asset hashes,
+   original asset count/size, symlink/traversal/collision/size bounds.
+   Synthetic Windows/Linux tests passed:
+   https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41465861700
+2. Corrected actual ARM32 guest base memory mapping. Previously ARM
+   RELATIVE pointers were rebased but the JIT still addressed raw
+   ELF virtual addresses. A joined guest-JIT test now actually
+   dereferences the rebased pointer. ELF Windows/Linux tests passed:
+   https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41466189278
+   and the joined JIT Linux run passed:
+   https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41466189392
+3. A32 ELF dynamic-symbol binding: understands the original SysV
+   DT_HASH, DT_SYMTAB, DT_STRTAB, DT_STRSZ plus ELF32 REL
+   R_ARM_ABS32/GLOB_DAT/JUMP_SLOT. Internal/weak symbols are
+   handled separately. Mandatory external symbols bind
+   **atomically**, refusing missing guest thunks instead of
+   pretending an Android runtime exists.
+   Windows/Linux tests passed:
+   https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41466707515
+   The user's actual ELF has all 1236 non-relative relocations
+   referencing undefined symbols (five weak), so the remaining
+   mandatory symbols need real guest service implementations.
+4. independent ATC_RGB and ATC_RGBA_EXPLICIT_ALPHA block decoder:
+   experimental/xperia_atc/. Portable RGBA8 output for GPUs
+   without ATC support. Asymmetric synthetic block + alpha/crop
+   tests passed on Windows/Linux:
+   https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41467220961
+   **Not yet connected to IM-M3G texture extraction, GLES upload
+   interception, or actual game rendering.**
+
+Next real runtime integrations are:
+- Convert the bound ARM import addresses into callable, bounded
+  guest-to-host thunks, respecting AAPCS softfp and avoiding
+  untrusted guest pointers.
+- Implement the actual Bionic/libstdc++/libm, JNI, GLES1, audio
+  and file-system services and original constructor sequencing.
+- Prove original Xperia ELF executing at least JNI_OnLoad and
+  NativeOnCreate with the verified donor, then frame rendering.
+- Wire the existing PS4 DualShock 4 input bridge to the active
+  game's JNI pointer and key callbacks and test gameplay interaction.
+- Only after successful visual/functional tests claim a playable
+  Windows/Linux translation build.
+
 ## Known non-working parts
 
 The original Xperia game has NOT been executed on x86-64.
@@ -124,9 +183,12 @@ GLES 1.x rendering, PVRTC/texture support, audio, files, saves and
 frame execution. These must be integrated before playable results
 can be claimed.
 
-The user's Library provided the exact .so, not a complete
-verified Xperia assets/published tree. Existing Google Play/Fixes
-assets are a separate game edition and are not guaranteed compatible.
+The user has now provided a complete verified **Vita-ready main campaign
+donor** (reduced ATC version), in addition to the exact Xperia ARM ELF.
+See docs/XPERIA_PLAY_DONOR_2026-11-02.md. The full PVRTC edition and
+optional Survival/Burst Rifle assets are not included, but the known Vita
+donor has a full campaign asset tree. Do not use a PVRTC-only decoder on
+this donor or mix unrelated Google Play/Fixes assets.
 EapRules observed black models on an ETC1 "full" donor lacking
 appropriate PVRTC assets.
 
