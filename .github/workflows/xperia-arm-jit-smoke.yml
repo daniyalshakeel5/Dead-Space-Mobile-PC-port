@@ -35,7 +35,7 @@ jobs:
       - name: Prepare Windows-native ARM JIT dependencies
         run: |
           if (-not $env:VCPKG_INSTALLATION_ROOT) { throw 'Windows vcpkg is unavailable' }
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install boost-headers:x64-windows
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install boost-headers:x64-windows boost-variant:x64-windows
           if ($LASTEXITCODE -ne 0) { throw 'Boost headers installation failed' }
       - name: Configure real Win64 ARM32 JIT without QEMU or WSL
         run: |
