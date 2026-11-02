@@ -1,5 +1,7 @@
 #define SDL_MAIN_HANDLED
 #include "ds_port/original_menu_gl.hpp"
+#include "ds_port/native_menu_input.hpp"
+#include "ds_port/original_input_jni_bridge.hpp"
 #include <SDL.h>
 #include <SDL_opengl.h>
 #include <algorithm>
@@ -128,13 +130,51 @@ OriginalMenuGpuStatus run_original_menu_gl(
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);
     glVertexPointer(3,GL_FLOAT,sizeof(PackedVertex),packed[0].xyz);
     glTexCoordPointer(2,GL_FLOAT,sizeof(PackedVertex),packed[0].uv);
+    NativeMenuInputState input{};
+    NativeMenuInputCallbacks callbacks{};
+    callbacks.pointer=[](void*,int event,int module,int id,float x,float y) {
+        Java_com_ea_blast_TouchSurfaceAndroid_NativeOnPointerEvent(
+            nullptr,nullptr,event,module,id,x,y);
+    };
+    callbacks.key_down=[](void*,int module,int key,int alt) {
+        Java_com_ea_blast_KeyboardAndroid_NativeOnKeyDown(
+            nullptr,nullptr,module,key,alt);
+    };
+    callbacks.key_up=[](void*,int module,int key,int alt) {
+        Java_com_ea_blast_KeyboardAndroid_NativeOnKeyUp(
+            nullptr,nullptr,module,key,alt);
+    };
     bool quit_requested=false;
     while(!quit_requested){
         SDL_Event e{};
-        while(SDL_PollEvent(&e))
-            if(e.type==SDL_QUIT ||
-               (e.type==SDL_KEYDOWN&&e.key.keysym.sym==SDLK_ESCAPE))
-                quit_requested=true;
+        while(SDL_PollEvent(&e)) {
+            if(e.type==SDL_QUIT)quit_requested=true;
+            else if(e.type==SDL_WINDOWEVENT &&
+                    e.window.event==SDL_WINDOWEVENT_FOCUS_LOST)
+                native_menu_focus_lost(input,callbacks);
+            else if(e.type==SDL_KEYDOWN && !e.key.repeat) {
+                if(e.key.keysym.sym==SDLK_ESCAPE)
+                    quit_requested=true;
+                else if(e.key.keysym.sym==SDLK_RETURN)
+                    native_menu_key(input,callbacks,66,true);
+            }else if(e.type==SDL_KEYUP &&
+                     e.key.keysym.sym==SDLK_RETURN)
+                native_menu_key(input,callbacks,66,false);
+            else if(e.type==SDL_MOUSEBUTTONDOWN ||
+                    e.type==SDL_MOUSEBUTTONUP ||
+                    e.type==SDL_MOUSEMOTION) {
+                int width=0,height=0;
+                SDL_GetWindowSize(window.get(),&width,&height);
+                if(e.type==SDL_MOUSEMOTION && input.mouse_held)
+                    native_menu_pointer(input,callbacks,2,e.motion.x,e.motion.y,width,height);
+                else if(e.type==SDL_MOUSEBUTTONDOWN &&
+                        e.button.button==SDL_BUTTON_LEFT)
+                    native_menu_pointer(input,callbacks,0,e.button.x,e.button.y,width,height);
+                else if(e.type==SDL_MOUSEBUTTONUP &&
+                        e.button.button==SDL_BUTTON_LEFT)
+                    native_menu_pointer(input,callbacks,1,e.button.x,e.button.y,width,height);
+            }
+        }
         int w=0,h=0;SDL_GL_GetDrawableSize(window.get(),&w,&h);
         if(w<=0||h<=0)continue;
         glViewport(0,0,w,h);
