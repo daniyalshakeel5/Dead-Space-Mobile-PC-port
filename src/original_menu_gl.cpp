@@ -170,8 +170,10 @@ OriginalMenuGpuStatus run_original_menu_gl(
                 else if(e.key.keysym.sym==SDLK_RETURN)
                     native_menu_key(input,callbacks,66,true);
             }else if(e.type==SDL_KEYUP &&
-                     e.key.keysym.sym==SDLK_RETURN)
-                native_menu_key(input,callbacks,66,false);
+                     (e.key.keysym.sym==SDLK_RETURN ||
+                      e.key.keysym.sym==SDLK_ESCAPE))
+                native_menu_key(input,callbacks,
+                                e.key.keysym.sym==SDLK_ESCAPE?4:66,false);
             else if(e.type==SDL_MOUSEBUTTONDOWN ||
                     e.type==SDL_MOUSEBUTTONUP ||
                     e.type==SDL_MOUSEMOTION) {
