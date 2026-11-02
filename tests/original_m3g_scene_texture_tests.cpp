@@ -71,8 +71,10 @@ int main() {
         assert(decoded.decoded);
         assert(decoded.width==2 && decoded.height==2);
         assert(decoded.pixels_rgba.size()==16);
-        assert(decoded.pixels_rgba[0]==10);
-        assert(decoded.pixels_rgba[3]==(format==99?255:13));
+        assert(decoded.pixels_rgba[0]==(format==96?255:10));
+        const unsigned expected_alpha=format==96?10:format==98?11:
+            format==100?13:255;
+        assert(decoded.pixels_rgba[3]==expected_alpha);
         auto broken=bytes;
         broken.back()^=0xff;
         assert(!ds_port::decode_m3g_scene_texture_image(
