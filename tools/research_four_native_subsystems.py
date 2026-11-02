@@ -41,20 +41,20 @@ with zipfile.ZipFile(apk) as archive:
         for node_id,blob in nodes:
             for offset in range(len(blob)-3):
                 id_=struct.unpack_from("<I",blob,offset)[0]
-                if ref(id_) in (1,2,17):
+                if ref(id_) in (1,2,19):
                     animated[(items[node_id-1][0],offset,ref(id_))]+=1
         print("TRANSFORMS_CAMERA possible animation reference offsets",
               animated.most_common(20))
         print("TRANSFORMS_CAMERA matrix semantics UNVERIFIED")
     elif mode=="materials":
         appearances=[(i+1,p) for i,(t,p) in enumerate(items) if t==3]
-        textures=[i+1 for i,(t,_) in enumerate(items) if t==19]
+        textures=[i+1 for i,(t,_) in enumerate(items) if t==17]
         images=[i+1 for i,(t,_) in enumerate(items) if t==10]
         print("MATERIALS appearances",len(appearances),"texture_objects",len(textures),"image_objects",len(images))
         # Distinguish plausible references from validated mappings.
         # For each source object use *unaligned* little-endian references,
         # then report how often a single offset maps to a target type.
-        for typ in (3,19):
+        for typ in (3,17):
             candidates=collections.Counter()
             concrete=collections.defaultdict(list)
             for i,(t,p) in enumerate(items,1):
@@ -62,7 +62,7 @@ with zipfile.ZipFile(apk) as archive:
                 for k in range(len(p)-3):
                     target=struct.unpack_from("<I",p,k)[0]
                     targettype=ref(target)
-                    if targettype in (3,10,19):
+                    if targettype in (3,10,17):
                         candidates[(k,targettype)]+=1
                         concrete[(k,targettype)].append((i,target))
             for key,count in candidates.most_common(20):
@@ -71,8 +71,8 @@ with zipfile.ZipFile(apk) as archive:
                       "distinct_targets",len(set(x for _,x in concrete[key])))
         print("MATERIALS original bindings UNVERIFIED")
     elif mode=="animation":
-        print("ANIMATION tracks",sum(t==2 for t,_ in items),"controllers",sum(t==1 for t,_ in items),"transform_data",sum(t==17 for t,_ in items))
-        for typ in (1,2,17):
+        print("ANIMATION tracks",sum(t==2 for t,_ in items),"controllers",sum(t==1 for t,_ in items),"keyframe_sequences",sum(t==19 for t,_ in items))
+        for typ in (1,2,19):
             counts=collections.Counter(len(p) for t,p in items if t==typ)
             print("ANIMATION type",typ,"lengths",sorted(counts.items())[:25])
         for typ in (1,2,17):
@@ -82,7 +82,7 @@ with zipfile.ZipFile(apk) as archive:
                 for offset in range(len(p)-3):
                     target=struct.unpack_from("<I",p,offset)[0]
                     targettype=ref(target)
-                    if targettype in (1,2,17):
+                    if targettype in (1,2,19):
                         frequency[(offset,targettype)]+=1
             print("ANIMATION potential reference offsets type",typ,
                   frequency.most_common(20))
