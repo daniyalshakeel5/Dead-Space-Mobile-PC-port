@@ -3,6 +3,7 @@
 #ifdef DS_NATIVE_SPLASH_PRESENTATION
 #include "ds_port/original_splash_host.hpp"
 #include "ds_port/im_menu_scene.hpp"
+#include "ds_port/original_ui_sbin.hpp"
 #include "ds_port/original_menu_draw_stream.hpp"
 #ifdef DS_NATIVE_ORIGINAL_MENU_GL
 #include "ds_port/original_menu_gl.hpp"
@@ -154,6 +155,17 @@ bool load_original_menu_stage(const std::string& root) {
         scene_bytes.data(),scene_bytes.size());
     const auto ui=ds_port::decode_im_ui_rgba_images(
         ui_bytes.data(),ui_bytes.size());
+    const auto frontend=ds_port::decode_original_ui_sbin(
+        ui.frontend_sbin.data(),ui.frontend_sbin.size());
+    if(!frontend.decoded) {
+        std::cerr<<"Original frontend SBIN sprite database invalid: "
+                 <<frontend.error<<"\\n";
+        return false;
+    }
+    std::cerr<<"Original frontend UI database: "<<frontend.names.size()
+             <<" named resources, "<<frontend.types.size()
+             <<" record structures, "<<frontend.object_data.size()
+             <<" bytes of source/destination sprite information.\\n";
     if(!scene.decoded || !ui.decoded || ui.images.size()!=2 ||
        scene.mesh_count==0 || scene.surfaces.empty() ||
        scene.camera_object_indices.empty() ||
