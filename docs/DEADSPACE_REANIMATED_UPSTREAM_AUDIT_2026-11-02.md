@@ -80,11 +80,21 @@ Reanimated additionally ships its separate AArch64
 are not source code**. Exact original game logic identity is established
 for the matched ARM ELF; altered behavior may be in the new runtime.
 
-The first comparison found zero identical original asset paths between
-the 1,731 original and 1,955 reference assets. This **does not** imply
-all original asset data changed: the remaster reorganized its assets.
-A follow-up compares asset length/CRC32 signatures across renamed paths
-without exporting any game data.
+[Second isolated GitHub runner comparison 41432690426](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41432690426)
+found **1,729 cross-path asset matches by both uncompressed byte length
+and ZIP CRC32**, out of 1,731 original asset entries and 1,955
+Reanimated asset entries. There are **zero identical asset paths**, because
+the game data was relocated: the original files are principally under
+`assets/published/`, while the remaster's bundled original data resides
+under `assets/game/assets/`, with a separate `assets/texture_hd/` area
+(222 entries). This strongly suggests the remaster bundles most original
+content unchanged **as metadata**, but CRC32/size is not cryptographic
+proof that any particular original asset bytes are identical.
+No individual proprietary asset names or data were exported.
+
+This shows why the Reanimated APK is a useful independent test of the
+*same original* logic and asset conventions, while its 64-bit runtime
+and HD additions remain unsuitable as a drop-in native PC engine.
 
 On an isolated machine or **ephemeral GitHub runner**, with both APKs
 obtained legally by the tester, execute our existing metadata inventory
