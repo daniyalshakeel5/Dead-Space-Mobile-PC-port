@@ -235,9 +235,15 @@ OriginalMenuGpuStatus run_original_menu_gl(
                     ++diverse_colors;
                 }
             }
+            const auto center=(std::size_t(h/2)*w+std::size_t(w/2))*4u;
             std::cerr<<"Original 3D menu GPU frame: "<<w<<"x"<<h
                      <<", nonblack pixels "<<nonblack
-                     <<", distinct color buckets "<<diverse_colors<<"\\n";
+                     <<", distinct color buckets "<<diverse_colors
+                     <<", first RGB ("<<int(rgba[0])<<","
+                     <<int(rgba[1])<<","<<int(rgba[2])<<")"
+                     <<", center RGB ("<<int(rgba[center])<<","
+                     <<int(rgba[center+1])<<","<<int(rgba[center+2])<<")"
+                     <<", GL error "<<unsigned(error)<<"\\n";
             free_textures();
             if(error!=GL_NO_ERROR || nonblack==0 || diverse_colors<8) {
                 diagnostic="Original GPU scene generated no visible pixels or GL error";
