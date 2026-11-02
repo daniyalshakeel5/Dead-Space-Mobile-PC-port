@@ -43,7 +43,7 @@ Bytes texture(bool zip,std::uint8_t format) {
     image.push_back(format);image.push_back(0);
     u32(image,2);u32(image,2);
     u32(image,0); // no palette
-    const unsigned channels=format==100?4:3;
+    const unsigned channels=format<=97?1:format==98?2:format==99?3:4;
     u32(image,4*channels);
     for(unsigned j=0;j<4*channels;++j)
         image.push_back(static_cast<std::uint8_t>(j+10));
@@ -64,7 +64,7 @@ Bytes texture(bool zip,std::uint8_t format) {
     return file;
 }
 int main() {
-    for(auto format:{99u,100u})for(bool zip:{false,true}) {
+    for(auto format:{96u,97u,98u,99u,100u})for(bool zip:{false,true}) {
         const auto bytes=texture(zip,static_cast<std::uint8_t>(format));
         const auto decoded=ds_port::decode_m3g_scene_texture_image(
             bytes.data(),bytes.size());
