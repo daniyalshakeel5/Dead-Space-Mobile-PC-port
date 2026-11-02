@@ -75,7 +75,8 @@ Matrix mul(const Matrix& a,const Matrix& b) {
         for(int k=0;k<4;++k)out[c*4+r]+=a[k*4+r]*b[c*4+k];
     return out;
 }
-bool object3d(Cursor& c,std::uint32_t id,std::size_t& tracks) {
+bool object3d(Cursor& c,std::uint32_t id,std::size_t& tracks,
+              std::string* external_image=nullptr) {
     std::uint32_t user=0,count=0,params=0;
     if(!c.word(user)||!c.word(count)||count>256||count>(c.n-c.at)/4)return false;
     for(std::uint32_t i=0;i<count;++i) {
@@ -88,7 +89,18 @@ bool object3d(Cursor& c,std::uint32_t id,std::size_t& tracks) {
     for(std::uint32_t i=0;i<params;++i) {
         std::uint32_t param=0,length=0;
         if(!c.word(param)||!c.word(length)||!param_ids.insert(param).second||
-           !c.skip(length))return false;
+           length>c.n-c.at)return false;
+        if(external_image && param==900 && length>=1 && length<256) {
+            const auto* start=c.p+c.at;
+            std::size_t printable=length;
+            if(start[printable-1]==0)--printable;
+            bool safe=printable>0;
+            for(std::size_t k=0;k<printable;++k)
+                if(start[k]<32||start[k]>126||start[k]=='\\')safe=false;
+            if(safe)external_image->assign(
+                reinterpret_cast<const char*>(start),printable);
+        }
+        if(!c.skip(length))return false;
     }
     return true;
 }
@@ -186,7 +198,8 @@ OriginalM3gScene decode_original_m3g_scene(const std::uint8_t* data,std::size_t 
     OriginalM3gScene out{};
     auto fail=[&](const char* message){
         out.decoded=false;out.error=message;
-        out.nodes.clear();out.materials.clear();out.images.clear();return out;
+        out.nodes.clear();out.materials.clear();out.images.clear();
+        out.image_sources.clear();return out;
     };
     if(!data||size<30||size>64u*1024u*1024u||
        !std::equal(magic,magic+12,data)||
@@ -214,7 +227,9 @@ OriginalM3gScene decode_original_m3g_scene(const std::uint8_t* data,std::size_t 
         if(o.type!=5&&o.type!=9&&o.type!=14&&o.type!=3&&
            o.type!=10&&o.type!=17&&o.type!=6&&o.type!=8)continue;
         Cursor c{o.data,o.size,0};
-        if(!object3d(c,id,out.animation_references))
+        std::string external_image;
+        if(!object3d(c,id,out.animation_references,
+                     o.type==10?&external_image:nullptr))
             return fail("Malformed M3G Object3D header");
         if(o.type==5||o.type==9||o.type==14) {
             Matrix local{};
@@ -314,6 +329,7 @@ OriginalM3gScene decode_original_m3g_scene(const std::uint8_t* data,std::size_t 
             if(pixel_bytes>96u*1024u*1024u)return fail("Original scene image budget exceeded");
             image_indices[id]=static_cast<std::uint32_t>(out.images.size());
             out.images.push_back(std::move(img));
+            out.image_sources.push_back(std::move(external_image));
         }
     }
     for(auto& n:out.nodes)if(parents.count(n.object_id))
