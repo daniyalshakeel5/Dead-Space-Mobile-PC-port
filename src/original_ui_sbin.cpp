@@ -125,7 +125,7 @@ OriginalUiSbin decode_original_ui_sbin(const std::uint8_t* data,
     // The original frontend's DATA root at OHDR[1] is a counted list of
     // Image objects. Object pointers are encoded as byte-offset * 8.
     // Each Image is a two-byte class tag + 16-byte record + padding;
-    // Rectangle records use the matching class tag and four UInt16s.
+    // Rectangle records are exactly 10 bytes (tag + four UInt16s).
     const auto pointer=[&](std::uint32_t id,std::size_t record_bytes,
                            std::uint16_t type,std::size_t& offset)->bool {
         if(id>=hdr.n/4)return false;
@@ -159,8 +159,8 @@ OriginalUiSbin decode_original_ui_sbin(const std::uint8_t* data,
            source_height>4096)
             return fail("Original frontend sprite descriptor invalid");
         std::size_t source_at=0,dest_at=0;
-        if(!pointer(source_id,12,1,source_at) ||
-           !pointer(dest_id,12,1,dest_at)) {
+        if(!pointer(source_id,10,1,source_at) ||
+           !pointer(dest_id,10,1,dest_at)) {
             out.error="Original frontend rectangle missing at sprite "+
                 std::to_string(n)+", object "+std::to_string(id)+
                 ", source "+std::to_string(source_id)+
