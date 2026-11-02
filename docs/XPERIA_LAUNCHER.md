@@ -10,9 +10,38 @@ In the Home / Setup screen, select your private, original **Xperia Play Vita-rea
 
 The Xperia 1.1.33 ARM game and ATC campaign assets remain under `assets/` and `lib/armeabi/`; Reanimated's 222 HD `.ktx` textures remain **separate** under `enhancements/reanimated/texture_hd/`. SHA256/version, key original resource hashes, ZIP path safety, and size bounds are checked before any installation; the new folder is populated transactionally. This matches the functionality of the repo's Python importer but **does not require Python on the user's PC**.
 
-The Graphics screen remembers a future preference for HD textures; the Controls screen documents DualShock 4 touchpad, sticks and buttons. The Runtime page honestly reports missing Android/Bionic/JNI/GLES integration.
+The Graphics screen remembers a future preference for HD textures; the Controls screen documents DualShock 4 touchpad, sticks and buttons. The Runtime page shows the selected QEMU compatibility backend and reports the last real startup milestone.
 
-**Play is disabled.** Neither the existing experimental Dynarmic demo nor the user-owned Xperia game is a playable Windows executable yet, so enabling it would be misleading. The first playable runtime can be packaged next to this UI when it exists. Installing the HD files does **not** enable texture overrides; a KTX loader and verified resource/material correspondence are still missing.
+**QEMU is the primary original-game boot backend.** Once the Xperia
+game is installed, the Home page enables **TEST GAME BOOT (QEMU)**.
+The button first asks permission to download/build the separate
+EapRules **GPL-3.0** ARM/Linux runtime. A background Windows PowerShell
+bridge checks **WSL2 and Docker Linux containers**, converts the
+user's installed game folder into a WSL filesystem path, and invokes
+the bundled Python boot adapter. **Python 3, Git and Docker are needed
+inside WSL2**, but none is required merely to open the Windows WPF
+launcher or install assets. All diagnostics are stored under
+`%LOCALAPPDATA%\\DeadSpaceMobile-Xperia\\qemu-boot`.
+The Runtime page provides a button to open these logs. The UI
+distinguishes success at real `JNI_OnLoad` / `NativeOnCreate` from
+failure before the engine booted; stage M7 verifies input-driven
+scene changes.
+
+**Play is still disabled**, because this first QEMU compatibility
+adapter renders **offscreen** into its test environment and doesn't
+yet present an interactive Windows game window or mapped DualShock 4.
+Do not confuse passing the game-boot test with a playable release.
+The first interactive display/audio/controller path is still
+outstanding. The Reanimated HD KTX sidecar is prepared but not
+yet mounted into the original game's renderer.
+
+The WPF launcher remains usable with no external dependencies until
+the user explicitly chooses the QEMU test. Its boot adapter is bundled
+with the portable Windows package at `tools/xperia_qemu_boot.py`,
+and the WSL2 bridge is in `launcher/QemuBoot.ps1`.
+No proprietary original game data enters the Docker *build image*,
+GitHub source, releases or Actions artifacts; installed content is
+mounted read-only into the emulator container.
 
 The installed files and logs are local. Never upload or commit your original ZIP, APK, textures, game binary or game sound files to this repository. Reanimated imagery and original assets belong to their owners. Diamond Rush launcher architecture is based on the user's original project.
 
