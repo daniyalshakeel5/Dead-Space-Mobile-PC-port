@@ -15,6 +15,16 @@ struct OriginalUiDraw {
     bool hit_only=false;
     std::uint32_t action_id=0;
 };
+// Layouts.xml.sb stores the game's actual 480x320 logical UI canvas.
+// Center the overlay without stretching it in widescreen/resized windows.
+struct OriginalUiViewport {
+    int x=0,y=0,width=0,height=0; // top-left screen coordinates
+};
+OriginalUiViewport original_ui_viewport(int screen_width,int screen_height) noexcept;
+// Screen events are in SDL window coordinates (not drawable pixels).
+// Returns false for letterbox/pillarbox margins and out-of-window events.
+bool original_ui_window_to_canvas(int window_width,int window_height,
+    int pointer_x,int pointer_y,int& canvas_x,int& canvas_y) noexcept;
 struct OriginalUiHit {
     bool found=false;
     std::uint32_t sprite_object_id=0;
