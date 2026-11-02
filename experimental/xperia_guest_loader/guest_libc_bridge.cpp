@@ -1,5 +1,6 @@
 #include "guest_libc_bridge.hpp"
 #include "guest_heap.hpp"
+#include "guest_filesystem.hpp"
 #include <algorithm>
 #include <climits>
 #include <cstring>
@@ -32,9 +33,10 @@ std::uint32_t compare_strings(GuestElf32& image,std::uint32_t lhs,
 GuestLibcBridge::GuestLibcBridge() {
     static const char* const names[]={
         "memcpy","memmove","memset","memcmp","strlen","strcmp","strncmp",
-        "malloc","calloc","free","realloc"
+        "malloc","calloc","free","realloc",
+        "open","read","lseek","close"
     };
-    for(unsigned i=0;i<11;++i){
+    for(unsigned i=0;i<15;++i){
         const std::uint32_t id=i+1;
         symbols_.emplace(names[i],veneer_base+i*8);
         const std::uint32_t instructions[2]={0xef000000u|id,0xe12fff1eu};
@@ -51,9 +53,10 @@ bool GuestLibcBridge::code_byte(std::uint32_t address,
 }
 bool GuestLibcBridge::dispatch(
     std::uint32_t id,std::array<std::uint32_t,16>& regs,
-    GuestElf32& image,std::string& failure,GuestHeap* heap) const noexcept {
+    GuestElf32& image,std::string& failure,GuestHeap* heap,
+    GuestFileSystem* files) const noexcept {
     try {
-        if(id<1||id>11)
+        if(id<1||id>15)
             throw std::runtime_error("Unknown Android libc SVC service");
         const auto a=regs[0],b=regs[1],n=regs[2];
         std::uint32_t result=0;
@@ -122,6 +125,44 @@ bool GuestLibcBridge::dispatch(
                 result=0;
             }
             if(id==11)result=heap->resize(a,b);
+            break;
+        }
+        case 12: { // open(filename, O_RDONLY, ignored mode)
+            if(!files)throw std::runtime_error("Guest asset mount unavailable");
+            std::string path;
+            for(std::uint32_t i=0;i<4096u;++i){
+                if(std::uint64_t(a)+i>UINT32_MAX)
+                    throw std::runtime_error("ARM open filename pointer wrap");
+                const auto character=byte(image,a+i);
+                if(!character)break;
+                path.push_back(static_cast<char>(character));
+            }
+            if(path.size()==4096u)
+                throw std::runtime_error("Unterminated ARM asset path");
+            result=static_cast<std::uint32_t>(files->open_readonly(path,b));
+            break;
+        }
+        case 13: { // read(fd, guest_buffer, byte_count)
+            if(!files)throw std::runtime_error("Guest asset mount unavailable");
+            if(n>GuestFileSystem::max_io)
+                throw std::runtime_error("ARM read length exceeds bounded transfer");
+            if(n==0){result=0;break;}
+            auto* destination=image.writeable(b,n);
+            if(!destination)throw std::runtime_error("Unmapped ARM read destination");
+            result=static_cast<std::uint32_t>(files->read(
+                static_cast<std::int32_t>(a),destination,n));
+            break;
+        }
+        case 14: { // lseek(fd, signed_offset, SEEK_SET/CUR/END)
+            if(!files)throw std::runtime_error("Guest asset mount unavailable");
+            result=static_cast<std::uint32_t>(files->seek(
+                static_cast<std::int32_t>(a),
+                static_cast<std::int32_t>(b),static_cast<int>(n)));
+            break;
+        }
+        case 15: { // close(fd)
+            if(!files)throw std::runtime_error("Guest asset mount unavailable");
+            result=static_cast<std::uint32_t>(files->close(static_cast<int>(a)));
             break;
         }
         }

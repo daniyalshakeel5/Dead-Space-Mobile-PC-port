@@ -79,10 +79,12 @@ struct GuestArmCallRunner::Impl {
     GuestElf32& image;
     GuestLibcBridge& bridge;
     GuestHeap& heap;
+    GuestFileSystem* files;
     Host host;
     Dynarmic::A32::Jit jit;
-    Impl(GuestElf32& elf,GuestLibcBridge& services,GuestHeap& memory)
-        :image(elf),bridge(services),heap(memory),host(elf,services),
+    Impl(GuestElf32& elf,GuestLibcBridge& services,GuestHeap& memory,
+         GuestFileSystem* mount)
+        :image(elf),bridge(services),heap(memory),files(mount),host(elf,services),
          jit(config(host)){
         // One owned 256 KiB guest stack, disjoint from game code/heap
         // and import veneers, allocated only once for the runner.
@@ -122,10 +124,10 @@ struct GuestArmCallRunner::Impl {
                     throw std::runtime_error("ARM guest exceeded bounded instruction budget");
                 const auto expected=GuestLibcBridge::veneer_base+
                     std::uint64_t(id-1u)*8u;
-                if(expected>UINT32_MAX || id>11)
+                if(expected>UINT32_MAX || id>15)
                     throw std::runtime_error("Unsupported Android SVC/import");
                 std::array<u32,16> copy=jit.Regs();
-                if(!bridge.dispatch(id,copy,image,error,&heap))
+                if(!bridge.dispatch(id,copy,image,error,&heap,files))
                     return false;
                 jit.Regs()[0]=copy[0];
                 jit.Regs()[15]=static_cast<u32>(expected)+4u; // BX LR
@@ -137,8 +139,8 @@ struct GuestArmCallRunner::Impl {
     }
 };
 GuestArmCallRunner::GuestArmCallRunner(GuestElf32& image,
-       GuestLibcBridge& services,GuestHeap& heap)
-    :impl_(std::make_unique<Impl>(image,services,heap)){}
+       GuestLibcBridge& services,GuestHeap& heap,GuestFileSystem* files)
+    :impl_(std::make_unique<Impl>(image,services,heap,files)){}
 GuestArmCallRunner::~GuestArmCallRunner()=default;
 bool GuestArmCallRunner::invoke(u32 address,const std::array<u32,4>& args,
                                u32& result,std::string& error){

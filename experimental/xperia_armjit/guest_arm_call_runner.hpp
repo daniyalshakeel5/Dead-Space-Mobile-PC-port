@@ -9,9 +9,11 @@
 namespace xperia {
 // Reusable AAPCS/softfp ARM32 execution boundary on Dynarmic's x86-64 JIT.
 // Does not pretend to implement Android JNI, OpenGL ES or original audio.
+class GuestFileSystem;
 class GuestArmCallRunner {
 public:
-    GuestArmCallRunner(GuestElf32& image,GuestLibcBridge& services,GuestHeap& heap);
+    GuestArmCallRunner(GuestElf32& image,GuestLibcBridge& services,
+                       GuestHeap& heap,GuestFileSystem* files=nullptr);
     ~GuestArmCallRunner();
     GuestArmCallRunner(const GuestArmCallRunner&)=delete;
     GuestArmCallRunner& operator=(const GuestArmCallRunner&)=delete;
