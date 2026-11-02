@@ -46,6 +46,7 @@ bool read_original_bounded(const std::string& root,const char* name,
 // directory, e.g. ../textures/texture_env_main_menu_01.m3g.
 // Resolve only the verified original asset namespaces, and never permit
 // traversal, separators or absolute destinations from game-file metadata.
+#ifdef DS_NATIVE_ORIGINAL_MENU_GL
 bool original_menu_texture_path(std::string_view reference,std::string& path) {
     constexpr std::string_view textures="../textures/";
     constexpr std::string_view uncompressed="../textures_uncompressed/";
@@ -97,6 +98,7 @@ bool load_original_external_textures(const std::string& root,
              <<"/"<<scene.images.size()<<"\\n";
     return replaced!=0;
 }
+#endif // DS_NATIVE_ORIGINAL_MENU_GL
 bool load_original_menu_stage(const std::string& root) {
     std::vector<std::uint8_t> scene_bytes,ui_bytes;
     if(!read_original_bounded(root,"published/models/main_menu.m3g",scene_bytes) ||
