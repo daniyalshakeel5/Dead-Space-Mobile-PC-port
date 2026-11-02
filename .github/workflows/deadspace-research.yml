@@ -10,6 +10,8 @@ on:
       - "tools/deadspace_native_enum_recover.py"
       - "tools/deadspace_native_leaf_recover.py"
       - "tools/deadspace_original_code_window.py"
+      - "tools/deadspace_seek_table_probe.py"
+      - "tests/test_deadspace_seek_table_probe.py"
       - "tools/deadspace_startup_registration_trace.py"
       - "tools/deadspace_plt_import.py"
       - "tests/test_deadspace_plt_import.py"

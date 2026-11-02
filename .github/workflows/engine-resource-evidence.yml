@@ -4,6 +4,7 @@ on:
     paths:
       - ".github/workflows/engine-resource-evidence.yml"
       - "tools/deadspace_original_code_window.py"
+      - "tools/deadspace_seek_table_probe.py"
       - "tools/deadspace_boot_asset_manifest.py"
       - "tools/deadspace_boot_native_verify.py"
   workflow_dispatch:
@@ -48,6 +49,8 @@ jobs:
           python tools/deadspace_original_code_window.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
             --output "$RUNNER_TEMP/full-instruction-windows.json"
+          python tools/deadspace_seek_table_probe.py \
+            --apk "$RUNNER_TEMP/deadspace.apk"
           python - <<'PY'
           import json,os
           from pathlib import Path
