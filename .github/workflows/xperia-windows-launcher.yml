@@ -20,6 +20,9 @@ jobs:
       - name: Validate Windows PowerShell logic and original Diamond Rush WPF layout
         shell: powershell
         run: powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File tests/Test-Launcher.ps1
+      - name: Test installer extraction against 222 synthetic KTX resources
+        shell: powershell
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/Test-Installer-Synthetic.ps1
       - name: Compile Windows GUI entry stub, without a console window
         shell: powershell
         run: |
