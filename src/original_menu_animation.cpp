@@ -264,7 +264,7 @@ bool sample_original_menu_motion(const OriginalMenuMotion& animation,
         }else if(track.property_id==268 && value.size()==4) {
             rotate_from_quaternion(local,value);
         }else if(track.property_id==276 && value.size()==1) {
-            result[node->second].visible=value[0]>=0.5f;
+            result[node->second].rendering_enabled=value[0]>=0.5f;
         }
     }
     return true;
