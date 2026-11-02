@@ -174,14 +174,66 @@ Next real runtime integrations are:
 - Only after successful visual/functional tests claim a playable
   Windows/Linux translation build.
 
+## Native ARM service and entrypoint reconstruction — 2026-11-02
+
+The original Xperia ELF's actual undefined ARM symbol table contains
+`memcpy`, `memmove`, `memset`, `memcmp`, `strlen`, `strcmp`,
+`strncmp`, `malloc`, `calloc`, `free` and `realloc`.
+
+This branch now has an original-free C++ implementation of **all eleven**
+of those Bionic-compatible memory/string services:
+
+- `experimental/xperia_guest_loader/guest_libc_bridge.{hpp,cpp}`:
+  genuine AAPCS `r0`-`r3` exchange, bounded guest pointer validation,
+  and synthetic ARM32 `SVC #slot; BX LR` veneer addresses at
+  `0x70000000`; unknown imports and traps are rejected.
+- `experimental/xperia_guest_loader/guest_heap.{hpp,cpp}`:
+  bounded sparse 32-bit heap at `0x50000000` with genuine
+  malloc/calloc/free/realloc memory semantics, allocation caps,
+  invalid-pointer and double-free rejection, no raw host pointers.
+- Native Windows/Linux unit tests:
+  [41480116856](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41480116856)
+  passed the memory/string and guest heap suites.
+- Actual x86-64 Dynarmic **ARM guest BLX -> SVC -> host memcpy -> BX LR**
+  roundtrip, using synthetic ARM machine code and the guest
+  ELF memory map:
+  [41479175462](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41479175462),
+  green.
+- Original ELF dynamic metadata parser now exposes ARM JNI exported
+  function names plus the ordered `DT_INIT` and relocated
+  `DT_INIT_ARRAY` pointers. Synthetic startup tests (including
+  Thumb-tagged pointers and malformed-array rejection) passed
+  Windows/Linux:
+  [41480235614](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41480235614).
+  Static inspection of the user's exact original ELF confirms
+  **836 bytes / 209 entries** in its constructor pointer array,
+  plus JNI_OnLoad and MainActivity/renderer lifecycle exports.
+- `experimental/xperia_armjit/guest_arm_call_runner.{hpp,cpp}`:
+  a reusable bounded AAPCS/softfp function call boundary with an
+  owned 256 KiB guest stack, JIT callback/dispatch loop and explicit
+  constructor ordering. Runs synthetic code; its separate
+  cross-platform validation is still a requirement before using any
+  original game code.
+
+No proprietary game code or assets were added to the repository.
+**Passing synthetic ARM code is not the same as running the original ELF.**
+
 ## Known non-working parts
 
-The original Xperia game has NOT been executed on x86-64.
-Missing: guest ELF load/relocation into Dynarmic memory, 23913
-relocations, host symbol thunks, Android JNI, constructor sequencing,
-GLES 1.x rendering, PVRTC/texture support, audio, files, saves and
-frame execution. These must be integrated before playable results
-can be claimed.
+The original Xperia game has **NOT** been executed on x86-64.
+Now implemented: ELF PT_LOAD guest mapping, R_ARM_RELATIVE relocations,
+a dynamic ARM import-table binder, a real ARM32-to-host service trap
+roundtrip, eleven bounded libc/heap functions, and discovery of original
+constructor/JNI addresses. The parser knows original constructor order,
+but **original constructors have not been executed**.
+
+Still missing: enough of the original 392 undefined symbols to link
+successfully; Bionic services outside the eleven allowlisted functions,
+pthreads, libstdc++ exceptions/ABI, real Android JNI, GLES 1.x rendering,
+ATC/KTX texture upload integration, audio, asset/file-system services,
+game saves and lifecycle/frame execution. The linked ARM guest runtime
+must also be tested against the user's exact legally held Xperia ELF
+before any claim of an actual boot or playable Windows/Linux build.
 
 The user has now provided a complete verified **Vita-ready main campaign
 donor** (reduced ATC version), in addition to the exact Xperia ARM ELF.
