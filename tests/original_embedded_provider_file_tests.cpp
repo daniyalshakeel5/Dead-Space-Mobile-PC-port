@@ -76,6 +76,18 @@ int main(){
     auto pos=original_embedded_provider_position_file_0x271794(
         provider.data(),provider.size(),fd,0u);
     assert(pos.status==S::Completed&&pos.original_r0==3u);
+    auto remaining=original_embedded_provider_position_file_0x271794(
+        provider.data(),provider.size(),fd,2u);
+    assert(remaining.status==S::Completed&&remaining.original_r0==n-3u);
+    pos=original_embedded_provider_position_file_0x271794(
+        provider.data(),provider.size(),fd,0u);
+    assert(pos.status==S::Completed&&pos.original_r0==3u);
+    remaining=original_embedded_provider_position_file_0x271794(
+        provider.data(),provider.size(),fd+1,2u);
+    assert(remaining.status==S::InvalidHostFileBinding);
+    remaining=original_embedded_provider_position_file_0x271794(
+        provider.data(),provider.size(),fd,99u);
+    assert(remaining.status==S::Completed&&remaining.original_r0==0u);
     pos=original_embedded_provider_position_file_0x271794(
         provider.data(),provider.size(),fd+1,0u);
     assert(pos.status==S::InvalidHostFileBinding);
@@ -134,6 +146,15 @@ int main(){
     pos=original_embedded_provider_position_file_0x271794(
         provider.data(),provider.size(),fd,0u);
     assert(pos.status==S::Completed&&pos.original_r0==n);
+    remaining=original_embedded_provider_position_file_0x271794(
+        provider.data(),provider.size(),fd,2u);
+    assert(remaining.status==S::Completed&&remaining.original_r0==0u);
+    seek=original_embedded_provider_seek_file_0x273034(
+        provider.data(),provider.size(),fd,static_cast<std::int32_t>(n+3u),0u);
+    assert(seek.status==S::Completed&&seek.original_r0==1u);
+    remaining=original_embedded_provider_position_file_0x271794(
+        provider.data(),provider.size(),fd,2u);
+    assert(remaining.status==S::Completed&&remaining.original_r0==0xfffffffdu);
     // Unsupported original memory-backed mode needs codec.
     put(provider.data()+0xa4u,1u);
     read=original_embedded_provider_read_file_0x2716f8(

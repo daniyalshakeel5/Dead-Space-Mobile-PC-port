@@ -135,33 +135,44 @@ OriginalEmbeddedProviderResult original_embedded_provider_size_file_0x2763ac(
     return {S::Completed,static_cast<std::uint32_t>(end)};
 }
 OriginalEmbeddedProviderResult original_embedded_provider_position_file_0x271794(
-    const void* mapped,std::size_t size,
+    void* mapped,std::size_t size,
     int native_fd,std::uint32_t selector) noexcept {
     using S=OriginalEmbeddedProviderStatus;
     if(!mapped||size<0xa8u)return {S::InvalidMappedProvider,0};
-    const auto* p=static_cast<const std::uint8_t*>(mapped);
+    auto* p=static_cast<std::uint8_t*>(mapped);
     if(load32(p+0xa4u)==1u)
         return {S::NeedsOriginalMemoryService,0};
-    // Original 0x2717B0 returns zero for unsupported selector.
+    // Verified 0x2717A8..0x2717B4: only selectors 0 and 2
+    // dispatch the original file-backed seek path.
     if(selector!=0u&&selector!=2u)return {S::Completed,0};
     if(load32(p+0x10u)==0xffffffffu)
         return {S::Completed,0xffffffffu};
     if(!matches_explicit_host_fd(p,native_fd))
         return {S::InvalidHostFileBinding,0};
-    // Original selector=0 at ARM 0x27180C invokes
-    // original PLT 0x35350 -> libc lseek(fd,0,SEEK_CUR).
-    if(selector!=0u)
-        return {S::NeedsOriginalFileService,0};
+
+    // Original selector 0: lseek(fd,0,SEEK_CUR).
+    // Original selector 2: lseek(fd,0,SEEK_CUR) followed by the
+    // provider's +0x20 file-size method 0x2763AC, then
+    // RSBNE r5,r0,r5 (r5 = size - prior position).
 #ifdef _WIN32
     const auto at=::_lseek(native_fd,0L,SEEK_CUR);
 #else
     const auto at=::lseek(native_fd,static_cast<off_t>(0),SEEK_CUR);
 #endif
     if(at<0)return {S::Completed,0xffffffffu};
-    // ARM32's r0 return width is 32-bit. Higher host offsets
-    // have no faithful ARM32 representation.
     if(static_cast<std::uint64_t>(at)>0xffffffffull)
         return {S::NeedsOriginalFileService,0};
-    return {S::Completed,static_cast<std::uint32_t>(at)};
+    const auto position=static_cast<std::uint32_t>(at);
+    if(selector==0u)return {S::Completed,position};
+
+    const auto length=original_embedded_provider_size_file_0x2763ac(
+        mapped,size,native_fd);
+    if(length.status!=S::Completed)return length;
+    // ARM CMN r0,#1 suppresses RSB when size query failed.
+    if(length.original_r0==0xffffffffu)
+        return {S::Completed,position};
+    return {S::Completed,
+            static_cast<std::uint32_t>(length.original_r0-position)};
 }
+
 } // namespace ds_port::original_runtime

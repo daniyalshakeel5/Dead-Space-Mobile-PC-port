@@ -71,8 +71,11 @@ OriginalEmbeddedProviderResult original_embedded_provider_size_file_0x2763ac(
 // Original provider +0x28 file-mode selector=0 calls
 // lseek(fd,0,SEEK_CUR) via PLT 0x35350. The host fd is explicitly
 // bound and checked against provider+0x10, never inferred.
+// File-mode selector=0 returns current position, selector=2 returns
+// original size minus current position (ARM32 unsigned arithmetic).
+// Original size-query failures can write errno into provider+0xA0.
 OriginalEmbeddedProviderResult original_embedded_provider_position_file_0x271794(
-    const void* mapped_provider,std::size_t accessible_bytes,
+    void* mapped_provider,std::size_t accessible_bytes,
     int native_fd,std::uint32_t original_selector) noexcept;
 
 } // namespace ds_port::original_runtime
