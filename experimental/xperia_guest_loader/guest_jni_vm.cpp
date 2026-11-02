@@ -313,11 +313,12 @@ bool GuestJniVm::dispatch(std::uint32_t id,
            r2>kMethodBase+7u*16u || (r2-kMethodBase)%16u){
             error="Unknown JNI CallVoidMethod receiver/method";return false;
         }
-        if(!audio_.enqueue){
-            error="AudioTrack output device not initialized";return false;
+        if(!audio_.control){
+            error="AudioTrack output control unavailable";return false;
         }
-        // The SDL output is opened and resumed by the Windows runtime.
-        // Actual write data is queued through slot 49 above.
+        const auto method=(r2-kMethodBase)/16u;
+        if(!audio_.control(audio_.context,static_cast<unsigned>(method-5u),error))
+            return false;
         regs[0]=0;error.clear();return true;
     }
     if(slot==168){ // GetStringUTFLength
