@@ -7,6 +7,7 @@ on:
       - "apps/deadspace_native.cpp"
       - "tools/research_original_scene_records.py"
       - "tools/research_four_native_subsystems.py"
+      - "tools/research_menu_particle_checksum.py"
       - "src/original_splash_host.cpp"
       - "src/im_ui_image.cpp"
       - "src/im_menu_scene.cpp"
@@ -87,6 +88,9 @@ jobs:
           path: ${{ runner.temp }}/research-*.log
           if-no-files-found: warn
           retention-days: 7
+      - name: Check original uncompressed particle texture section checksums
+        shell: bash
+        run: python tools/research_menu_particle_checksum.py "$RUNNER_TEMP/deadspace.apk"
       - name: Stage original splash screens and main-menu resources
         shell: bash
         run: |
