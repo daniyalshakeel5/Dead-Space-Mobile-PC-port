@@ -11,10 +11,10 @@ copyrighted assets have been committed.
 
 | Item | Actual Xperia Play binary |
 | --- | ---: |
-| Undefined dynamic symbol names including null | 393 |
+| Undefined dynamic symbol entries, including one unnamed | 393 |
 | GL / OpenGL ES imports (symbols beginning `gl`) | 190 |
 | Pthread and semaphore imports (`pthread*` or `sem_*`) | 39 |
-| Other runtime/OS/C/C++ imports | 144 |
+| Other runtime/OS/C/C++ entries (including one unnamed) | 144 |
 | ARM32 `R_ARM_RELATIVE` relocations | 22,677 |
 | ARM32 `R_ARM_ABS32` relocations | 890 |
 | ARM32 `R_ARM_JUMP_SLOT` relocations | 294 |
