@@ -35,7 +35,7 @@ int main(){
     assert(vm.dispatch(vm.env_svc_base+4,r,elf,error) && r[0]==0x00010006u);
     r[0]=vm.env_address;
     assert(!vm.dispatch(vm.env_svc_base+6,r,elf,error));
-    assert(error.find("6")!=std::string::npos);
+    assert(error.find("FindClass name unmapped")!=std::string::npos);
     const auto write_string=[&](std::uint32_t at,const char* value){
         auto* dst=elf.writeable(at,std::strlen(value)+1);
         assert(dst);
