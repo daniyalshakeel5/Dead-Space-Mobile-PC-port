@@ -24,6 +24,7 @@ on:
       - "src/im_menu_scene.cpp"
       - "src/native_menu_input.cpp"
       - "src/original_menu_gl.cpp"
+      - "src/original_ui_interaction.cpp"
       - "src/original_m3g_scene.cpp"
       - "src/original_menu_animation.cpp"
       - "include/ds_port/original_m3g_scene.hpp"
@@ -50,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install SDL2 for actual native splash rendering
-        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libgl-dev zlib1g-dev
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libgl-dev zlib1g-dev xvfb libgl1-mesa-dri
       - name: Configure original splash-capable game executable
         run: >
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -224,6 +225,25 @@ jobs:
             "$RUNNER_TEMP/native-splash-exit.txt"
           grep -F "Native main-menu renderer still incomplete." \
             "$RUNNER_TEMP/native-splash-exit.txt"
+      - name: Verify authentic 3D and 2D frontend both render in software OpenGL
+        shell: bash
+        run: |
+          set +e
+          DS_NATIVE_MENU_SMOKE_FRAMES=1 LIBGL_ALWAYS_SOFTWARE=1 \
+            SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=dummy \
+            SDL_RENDER_DRIVER=software \
+            timeout 35s xvfb-run -a -s "-screen 0 1280x720x24" \
+            build/deadspace_native --boot-splash \
+            --assets-dir "$RUNNER_TEMP/boot-assets" \
+            > "$RUNNER_TEMP/native-gl-menu.txt" 2>&1
+          code=$?
+          set -e
+          cat "$RUNNER_TEMP/native-gl-menu.txt"
+          test "$code" = 20
+          grep -F "Original 3D menu GPU frame:" "$RUNNER_TEMP/native-gl-menu.txt"
+          grep -F "Original 2D frontend GPU overlay:" "$RUNNER_TEMP/native-gl-menu.txt"
+          grep -E "changed pixels [1-9][0-9]*" "$RUNNER_TEMP/native-gl-menu.txt"
+          grep -F "GL error 0" "$RUNNER_TEMP/native-gl-menu.txt"
       - name: Test one-command user APK install and native boot (no bundled assets)
         shell: bash
         run: |
