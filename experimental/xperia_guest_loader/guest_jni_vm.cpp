@@ -21,13 +21,17 @@ struct Class {
 constexpr Class classes[]={
     {"com/eamobile/Query"},{"com/ea/EAIO/EAIO"},
     {"java/lang/String"},{"android/os/Build"},
-    {"android/media/AudioTrack"}
+    {"android/media/AudioTrack"},
+    {"com/ea/blast/SystemAndroidDelegate"},
+    {"com/ea/blast/DisplayAndroidDelegate"},
+    {"com/ea/blast/GetAppDataDirectoryDelegate"}
 };
 struct Method {
     unsigned owner;
     const char* name;
     const char* signature;
     bool is_static;
+    const char* value=nullptr;
 };
 constexpr Method methods[]={
     {0,"isContentReady","()Z",true},
@@ -38,7 +42,46 @@ constexpr Method methods[]={
     {4,"play","()V",false},
     {4,"stop","()V",false},
     {4,"release","()V",false},
-    {4,"getMinBufferSize","(III)I",true}
+    {4,"getMinBufferSize","(III)I",true},
+    {5,"<init>","()V",false},
+    {5,"GetAccelerometerCount","()Ljava/lang/String;",false,"1"},
+    {5,"IsBatteryStateAvailable","()Ljava/lang/String;",false,"0"},
+    {5,"GetCameraCount","()Ljava/lang/String;",false,"0"},
+    {5,"GetChipset","()Ljava/lang/String;",false,"0"},
+    {5,"GetCompassCount","()Ljava/lang/String;",false,"0"},
+    {5,"GetManufacturer","()Ljava/lang/String;",false,"sony"},
+    {5,"GetDeviceModel","()Ljava/lang/String;",false,"Xperia PC"},
+    {5,"GetDeviceName","()Ljava/lang/String;",false,"R800"},
+    {5,"GetPhoneNumber","()Ljava/lang/String;",false,"0"},
+    {5,"GetDeviceUniqueId","()Ljava/lang/String;",false,"-1"},
+    {5,"GetDisplayCount","()Ljava/lang/String;",false,"1"},
+    {5,"GetGyroscopeCount","()Ljava/lang/String;",false,"1"},
+    {5,"GetLocationAvailable","()Ljava/lang/String;",false,"true"},
+    {5,"GetMicrophoneCount","()Ljava/lang/String;",false,"1"},
+    {5,"GetApiLevel","()Ljava/lang/String;",false,"19"},
+    {5,"GetPlatformRawName","()Ljava/lang/String;",false,"Android"},
+    {5,"GetPlatformStdName","()Ljava/lang/String;",false,"Android"},
+    {5,"GetPlatformVersion","()Ljava/lang/String;",false,"4.4.4"},
+    {5,"GetPhysicalKeyboardCount","()Ljava/lang/String;",false,"1"},
+    {5,"GetProcessorArchitecture","()Ljava/lang/String;",false,"armeabi-v7a"},
+    {5,"GetLanguage","()Ljava/lang/String;",false,"en"},
+    {5,"GetLocale","()Ljava/lang/String;",false,"en"},
+    {5,"GetTotalRAM","()Ljava/lang/String;",false,"-1"},
+    {5,"GetTouchPadCount","()Ljava/lang/String;",false,"1"},
+    {5,"GetTouchScreenCount","()Ljava/lang/String;",false,"1"},
+    {5,"GetTrackBallCount","()Ljava/lang/String;",false,"0"},
+    {5,"GetVibratorCount","()Ljava/lang/String;",false,"0"},
+    {5,"GetVirtualKeyboardCount","()Ljava/lang/String;",false,"1"},
+    {6,"<init>","()V",false},
+    {6,"GetDefaultWidth","()I",false},
+    {6,"GetDefaultHeight","()I",false},
+    {6,"GetDpiX","()F",false},
+    {6,"GetDpiY","()F",false},
+    {6,"GetStdOrientation","()I",false},
+    {6,"SetStdOrientation","(I)V",false},
+    {7,"<init>","()V",false},
+    {7,"GetAppDataDirectory","()Ljava/lang/String;",false,"deadspace"},
+    {7,"GetExternalStorageDirectory","()Ljava/lang/String;",false,"deadspace"}
 };
 bool guest_string(GuestElf32& guest,std::uint32_t addr,std::string& output){
     output.clear();
@@ -52,6 +95,29 @@ bool guest_string(GuestElf32& guest,std::uint32_t addr,std::string& output){
     }
     return false;
 }
+}
+std::uint32_t GuestJniVm::store_string(
+    GuestElf32& guest,const std::string& text,std::string& error) {
+    constexpr std::uint32_t kBase=0x74800000u;
+    if(text.size()>254||next_string_>=128u){
+        error="JNI guest string allocation limit";return 0;
+    }
+    if(!guest.read(kBase,1)) {
+        if(guest.read(kBase+65535u,1)){
+            error="JNI string arena overlaps guest ELF";return 0;
+        }
+        guest.segments.push_back({kBase,std::vector<std::uint8_t>(65536,0)});
+    }
+    const auto handle=kBase+next_string_*16u;
+    const auto data=kBase+4096u+next_string_*256u;
+    auto* string=guest.writeable(data,text.size()+1u);
+    auto* object=guest.writeable(handle,4u);
+    if(!string||!object){error="JNI guest string storage unmapped";return 0;}
+    std::memcpy(string,text.c_str(),text.size()+1u);
+    put32(object,data);
+    strings_.emplace(handle,data);
+    ++next_string_;
+    error.clear();return handle;
 }
 bool GuestJniVm::install(GuestElf32& guest,std::string& error) {
     if(installed_) {error="JNI VM installed twice";return false;}
