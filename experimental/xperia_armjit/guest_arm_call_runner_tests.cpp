@@ -52,6 +52,38 @@ int main(){
     elf.initialization_order={base+0x400,base+0x420};
     assert(runner.run_original_initializers(error));
     assert(elf.read_u32(base+0x700)==9u);
+    // Original ARM C++ destructor callbacks executed as translated ARM
+    // instructions, not host x86 pointers or simulated return values.
+    put32(elf,base+0x800,0xe3a0100bu); // MOV R1,#11
+    put32(elf,base+0x804,0xe5801000u); // STR R1,[R0]
+    put32(elf,base+0x808,0xe12fff1eu); // BX LR
+    put32(elf,base+0x820,0xe3a01016u); // MOV R1,#22
+    put32(elf,base+0x824,0xe5801000u);
+    put32(elf,base+0x828,0xe12fff1eu);
+    put32(elf,base+0xa00,0xe92d4000u); // PUSH LR
+    put32(elf,base+0xa04,0xe12fff33u); // BLX R3
+    put32(elf,base+0xa08,0xe8bd8000u); // POP PC
+    std::array<u32,16> finalizer_regs{};
+    finalizer_regs[0]=base+0x900;
+    finalizer_regs[1]=base+0x800;
+    finalizer_regs[2]=0x77;
+    assert(libc.dispatch(29,finalizer_regs,elf,error)); // __aeabi_atexit
+    finalizer_regs.fill(0);
+    finalizer_regs[0]=base+0x820;
+    finalizer_regs[1]=base+0x900;
+    finalizer_regs[2]=0x99;
+    assert(libc.dispatch(30,finalizer_regs,elf,error)); // __cxa_atexit
+    assert(runner.invoke(base+0xa00,
+        {0x77,0,0,libc.symbols().at("__cxa_finalize")},result,error));
+    assert(elf.read_u32(base+0x900)==11u);
+    assert(runner.invoke(base+0xa00,
+        {0,0,0,libc.symbols().at("__cxa_finalize")},result,error));
+    assert(elf.read_u32(base+0x900)==22u);
+    // Repeated cleanup must not invoke a registered destructor twice.
+    put32(elf,base+0x900,0u);
+    assert(runner.invoke(base+0xa00,
+        {0,0,0,libc.symbols().at("__cxa_finalize")},result,error));
+    assert(elf.read_u32(base+0x900)==0u);
     // Fail closed rather than claim to boot unsupported game services.
     assert(!runner.invoke(0xffffffffu,{0,0,0,0},result,error));
     assert(!error.empty());
