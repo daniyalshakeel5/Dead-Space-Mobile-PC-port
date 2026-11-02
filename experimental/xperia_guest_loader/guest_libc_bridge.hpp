@@ -20,7 +20,8 @@ public:
     // Undefined objects/ambiguous symbols are rejected, never fabricated.
     std::unordered_map<std::string,std::uint32_t> plan_guest_imports(
         const GuestElf32& elf,std::string& error,
-        const std::unordered_map<std::string,std::uint32_t>& data_symbols={});
+        const std::unordered_map<std::string,std::uint32_t>& data_symbols={},
+        const std::unordered_map<std::string,std::uint32_t>& host_functions={});
     std::string unresolved_import(std::uint32_t svc_id) const;
     std::size_t unresolved_import_count() const noexcept {
         return unresolved_imports_.size();
