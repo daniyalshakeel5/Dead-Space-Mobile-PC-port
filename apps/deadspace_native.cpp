@@ -173,6 +173,14 @@ struct NativeOriginalMenuUi {
         state.hovered=id;
         state.rebuild();
     }
+    static void back(void* ptr){
+        auto& state=*static_cast<NativeOriginalMenuUi*>(ptr);
+        // Reuse the actual BTN_BACK action recovered from layouts.xml.sb.
+        // Never fabricate a destination when a screen has no back control.
+        const auto found=std::find_if(state.actions.begin(),state.actions.end(),
+            [](const auto& action){return action.second=="BTN_BACK";});
+        if(found!=state.actions.end())activate(ptr,found->first);
+    }
     static void activate(void* ptr,std::uint32_t id){
         auto& state=*static_cast<NativeOriginalMenuUi*>(ptr);
         const auto action=state.actions.find(id);
@@ -303,7 +311,8 @@ bool load_original_menu_stage(const std::string& root) {
             &native_scene.materials,true};
         const ds_port::OriginalUiRuntime ui_runtime{
             &frontend,&ui.images,&menu_ui.commands,&menu_ui,
-            &NativeOriginalMenuUi::activate,&NativeOriginalMenuUi::hover};
+            &NativeOriginalMenuUi::activate,&NativeOriginalMenuUi::hover,
+            &NativeOriginalMenuUi::back};
         const auto render_result=ds_port::run_original_menu_gl(
             scene,draw,native_scene.images,resolved.frame,renderer_error,
             &animation_runtime,&ui_runtime);
