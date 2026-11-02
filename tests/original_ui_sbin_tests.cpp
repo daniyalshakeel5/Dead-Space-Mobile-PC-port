@@ -31,8 +31,18 @@ int main(){
     u16(fields,3);u16(fields,1);u16(fields,2);u16(fields,0);
     block(file,"ENUM",{});
     block(file,"STRU",structs);block(file,"FIEL",fields);
-    block(file,"OHDR",{0,0,0,0});
-    block(file,"DATA",{1,2,3,4});
+    Bytes headers;
+    for(auto id:{17u,162u,320u,480u,576u})u32(headers,id);
+    Bytes data(20,0);
+    u32(data,15);u32(data,1);u32(data,2); // root: one Image, ID 2
+    data.resize(40,0);
+    u16(data,0);u16(data,2); // Image, name="name"
+    data.push_back(0);data.push_back(1); // atlas, content scale
+    u16(data,2);u16(data,2);u32(data,3);u32(data,4);u16(data,0);
+    u16(data,1);u16(data,0);u16(data,0);u16(data,2);u16(data,2);u16(data,0);
+    u16(data,1);u16(data,0);u16(data,0);u16(data,2);u16(data,2);u16(data,0);
+    block(file,"OHDR",headers);
+    block(file,"DATA",data);
     block(file,"STRS",strings);
     auto out=ds_port::decode_original_ui_sbin(file.data(),file.size());
     assert(out.decoded);
@@ -41,7 +51,10 @@ int main(){
     assert(out.types.front().name=="Image");
     assert(out.types.front().fields.size()==2);
     assert(out.types.front().fields.front().name=="name");
-    assert(out.object_data.size()==4);
+    assert(out.object_data.size()==84);
+    assert(out.sprites.size()==1);
+    assert(out.sprites[0].name=="name");
+    assert(out.sprites[0].atlas_rect.width==2);
     file[3]=0;
     assert(!ds_port::decode_original_ui_sbin(file.data(),file.size()).decoded);
     return 0;
