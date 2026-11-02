@@ -1,4 +1,5 @@
 #include "ds_port/native_menu_input.hpp"
+#include "ds_port/original_input_events.hpp"
 #include <cassert>
 #include <vector>
 struct Event {int type,code,module;float x,y;};
@@ -30,6 +31,9 @@ int main(){
     native_menu_focus_lost(state,cb);
     assert(trace.events.size()==7);
     assert(trace.events[0].module==600);
+    assert(trace.events[0].code==int(ds_port::original_runtime::kOriginalRawPointerDown));
+    assert(trace.events[1].code==int(ds_port::original_runtime::kOriginalRawPointerMove));
+    assert(trace.events[2].code==int(ds_port::original_runtime::kOriginalRawPointerUp));
     assert(trace.events[5].type==3&&trace.events[5].code==66);
     assert(trace.events[6].type==3&&trace.events[6].code==4);
     return 0;
