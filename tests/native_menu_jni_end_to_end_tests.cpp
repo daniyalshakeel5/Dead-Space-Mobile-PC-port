@@ -42,6 +42,7 @@ int main() {
         0x1234,0x5678,0x9abc,0xdef0,&alloc,&enqueue,&h
     };
     original_bind_input_services({service,readiness.data(),readiness.size()});
+    assert(original_last_input_status()==OriginalInputStatus::NotReady);
     NativeMenuInputCallbacks callbacks{};
     callbacks.pointer=[](void*,int event,int module,int id,float x,float y) {
         Java_com_ea_blast_TouchSurfaceAndroid_NativeOnPointerEvent(
@@ -81,6 +82,7 @@ int main() {
     assert(original_last_input_status()==OriginalInputStatus::NotReady);
     assert(h.events.size()==5);
     original_unbind_input_services();
+    assert(original_last_input_status()==OriginalInputStatus::MissingOriginalService);
     assert(native_menu_key(input,callbacks,4,false));
     assert(original_last_input_status()==OriginalInputStatus::MissingOriginalService);
     return 0;
