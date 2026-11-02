@@ -65,6 +65,8 @@ function Refresh-Setup {
  $ui.QemuBoot.IsEnabled=$false # no WSL/Docker requirement in the player build
  $ui.GuestPreflight.IsEnabled=$isInstalled -and (-not $busy) -and
    (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'xperia_guest_import_report.exe') -PathType Leaf)
+ $ui.GuestStartup.IsEnabled=$isInstalled -and (-not $busy) -and
+   (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'xperia_guest_startup.exe') -PathType Leaf)
  foreach($name in @('BrowseZip','BrowseApk','ClearApk','Recheck','BrowseApkGraphics')){$ui[$name].IsEnabled= -not $busy}
  $ui.OpenOriginal.IsEnabled=$isInstalled
  $ui.OpenHd.IsEnabled=$hdInstalled
@@ -130,6 +132,21 @@ $ui.OpenOriginal.Add_Click({Safe-Action {Start-Process explorer.exe -ArgumentLis
 $ui.OpenHd.Add_Click({Safe-Action {Start-Process explorer.exe -ArgumentList (Quote-Argument (Join-Path $install 'enhancements\reanimated\texture_hd'))}})
 $ui.OpenInstall.Add_Click({Safe-Action {Start-Process explorer.exe -ArgumentList (Quote-Argument $install)}})
 $ui.OpenLogs.Add_Click({Start-Process explorer.exe -ArgumentList (Quote-Argument $logs)})
+$ui.GuestStartup.Add_Click({Safe-Action {
+ if(-not (Test-Installed)){throw 'Install verified Xperia Play files first.'}
+ $binary=Join-Path $PSScriptRoot 'xperia_guest_startup.exe'
+ if(-not (Test-Path -LiteralPath $binary -PathType Leaf)){throw 'Windows ARM32 startup runtime missing.'}
+ $response=[Windows.MessageBox]::Show(
+  'This runs original Xperia ARM initialization code through the experimental native Windows translator. Unimplemented Android services will stop execution and appear in the log; it cannot yet run a playable game. Proceed?',
+  'Experimental ARM32 guest execution','YesNo','Warning')
+ if($response -ne 'Yes'){return}
+ $original=Join-Path $install 'lib\armeabi\libEAMGameDeadSpace.so'
+ if(-not (Test-Path -LiteralPath $original -PathType Leaf)){throw 'Original Xperia game library missing.'}
+ $script:task=Start-Tracked $binary @($original,$install) 'Original Xperia ARM constructor startup'
+ Write-Activity 'Running original Xperia ARM guest constructors using Windows Dynarmic.'
+ Write-Activity 'Execution will stop at the first unsupported guest service or JNI bootstrap boundary.'
+ Refresh-Setup
+}})
 $ui.GuestPreflight.Add_Click({Safe-Action {
  if(-not (Test-Installed)){throw 'Install the verified Xperia Play files first.'}
  $helper=Join-Path $PSScriptRoot 'GuestPreflight.ps1'
