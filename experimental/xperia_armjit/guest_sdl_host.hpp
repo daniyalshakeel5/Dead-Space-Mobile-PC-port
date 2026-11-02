@@ -23,6 +23,7 @@ public:
     bool queue_pcm16(const std::uint8_t* data,std::size_t bytes,
                      std::string& error) noexcept;
     bool audio_ready() const noexcept {return audio_device_!=0;}
+    bool audio_control(unsigned action,std::string& error) noexcept;
     bool graphics_ready() const noexcept {return context_!=nullptr;}
     const std::unordered_map<std::string,std::uint32_t>& symbols() const noexcept {
         return symbols_;
