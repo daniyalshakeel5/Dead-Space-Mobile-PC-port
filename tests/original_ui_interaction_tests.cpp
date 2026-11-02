@@ -58,6 +58,48 @@ int main() {
     assert(cx==240&&cy==160);
     assert(original_ui_viewport(0,720).width==0);
     assert(!original_ui_window_to_canvas(0,720,0,0,cx,cy));
+    // Regression: the renderer previously pre-scaled SDL coordinates to
+    // 480x320 and the UI dispatcher scaled them a second time. Test the
+    // complete window-event input path at several real window sizes.
+    OriginalUiInteractionState desktop{};
+    const auto move=dispatch_original_ui_window_pointer(
+        desktop,sprites,OriginalUiPointerAction::Move,1280,720,140,60);
+    assert(move.hovered==2);
+    auto pressed=dispatch_original_ui_window_pointer(
+        desktop,sprites,OriginalUiPointerAction::Down,1280,720,140,60);
+    assert(pressed.hovered==2 && desktop.pressed==2);
+    auto clicked=dispatch_original_ui_window_pointer(
+        desktop,sprites,OriginalUiPointerAction::Up,1280,720,140,60);
+    assert(clicked.activated==2 && desktop.pressed==0);
+    // A press within a button followed by release in the black margin
+    // must not invoke that original menu action.
+    dispatch_original_ui_window_pointer(
+        desktop,sprites,OriginalUiPointerAction::Down,1280,720,140,60);
+    clicked=dispatch_original_ui_window_pointer(
+        desktop,sprites,OriginalUiPointerAction::Up,1280,720,1200,60);
+    assert(clicked.activated==0 && clicked.hovered==0);
+    // Horizontal and vertical letterboxing, plus a resized viewport.
+    assert(dispatch_original_ui_window_pointer(
+        desktop,sprites,OriginalUiPointerAction::Move,800,800,30,180)
+        .hovered==2);
+    assert(dispatch_original_ui_window_pointer(
+        desktop,sprites,OriginalUiPointerAction::Move,720,1280,25,445)
+        .hovered==2);
+    assert(dispatch_original_ui_window_pointer(
+        desktop,sprites,OriginalUiPointerAction::Move,720,1280,25,399)
+        .hovered==0);
+    dispatch_original_ui_window_pointer(
+        desktop,sprites,OriginalUiPointerAction::Down,480,320,15,25);
+    assert(desktop.pressed==2);
+    dispatch_original_ui_window_pointer(
+        desktop,sprites,OriginalUiPointerAction::Cancel,0,0,0,0);
+    assert(desktop.pressed==0 && desktop.hovered==0);
+    clicked=dispatch_original_ui_window_pointer(
+        desktop,sprites,OriginalUiPointerAction::Up,480,320,15,25);
+    assert(clicked.activated==0);
+    assert(dispatch_original_ui_window_pointer(
+        desktop,sprites,OriginalUiPointerAction::Move,0,0,100,100)
+        .hovered==0);
     // Keyboard navigation follows recovered clickable layout actions,
     // skips decorative sprites and wraps in both directions.
     const std::vector<OriginalUiDraw> navigation={
