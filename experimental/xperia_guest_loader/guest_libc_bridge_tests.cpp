@@ -86,6 +86,33 @@ int main() {
     assert(svc.dispatch(25,regs,image,error) && regs[0]==1);
     regs[0]=aborted;
     assert(svc.dispatch(27,regs,image,error));
+    // Original Android ARM C++ object lifecycle and errno TLS ABI.
+    const auto guest_dtor=0x10001900u;
+    regs.fill(0);
+    regs[0]=p;regs[1]=guest_dtor;regs[2]=0x111u;
+    assert(svc.dispatch(29,regs,image,error)); // __aeabi_atexit
+    assert(regs[0]==0);
+    regs.fill(0);
+    regs[0]=guest_dtor;regs[1]=q;regs[2]=0x222u;
+    assert(svc.dispatch(30,regs,image,error)); // __cxa_atexit
+    assert(regs[0]==0);
+    const auto first=svc.take_destructors(0x111u);
+    assert(first.size()==1 && first[0].function==guest_dtor &&
+           first[0].argument==p && first[0].dso==0x111u);
+    const auto second=svc.take_destructors(0);
+    assert(second.size()==1 && second[0].argument==q &&
+           second[0].dso==0x222u);
+    assert(svc.take_destructors(0).empty());
+    regs.fill(0);
+    assert(svc.dispatch(31,regs,image,error)); // __errno
+    const auto errno_ptr=regs[0];
+    assert(errno_ptr==0x72000000u);
+    assert(image.writeable(errno_ptr,4));
+    image.writeable(errno_ptr,4)[0]=13;
+    regs.fill(0);
+    assert(svc.dispatch(31,regs,image,error));
+    assert(regs[0]==errno_ptr && image.read(errno_ptr,1)[0]==13);
+    assert(!svc.dispatch(32,regs,image,error)); // JIT callback required
     assert(!svc.symbols().count("glDrawArrays"));
     assert(svc.symbols().count("malloc")); // implemented by bounded GuestHeap
     assert(svc.symbols().count("open") && svc.symbols().count("read"));
