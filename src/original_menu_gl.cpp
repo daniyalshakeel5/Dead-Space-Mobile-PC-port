@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <iostream>
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
@@ -145,6 +146,7 @@ OriginalMenuGpuStatus run_original_menu_gl(
             nullptr,nullptr,module,key,alt);
     };
     bool quit_requested=false;
+    bool reported_unbound_input=false;
     while(!quit_requested){
         SDL_Event e{};
         while(SDL_PollEvent(&e)) {
@@ -175,6 +177,16 @@ OriginalMenuGpuStatus run_original_menu_gl(
                     native_menu_pointer(input,callbacks,1,e.button.x,e.button.y,width,height);
             }
         }
+        // JNI wrappers fail closed until original mapped queue owners and
+        // event allocator are connected. Do not silently claim UI input works.
+        if(!reported_unbound_input &&
+           original_runtime::original_last_input_status()==
+               original_runtime::OriginalInputStatus::MissingOriginalService &&
+           (input.mouse_held || input.enter_held || input.escape_held)) {
+            std::cerr<<"Original menu input unavailable: original event allocator/queue "
+                        "not bound to the recovered runtime.\\n";
+            reported_unbound_input=true;
+        }
         int w=0,h=0;SDL_GL_GetDrawableSize(window.get(),&w,&h);
         if(w<=0||h<=0)continue;
         glViewport(0,0,w,h);
@@ -196,6 +208,7 @@ OriginalMenuGpuStatus run_original_menu_gl(
         }
         SDL_GL_SwapWindow(window.get());
     }
+    native_menu_focus_lost(input,callbacks);
     free_textures();
     diagnostic.clear();
     return OriginalMenuGpuStatus::UserAborted;
