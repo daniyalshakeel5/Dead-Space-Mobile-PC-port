@@ -6,6 +6,8 @@ import re
 import struct
 import sys
 import zipfile
+import tempfile
+import subprocess
 
 apk=pathlib.Path(sys.argv[1])
 mode=sys.argv[2]
@@ -98,4 +100,24 @@ with zipfile.ZipFile(apk) as archive:
             blob=archive.read(path)
             print("INPUT_AUDIO ELF",path,"size",len(blob),
                 "symbol-string-presence",{x.decode():x in blob for x in needles})
+            # Inspect the original ARM dynamic symbol table; unlike raw
+            # string matching this distinguishes exported callable symbols.
+            with tempfile.TemporaryDirectory() as temp:
+                original=pathlib.Path(temp)/"original.so"
+                original.write_bytes(blob)
+                result=subprocess.run(["readelf","--dyn-syms","--wide",str(original)],
+                    capture_output=True,text=True,timeout=15,check=False)
+                if result.returncode:
+                    print("INPUT_AUDIO dynsym readelf unavailable",result.returncode)
+                else:
+                    exports=[]
+                    for line in result.stdout.splitlines():
+                        parts=line.split()
+                        if len(parts)>=8 and parts[3]=="FUNC" and parts[6]!="UND":
+                            exports.append(parts[-1])
+                    jni=[name for name in exports if
+                         any(key in name for key in
+                             ("JNI_OnLoad","Java_com_ea","Audio","Input","NativeOn"))]
+                    print("INPUT_AUDIO exported callable count",len(exports))
+                    print("INPUT_AUDIO relevant native export names",jni[:100])
         print("INPUT_AUDIO native callback behavior UNVERIFIED")
