@@ -222,13 +222,24 @@ OriginalMenuGpuStatus run_original_menu_gl(
             glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,rgba.data());
             const auto error=glGetError();
             std::size_t nonblack=0;
-            for(std::size_t index=0;index<rgba.size();index+=4u)
+            std::array<bool,4096> color_buckets{};
+            std::size_t diverse_colors=0;
+            for(std::size_t index=0;index<rgba.size();index+=4u) {
                 if(rgba[index]>12||rgba[index+1]>12||rgba[index+2]>12)
                     ++nonblack;
+                if(index%(4u*16u)!=0)continue;
+                const unsigned bucket=((rgba[index]>>4u)<<8u) |
+                    ((rgba[index+1]>>4u)<<4u) | (rgba[index+2]>>4u);
+                if(!color_buckets[bucket]) {
+                    color_buckets[bucket]=true;
+                    ++diverse_colors;
+                }
+            }
             std::cerr<<"Original 3D menu GPU frame: "<<w<<"x"<<h
-                     <<", nonblack pixels "<<nonblack<<"\\n";
+                     <<", nonblack pixels "<<nonblack
+                     <<", distinct color buckets "<<diverse_colors<<"\\n";
             free_textures();
-            if(error!=GL_NO_ERROR || nonblack==0) {
+            if(error!=GL_NO_ERROR || nonblack==0 || diverse_colors<8) {
                 diagnostic="Original GPU scene generated no visible pixels or GL error";
                 return OriginalMenuGpuStatus::InvalidScene;
             }
