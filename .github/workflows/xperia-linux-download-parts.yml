@@ -1,0 +1,95 @@
+name: Publish QEMU Linux tester in smaller public downloads
+on:
+  push:
+    branches:
+      - work/deadspace-xperia-arm-wrapper-2026-11-02
+    paths:
+      - "linux-portable/Assemble-DeadSpace-Linux.sh"
+      - "linux-portable/Assemble-DeadSpace-Linux.desktop"
+      - "linux-portable/README-SPLIT-DOWNLOAD.txt"
+      - ".github/workflows/xperia-linux-download-parts.yml"
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+jobs:
+  split-and-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: xperia-linux-qemu-test-2026-11-02-parts
+      BUNDLE: DeadSpaceMobile-Xperia-Linux-x86_64-QEMU.zip
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve existing tested original-free Linux QEMU archive
+        uses: actions/download-artifact@v4
+        with:
+          name: DeadSpaceMobile-Xperia-Linux-x86_64-QEMU
+          run-id: 41489077390
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/downloaded
+      - name: Validate and split into 24 MiB parts
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          archive="$RUNNER_TEMP/downloaded/$BUNDLE"
+          test -s "$archive"
+          unzip -tqq "$archive"
+          unzip -Z1 "$archive" > "$RUNNER_TEMP/portable-file-list.txt"
+          grep -q '/bin/qemu-arm-static$' "$RUNNER_TEMP/portable-file-list.txt"
+          grep -q '/bin/deadspace-armhf$' "$RUNNER_TEMP/portable-file-list.txt"
+          grep -q '/Run Dead Space.sh$' "$RUNNER_TEMP/portable-file-list.txt"
+          if grep -E '(^|/)(game-data|libEAMGameDeadSpace[.]so|DeadSpaceReanimated[^/]*)($|/)' \
+             "$RUNNER_TEMP/portable-file-list.txt"; then
+            echo 'Unexpected original game files detected. Refusing public release.'
+            exit 2
+          fi
+          mkdir -p release
+          cp linux-portable/Assemble-DeadSpace-Linux.sh release/
+          cp linux-portable/Assemble-DeadSpace-Linux.desktop release/
+          cp linux-portable/README-SPLIT-DOWNLOAD.txt release/
+          chmod +x release/Assemble-DeadSpace-Linux.sh release/Assemble-DeadSpace-Linux.desktop
+          hash="$(sha256sum "$archive" | cut -d' ' -f1)"
+          printf '%s  %s\n' "$hash" "$BUNDLE" > release/BUNDLE-SHA256SUMS.txt
+          split -b 24M -d -a 3 "$archive" "release/$BUNDLE.part."
+          (cd release && sha256sum "$BUNDLE".part.* > PARTS-SHA256SUMS.txt)
+          (cd release && zip -q 00-START-HERE.zip \
+             Assemble-DeadSpace-Linux.sh Assemble-DeadSpace-Linux.desktop \
+             README-SPLIT-DOWNLOAD.txt BUNDLE-SHA256SUMS.txt PARTS-SHA256SUMS.txt)
+          cat release/"$BUNDLE".part.* > "$RUNNER_TEMP/joined.zip"
+          cmp "$archive" "$RUNNER_TEMP/joined.zip"
+          sha256sum "$RUNNER_TEMP/joined.zip"
+          ls -lh release/00-START-HERE.zip release/"$BUNDLE".part.*
+      - name: Publish public GitHub Release assets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          ## Dead Space Mobile — Linux QEMU smaller downloads
+
+          The previous single 289 MB Actions download was interrupted for some users.
+
+          Download 00-START-HERE.zip and all numbered .part.XXX files
+          into the same folder. Extract START-HERE into that folder.
+          Choose Run as Program on Assemble-DeadSpace-Linux.sh.
+          The helper identifies missing or corrupted parts, assembles
+          the ZIP, checks SHA256 and extracts the QEMU Linux runtime.
+
+          Each part is 24 MiB or less and can be downloaded again individually.
+          These are ordinary public Release assets; GitHub login is not required.
+
+          The original Xperia deadspace.zip must be supplied by the user.
+          Original copyrighted game data is NOT distributed here.
+          NOTES
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo 'Public release already exists; refusing to overwrite.'
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" \
+            release/00-START-HERE.zip release/"$BUNDLE".part.* \
+            --title "Dead Space Mobile — Linux QEMU smaller downloads" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            --target "$GITHUB_SHA" \
+            --prerelease
+          echo "PUBLIC_RELEASE=https://github.com/$GITHUB_REPOSITORY/releases/tag/$RELEASE_TAG"
