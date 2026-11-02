@@ -1,4 +1,7 @@
 #include "guest_arm_call_runner.hpp"
+#ifdef _WIN32
+#include "guest_sdl_host.hpp"
+#endif
 #include "dynarmic/interface/A32/a32.h"
 #include "dynarmic/interface/A32/config.h"
 #include <algorithm>
@@ -23,16 +26,21 @@ struct Host final : Dynarmic::A32::UserCallbacks {
     GuestElf32& image;
     const GuestLibcBridge& bridge;
     const GuestJniVm* java=nullptr;
+    const GuestSdlHost* sdl=nullptr;
     Dynarmic::A32::Jit* jit=nullptr;
     u64 budget=0;
     u32 trapped=0;
     bool fault=false;
-    Host(GuestElf32& elf,const GuestLibcBridge& svc,const GuestJniVm* jni)
-        :image(elf),bridge(svc),java(jni){}
+    Host(GuestElf32& elf,const GuestLibcBridge& svc,
+         const GuestJniVm* jni,const GuestSdlHost* graphics)
+        :image(elf),bridge(svc),java(jni),sdl(graphics){}
     u8 MemoryRead8(u32 p) override {
         u8 value=0;
         if(bridge.code_byte(p,value))return value;
         if(java && java->code_byte(p,value))return value;
+#ifdef _WIN32
+        if(sdl && sdl->code_byte(p,value))return value;
+#endif
         if(p>=kReturnTrap && p<kReturnTrap+4u){
             const u32 word=0xef000000u|kReturnSvc;
             return u8(word>>(8u*(p-kReturnTrap)));
@@ -86,11 +94,13 @@ struct GuestArmCallRunner::Impl {
     GuestHeap& heap;
     GuestFileSystem* files;
     GuestJniVm* java;
+    GuestSdlHost* sdl;
     Host host;
     Dynarmic::A32::Jit jit;
     Impl(GuestElf32& elf,GuestLibcBridge& services,GuestHeap& memory,
-         GuestFileSystem* mount,GuestJniVm* jni)
-        :image(elf),bridge(services),heap(memory),files(mount),java(jni),host(elf,services,jni),
+         GuestFileSystem* mount,GuestJniVm* jni,GuestSdlHost* graphics)
+        :image(elf),bridge(services),heap(memory),files(mount),java(jni),
+         sdl(graphics),host(elf,services,jni,graphics),
          jit(config(host)){
         // One owned 256 KiB guest stack, disjoint from game code/heap
         // and import veneers, allocated only once for the runner.
@@ -148,6 +158,15 @@ struct GuestArmCallRunner::Impl {
                 }
                 if(id==0)
                     throw std::runtime_error("ARM guest exceeded bounded instruction budget");
+#ifdef _WIN32
+                if(sdl && sdl->handles(id)){
+                    std::array<u32,16> gl_regs=jit.Regs();
+                    if(!sdl->dispatch(id,gl_regs,image,error))return false;
+                    jit.Regs()[0]=gl_regs[0];
+                    jit.Regs()[15]=sdl->return_pc(id);
+                    continue;
+                }
+#endif
                 if(java && java->handles(id)) {
                     std::array<u32,16> regs=jit.Regs();
                     if(!java->dispatch(id,regs,image,error))
@@ -237,8 +256,8 @@ struct GuestArmCallRunner::Impl {
     }
 };
 GuestArmCallRunner::GuestArmCallRunner(GuestElf32& image,
-       GuestLibcBridge& services,GuestHeap& heap,GuestFileSystem* files,GuestJniVm* java)
-    :impl_(std::make_unique<Impl>(image,services,heap,files,java)){}
+       GuestLibcBridge& services,GuestHeap& heap,GuestFileSystem* files,GuestJniVm* java,GuestSdlHost* sdl)
+    :impl_(std::make_unique<Impl>(image,services,heap,files,java,sdl)){} 
 GuestArmCallRunner::~GuestArmCallRunner()=default;
 bool GuestArmCallRunner::invoke(u32 address,const std::array<u32,4>& args,
                                u32& result,std::string& error){
