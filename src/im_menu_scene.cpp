@@ -117,6 +117,9 @@ ImMenuGeometry decode_im_menu_geometry(const std::uint8_t* data,
                 if(!accepted.empty()) {ambiguous=true;break;}
                 accepted=std::move(children);
             }
+            // A valid empty group has a zero child count in its final
+            // four bytes. Unlike nonzero child arrays it has no references.
+            // This is a structural classification, not a fabricated node.
             if(!ambiguous && !accepted.empty())
                 out.validated_group_children.push_back({
                     static_cast<std::uint32_t>(i+1),std::move(accepted)});
