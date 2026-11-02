@@ -1,6 +1,9 @@
 #pragma once
 #include "guest_elf32.hpp"
 #include "guest_xperia_input.hpp"
+#ifndef SDL_MAIN_HANDLED
+#define SDL_MAIN_HANDLED
+#endif
 #include <SDL.h>
 #include <array>
 #include <cstddef>
