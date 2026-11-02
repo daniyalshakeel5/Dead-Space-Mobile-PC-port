@@ -1,4 +1,5 @@
 #pragma once
+#include "ds_port/m3g_container.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -34,6 +35,11 @@ struct OriginalUiSbin {
 };
 // Parses the verified SBIN v2 binary metadata embedded as Image2D user
 // parameter 500. Every string, field offset and chunk is bounded.
+// Reconstruct a sprite from the source/destination crop boxes stored in
+// the original atlas. Blank trimmed margins remain transparent.
+M3gRgbaImage reconstruct_original_ui_sprite(
+    const OriginalUiSprite& sprite,
+    const std::vector<M3gRgbaImage>& original_atlases);
 OriginalUiSbin decode_original_ui_sbin(const std::uint8_t* data,
                                       std::size_t bytes);
 }
