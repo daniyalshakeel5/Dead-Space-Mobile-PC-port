@@ -3,6 +3,7 @@
 #include "guest_filesystem.hpp"
 #include <algorithm>
 #include <climits>
+#include <cstdio>
 #include <cstring>
 #include <stdexcept>
 
@@ -34,9 +35,10 @@ GuestLibcBridge::GuestLibcBridge() {
     static const char* const names[]={
         "memcpy","memmove","memset","memcmp","strlen","strcmp","strncmp",
         "malloc","calloc","free","realloc",
-        "open","read","lseek","close"
+        "open","read","lseek","close",
+        "fopen","fread","fseek","ftell","fclose"
     };
-    for(unsigned i=0;i<15;++i){
+    for(unsigned i=0;i<20;++i){
         const std::uint32_t id=i+1;
         symbols_.emplace(names[i],veneer_base+i*8);
         const std::uint32_t instructions[2]={0xef000000u|id,0xe12fff1eu};
@@ -56,7 +58,7 @@ bool GuestLibcBridge::dispatch(
     GuestElf32& image,std::string& failure,GuestHeap* heap,
     GuestFileSystem* files) const noexcept {
     try {
-        if(id<1||id>15)
+        if(id<1||id>20)
             throw std::runtime_error("Unknown Android libc SVC service");
         const auto a=regs[0],b=regs[1],n=regs[2];
         std::uint32_t result=0;
@@ -161,6 +163,64 @@ bool GuestLibcBridge::dispatch(
             break;
         }
         case 15: { // close(fd)
+            if(!files)throw std::runtime_error("Guest asset mount unavailable");
+            result=static_cast<std::uint32_t>(files->close(static_cast<int>(a)));
+            break;
+        }
+        case 16: { // FILE* fopen(path, "r" / "rb")
+            if(!files)throw std::runtime_error("Guest asset mount unavailable");
+            std::string path,mode;
+            for(std::uint32_t i=0;i<4096;++i){
+                if(std::uint64_t(a)+i>UINT32_MAX)
+                    throw std::runtime_error("ARM fopen path overflow");
+                const auto v=byte(image,a+i);
+                if(!v)break;
+                path.push_back(static_cast<char>(v));
+            }
+            if(path.size()>=4096)
+                throw std::runtime_error("Unterminated ARM fopen path");
+            for(std::uint32_t i=0;i<16;++i){
+                if(std::uint64_t(b)+i>UINT32_MAX)
+                    throw std::runtime_error("ARM fopen mode overflow");
+                const auto v=byte(image,b+i);
+                if(!v)break;
+                mode.push_back(static_cast<char>(v));
+            }
+            if(mode.size()>=16)
+                throw std::runtime_error("Unterminated ARM fopen mode");
+            if(mode!="r"&&mode!="rb"){result=0;break;}
+            const auto handle=files->open_readonly(path,0);
+            result=handle<0?0:static_cast<std::uint32_t>(handle);
+            break;
+        }
+        case 17: { // fread(ptr, element_size, count, guest_FILE*)
+            if(!files)throw std::runtime_error("Guest asset mount unavailable");
+            const std::uint64_t count=std::uint64_t(b)*n;
+            if(count>GuestFileSystem::max_io)
+                throw std::runtime_error("Guest fread transfer exceeds bound");
+            if(!count||!b){result=0;break;}
+            auto* destination=image.writeable(a,static_cast<std::size_t>(count));
+            if(!destination)throw std::runtime_error("Unmapped ARM fread destination");
+            const auto bytes=files->read(static_cast<int>(regs[3]),
+                                         destination,static_cast<std::size_t>(count));
+            if(bytes<0)throw std::runtime_error("Invalid guest FILE* in fread");
+            result=static_cast<std::uint32_t>(bytes)/b;
+            break;
+        }
+        case 18: { // fseek(FILE*, signed offset, whence)
+            if(!files)throw std::runtime_error("Guest asset mount unavailable");
+            const auto position=files->seek(static_cast<int>(a),
+                static_cast<std::int32_t>(b),static_cast<int>(n));
+            result=position<0?UINT32_MAX:0u;
+            break;
+        }
+        case 19: { // ftell(FILE*)
+            if(!files)throw std::runtime_error("Guest asset mount unavailable");
+            result=static_cast<std::uint32_t>(files->seek(
+                static_cast<int>(a),0,SEEK_CUR));
+            break;
+        }
+        case 20: { // fclose(FILE*)
             if(!files)throw std::runtime_error("Guest asset mount unavailable");
             result=static_cast<std::uint32_t>(files->close(static_cast<int>(a)));
             break;

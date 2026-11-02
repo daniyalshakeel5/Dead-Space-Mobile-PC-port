@@ -101,6 +101,34 @@ int main() {
     regs[0]=guest_path;regs[1]=0;
     assert(svc.dispatch(12,regs,image,error,nullptr,&assets));
     assert(static_cast<std::int32_t>(regs[0])==-1);
+    // Stdio functions use the same sandboxed handles and ARM32 ABI.
+    const char* mode="rb";
+    std::memcpy(image.writeable(guest_output,3),mode,3);
+    std::memcpy(image.writeable(guest_path,std::strlen(relative)+1),
+                relative,std::strlen(relative)+1);
+    regs.fill(0);regs[0]=guest_path;regs[1]=guest_output;
+    assert(svc.dispatch(16,regs,image,error,nullptr,&assets)); // fopen
+    const auto fileptr=regs[0];
+    assert(fileptr>=3u);
+    regs.fill(0);
+    regs[0]=guest_output+32;regs[1]=2;regs[2]=3;regs[3]=fileptr;
+    assert(svc.dispatch(17,regs,image,error,nullptr,&assets)); // fread
+    assert(regs[0]==3);
+    assert(std::memcmp(image.read(guest_output+32,6),"STASIS",6)==0);
+    regs[0]=fileptr;
+    assert(svc.dispatch(19,regs,image,error,nullptr,&assets)); // ftell
+    assert(regs[0]==6);
+    regs[0]=fileptr;regs[1]=0;regs[2]=0;
+    assert(svc.dispatch(18,regs,image,error,nullptr,&assets)); // fseek
+    assert(regs[0]==0);
+    regs[0]=fileptr;
+    assert(svc.dispatch(20,regs,image,error,nullptr,&assets)); // fclose
+    assert(regs[0]==0);
+    // Opening for writing must fail, never mutate original game data.
+    std::memcpy(image.writeable(guest_output,3),"wb",3);
+    regs[0]=guest_path;regs[1]=guest_output;
+    assert(svc.dispatch(16,regs,image,error,nullptr,&assets));
+    assert(regs[0]==0);
     fs::remove_all(install);
     return 0;
 }
