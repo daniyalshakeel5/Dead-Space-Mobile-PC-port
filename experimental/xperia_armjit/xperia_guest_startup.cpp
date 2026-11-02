@@ -62,10 +62,20 @@ int main(int argc,char** argv){
         if(!guest.run_original_initializers(error))
             throw std::runtime_error("Original ARM constructor failed: "+error);
         std::cerr<<"ORIGINAL_ARM_CONSTRUCTORS_COMPLETE\n";
-        // An actual Android JavaVM/JNIEnv and JNI_OnLoad are still required.
-        // Do not invoke JNI_OnLoad with forged pointers or mark the game booted.
-        std::cerr<<"XPERIA_STARTUP_BLOCKED: JNI JavaVM and Android services"
-                    " not implemented; game not launched.\n";
+        const auto entry=elf.jni_exports.find("JNI_OnLoad");
+        if(entry==elf.jni_exports.end())
+            throw std::runtime_error("Original Xperia ELF missing JNI_OnLoad export");
+        std::uint32_t version=0;
+        std::cerr<<"Invoking ORIGINAL Xperia JNI_OnLoad through ARM32 JavaVM.\\n";
+        if(!guest.invoke(entry->second,{java.vm(),0,0,0},version,error))
+            throw std::runtime_error("Original JNI_OnLoad stopped: "+error);
+        if(version!=0x00010002u && version!=0x00010004u &&
+           version!=0x00010006u)
+            throw std::runtime_error("Original JNI_OnLoad returned unsupported version");
+        std::cerr<<"ORIGINAL_XPERIA_JNI_ONLOAD_COMPLETE: 0x"
+                 <<std::hex<<version<<std::dec<<"\\n";
+        std::cerr<<"XPERIA_STARTUP_BLOCKED: Java application bootstrap, "
+                    "graphics and frame lifecycle still missing.\\n";
         return 5;
     }catch(const std::exception& e){
         std::cerr<<"XPERIA_STARTUP_FAILED: "<<e.what()<<"\n";
