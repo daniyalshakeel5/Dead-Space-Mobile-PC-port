@@ -41,8 +41,11 @@ int main(){
     assert(error.empty());
     assert(image.relative_relocations==1);
     assert(image.remaining_relocations==1);
-    assert(image.read_u32(0x1350)==0x10001234u);
-    assert(image.read_u32(0x1354)==0u);
+    assert(image.read_u32(0x10001350)==0x10001234u);
+    assert(image.read_u32(0x10001354)==0u);
+    // Old incorrectly unrebased guest virtual addresses MUST NOT work.
+    assert(image.read(0x1350,4)==nullptr);
+    assert(image.writeable(0x1350,4)==nullptr);
     assert(!image.read(0xffffffff,16));
     assert(!image.writeable(0xffffffff,16));
     bytes[18]=62; // Reject native Windows/x86 ELF.

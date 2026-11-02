@@ -33,7 +33,7 @@ static std::vector<u8> elf_fixture(){
     put32(b,280,2);put32(b,284,0);
     put32(b,288,0);
     put32(b,0x280,0x1600);put32(b,0x284,23); // Relative relocated target
-    put32(b,0x600,0x00005678); // addend rebases to 0x10005678
+    put32(b,0x600,0x00001500); // relocated pointer must refer to guest data
     // ARM guest code at vaddr 0x1400, data at 0x1500.
     put32(b,0x400,0xe3a0002a); // mov r0,#42
     put32(b,0x404,0xe2800001); // add r0,r0,#1
@@ -84,17 +84,18 @@ int main(){
     if(!elf.open(elf_fixture(),why)){std::cerr<<why<<"\n";return 1;}
     if(elf.relative_relocations!=1 ||
        elf.remaining_relocations!=0 ||
-       elf.read_u32(0x1600)!=0x10005678u)return 2;
+       elf.read_u32(0x10001600)!=0x10001500u)return 2;
     ElfHost host(elf);
     Dynarmic::A32::UserConfig cfg;
     cfg.callbacks=&host;
     Dynarmic::A32::Jit jit(cfg);
-    jit.Regs()[1]=0x1500;
-    jit.Regs()[15]=0x1400;
+    // The guest ARM code must actually dereference a relocated pointer.
+    jit.Regs()[1]=elf.read_u32(0x10001600);
+    jit.Regs()[15]=0x10001400;
     jit.SetCpsr(0x10);
     host.left=8;
     jit.Run();
-    if(host.error||jit.Regs()[0]!=43||elf.read_u32(0x1500)!=43)
+    if(host.error||jit.Regs()[0]!=43||elf.read_u32(0x10001500)!=43)
         return 3;
     std::cout<<"Xperia guest ELF sparse PT_LOAD + RELATIVE reloc "
              <<"-> ARM JIT -> guest memory: PASSED\n";

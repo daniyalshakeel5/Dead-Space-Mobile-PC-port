@@ -53,7 +53,13 @@ bool GuestElf32::open(const std::vector<std::uint8_t>& bytes,
             if(mem_total>128ull*1024*1024)
                 throw std::runtime_error("Guest memory cap exceeded");
             GuestSegment seg;
-            seg.start=addr;seg.contents.resize(memsz);
+            // Actual guest address space and relocation base must agree.
+            // Previously B+A pointers were rebased, but code/segments
+            // remained at unrebased addresses: a dereference would fault.
+            const auto mapped=std::uint64_t(guest_base)+addr;
+            if(mapped+memsz>0x100000000ull)
+                throw std::runtime_error("Guest PT_LOAD exceeds ARM32 address space");
+            seg.start=checked32(mapped);seg.contents.resize(memsz);
             std::copy_n(bytes.data()+offset,filesz,seg.contents.data());
             segments.push_back(std::move(seg));
         }
@@ -91,17 +97,17 @@ bool GuestElf32::open(const std::vector<std::uint8_t>& bytes,
             if(table.size==0)continue;
             // Only the original PT_LOAD file-backed payload can contain
             // relocation table records; target slots can be zero-filled BSS.
-            const auto* rels=read(table.address,table.size);
+            const auto* rels=read(checked32(std::uint64_t(guest_base)+table.address),table.size);
             if(!rels)throw std::runtime_error("Unmapped REL table");
             for(std::uint32_t off=0;off<table.size;off+=8){
                 auto target=rd32(rels+off);
                 const auto info=rd32(rels+off+4);
                 const auto kind=info&255u;
-                if(!writeable(target,4))
+                if(!writeable(checked32(std::uint64_t(guest_base)+target),4))
                     throw std::runtime_error("Relocation target unmapped");
                 if(kind==23u){
                     if((info>>8u)!=0u)throw std::runtime_error("RELATIVE with symbol index");
-                    auto* at=writeable(target,4);
+                    auto* at=writeable(checked32(std::uint64_t(guest_base)+target),4);
                     // ARM32 REL addend lives in the relocated target itself.
                     const auto addend=rd32(at);
                     const auto rebased=checked32(std::uint64_t(guest_base)+addend);

@@ -4,8 +4,9 @@
 #include <string>
 #include <vector>
 namespace xperia {
-// Directly maps actual ARM ELF32 PT_LOAD virtual addresses into owned
-// sparse guest memory and resolves only R_ARM_RELATIVE relocations.
+// Maps original ARM ELF32 PT_LOAD at guest_base+original vaddr into
+// owned sparse guest memory, with relocated pointers using the
+// *same* address space as Dynarmic. Resolves R_ARM_RELATIVE only.
 // No game code executes; ABS32/GLOB_DAT/JUMP_SLOT remain unbound.
 // No original EA binary is included in the module.
 struct GuestSegment {
