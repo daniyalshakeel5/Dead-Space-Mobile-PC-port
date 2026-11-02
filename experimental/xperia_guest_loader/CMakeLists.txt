@@ -10,9 +10,16 @@ add_test(NAME xperia_elf32_relative_and_external_relocations
          COMMAND xperia_guest_elf32_tests)
 
 # Original-free, ARM AAPCS libc import service dispatcher.
+add_library(xperia_guest_heap STATIC guest_heap.cpp)
+target_link_libraries(xperia_guest_heap PUBLIC xperia_guest_elf32)
+target_include_directories(xperia_guest_heap PUBLIC .)
 add_library(xperia_guest_libc_bridge STATIC guest_libc_bridge.cpp)
-target_link_libraries(xperia_guest_libc_bridge PUBLIC xperia_guest_elf32)
+target_link_libraries(xperia_guest_libc_bridge PUBLIC xperia_guest_elf32 xperia_guest_heap)
 target_include_directories(xperia_guest_libc_bridge PUBLIC .)
 add_executable(xperia_guest_libc_bridge_tests guest_libc_bridge_tests.cpp)
 target_link_libraries(xperia_guest_libc_bridge_tests PRIVATE xperia_guest_libc_bridge)
 add_test(NAME xperia_guest_bionic_libc_memory_strings COMMAND xperia_guest_libc_bridge_tests)
+
+add_executable(xperia_guest_heap_tests guest_heap_tests.cpp)
+target_link_libraries(xperia_guest_heap_tests PRIVATE xperia_guest_libc_bridge)
+add_test(NAME xperia_guest_bionic_heap_allocation COMMAND xperia_guest_heap_tests)
