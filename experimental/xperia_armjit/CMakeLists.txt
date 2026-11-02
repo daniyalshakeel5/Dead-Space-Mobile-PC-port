@@ -23,6 +23,12 @@ add_test(NAME xperia_arm32_jit_synthetic_a32 COMMAND xperia_arm32_jit_smoke)
 # dynamic JIT, all from original-free synthetic instructions.
 add_library(xperia_guest_elf32 STATIC ../xperia_guest_loader/guest_elf32.cpp)
 target_include_directories(xperia_guest_elf32 PUBLIC ../xperia_guest_loader)
+add_executable(xperia_guest_elf32_tests
+    ../xperia_guest_loader/guest_elf32_tests.cpp)
+target_compile_features(xperia_guest_elf32_tests PRIVATE cxx_std_17)
+target_link_libraries(xperia_guest_elf32_tests PRIVATE xperia_guest_elf32)
+add_test(NAME xperia_original_elf32_symbol_types_and_relocations
+    COMMAND xperia_guest_elf32_tests)
 add_executable(xperia_elf_jit_synthetic elf_mapped_jit_smoke.cpp)
 target_compile_features(xperia_elf_jit_synthetic PRIVATE cxx_std_20)
 target_link_libraries(xperia_elf_jit_synthetic PRIVATE
