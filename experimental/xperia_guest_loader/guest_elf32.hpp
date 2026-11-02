@@ -19,6 +19,9 @@ struct PendingImport {
     std::uint32_t kind=0;
     std::uint32_t addend=0;
     std::string name;
+    // ELF32 ST_TYPE; needed to distinguish safe function-call traps from
+    // unresolved data objects (which must NOT point at executable veneers).
+    std::uint8_t symbol_type=0;
 };
 class GuestElf32 {
 public:
