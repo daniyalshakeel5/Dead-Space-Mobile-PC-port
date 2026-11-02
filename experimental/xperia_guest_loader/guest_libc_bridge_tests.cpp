@@ -113,6 +113,44 @@ int main() {
     assert(svc.dispatch(31,regs,image,error));
     assert(regs[0]==errno_ptr && image.read(errno_ptr,1)[0]==13);
     assert(!svc.dispatch(32,regs,image,error)); // JIT callback required
+    // Guest pthread mutex state machine: real uncontended lock and unlock.
+    const auto mutex_ptr=0x10001840u;
+    regs.fill(0);regs[0]=mutex_ptr;regs[1]=0;
+    assert(svc.dispatch(33,regs,image,error)&&regs[0]==0);
+    regs[0]=mutex_ptr;
+    assert(svc.dispatch(35,regs,image,error)&&regs[0]==0);
+    regs[0]=mutex_ptr;
+    assert(svc.dispatch(36,regs,image,error)&&regs[0]==16); // EBUSY
+    regs[0]=mutex_ptr;
+    assert(svc.dispatch(34,regs,image,error)&&regs[0]==16); // locked
+    regs[0]=mutex_ptr;
+    assert(svc.dispatch(37,regs,image,error)&&regs[0]==0);
+    regs[0]=mutex_ptr;
+    assert(svc.dispatch(34,regs,image,error)&&regs[0]==0);
+    regs[0]=mutex_ptr;
+    assert(!svc.dispatch(35,regs,image,error)); // use-after-destroy
+    // Guest POSIX semaphore counts and try-wait errno behavior.
+    const auto sem_ptr=0x10001850u,sem_value_ptr=0x10001860u;
+    regs.fill(0);regs[0]=sem_ptr;regs[1]=0;regs[2]=2;
+    assert(svc.dispatch(38,regs,image,error)&&regs[0]==0);
+    regs[0]=sem_ptr;
+    assert(svc.dispatch(40,regs,image,error)&&regs[0]==0);
+    regs[0]=sem_ptr;regs[1]=sem_value_ptr;
+    assert(svc.dispatch(43,regs,image,error)&&regs[0]==0);
+    assert(image.read_u32(sem_value_ptr)==3);
+    for(int i=0;i<3;++i){
+        regs[0]=sem_ptr;
+        assert(svc.dispatch(41,regs,image,error)&&regs[0]==0);
+    }
+    assert(image.read_u32(sem_ptr)==0);
+    regs[0]=sem_ptr;
+    assert(svc.dispatch(42,regs,image,error)&&regs[0]==UINT32_MAX);
+    assert(image.read_u32(errno_ptr)==11); // EAGAIN
+    regs[0]=sem_ptr;
+    assert(!svc.dispatch(41,regs,image,error)); // no guest thread scheduler
+    regs[0]=sem_ptr;
+    assert(svc.dispatch(39,regs,image,error)&&regs[0]==0);
+    assert(!svc.dispatch(44,regs,image,error)); // pthread_once requires JIT
     assert(!svc.symbols().count("glDrawArrays"));
     assert(svc.symbols().count("malloc")); // implemented by bounded GuestHeap
     assert(svc.symbols().count("open") && svc.symbols().count("read"));
