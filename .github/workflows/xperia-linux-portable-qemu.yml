@@ -71,6 +71,16 @@ jobs:
           sudo cp -a /lib/arm-linux-gnueabihf "$dest/sysroot/lib/"
           sudo cp -a /usr/lib/arm-linux-gnueabihf "$dest/sysroot/usr/lib/"
           sudo cp -a /lib/ld-linux-armhf.so.3 "$dest/sysroot/lib/"
+          # The upstream glibc 2.31 binary still needs legacy SONAMEs such as
+          # libcrypto.so.1.1, which Ubuntu 24.04 no longer ships.
+          # Merge only MISSING libraries from upstream's own public, licensed
+          # PortMaster runtime; do not replace newer ARMHF Mesa/SDL libraries.
+          for oldlib in "$RUNNER_TEMP"/upstream/deadspace/libs.armhf/*.so*; do
+            base="$(basename "$oldlib")"
+            test -e "$dest/sysroot/usr/lib/arm-linux-gnueabihf/$base" ||
+              cp -L "$oldlib" "$dest/sysroot/usr/lib/arm-linux-gnueabihf/$base"
+          done
+          cp -a "$RUNNER_TEMP/upstream/deadspace/licenses" "$dest/licenses/upstream-portmaster"
           cp 'linux-portable/Run Dead Space.sh' "$dest/Run Dead Space.sh"
           cp 'linux-portable/Dead Space Mobile.desktop' "$dest/Dead Space Mobile.desktop"
           cp 'linux-portable/README.md' "$dest/README.md"
