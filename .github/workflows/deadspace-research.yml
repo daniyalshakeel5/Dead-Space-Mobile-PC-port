@@ -176,6 +176,29 @@ jobs:
                   dst=root/name
                   dst.parent.mkdir(parents=True,exist_ok=True)
                   dst.write_bytes(apk.read("assets/"+name))
+              # Original main_menu.m3g parameter-900 texture dependencies.
+              # Fixture names came from the real APK; the runtime resolves
+              # these dynamically from user parameters, not this list.
+              for name in (
+                  "published/textures/texture_env_main_menu_objects_02.m3g",
+                  "published/textures/texture_env_sprawl_starfield_01.m3g",
+                  "published/textures/texture_FX_HoloBackPanel.m3g",
+                  "published/textures/texture_FX_InteractDoorBacking.m3g",
+                  "published/textures/texture_FX_Dash.m3g",
+                  "published/textures/texture_FX_D_logo_Grey.m3g",
+                  "published/textures/texture_FX_GenBorder.m3g",
+                  "published/textures/texture_env_generic_fog_01.m3g",
+                  "published/textures/texture_floor_shadow.m3g",
+                  "published/textures/texture_env_main_menu_01.m3g",
+                  "published/textures/texture_env_main_menu_starfield.m3g",
+                  "published/textures/texture_env_main_menu_objects.m3g",
+                  "published/textures_uncompressed/texture_env_generic_uv_particle.m3g",
+              ):
+                  item=apk.getinfo("assets/"+name)
+                  assert 0<item.file_size<64*1024*1024
+                  dst=root/name
+                  dst.parent.mkdir(parents=True,exist_ok=True)
+                  dst.write_bytes(apk.read("assets/"+name))
           PY
           set +e
           SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software \
