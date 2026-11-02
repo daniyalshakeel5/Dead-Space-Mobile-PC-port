@@ -57,6 +57,7 @@ struct ImMenuGeometry {
     std::vector<std::uint32_t> group_object_indices;
     std::vector<ImMenuSceneNodeRecord> scene_node_records;
     std::vector<ImMenuGroupChildren> validated_group_children;
+    std::vector<std::uint32_t> possible_empty_group_indices;
     std::vector<ImMenuReferenceCandidate> scene_reference_candidates;
 };
 ImMenuGeometry decode_im_menu_geometry(
