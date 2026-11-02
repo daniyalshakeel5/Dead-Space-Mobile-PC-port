@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <unordered_set>
 
 namespace xperia {
 class GuestHeap;
@@ -28,5 +29,6 @@ public:
 private:
     std::unordered_map<std::string,std::uint32_t> symbols_;
     std::vector<std::uint8_t> code_;
+    mutable std::unordered_set<std::uint32_t> initializing_guards_;
 };
 }
