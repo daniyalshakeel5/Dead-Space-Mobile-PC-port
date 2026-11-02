@@ -1,0 +1,52 @@
+name: Xperia Windows ARM guest runtime
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - work/deadspace-xperia-arm-wrapper-2026-11-02
+    paths:
+      - 'experimental/xperia_armjit/**'
+      - 'experimental/xperia_guest_loader/**'
+      - 'launcher/GuestPreflight.ps1'
+      - '.github/workflows/xperia-windows-arm-runtime.yml'
+permissions:
+  contents: read
+jobs:
+  arm-runtime:
+    runs-on: windows-2022
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure Windows x64 Dynarmic guest runtime
+        shell: pwsh
+        run: cmake -S experimental/xperia_armjit -B build/armjit -A x64 -DCMAKE_BUILD_TYPE=Release
+      - name: Compile ARM32 JIT, ELF loader and libc bridge
+        shell: pwsh
+        run: cmake --build build/armjit --config Release --parallel 4
+      - name: Run actual ARM guest execution tests (synthetic original-free)
+        shell: pwsh
+        run: ctest --test-dir build/armjit -C Release --output-on-failure
+      - name: Package Windows guest preflight executable
+        shell: pwsh
+        run: |
+          $root='dist/XperiaWindowsGuestRuntime'
+          New-Item -ItemType Directory -Force $root | Out-Null
+          Copy-Item build/armjit/Release/xperia_guest_import_report.exe $root/
+          Copy-Item launcher/GuestPreflight.ps1 $root/
+          @'
+          Xperia Play guest runtime developer package
+          The included import-report tool checks an original, locally installed Xperia
+          ARM32 library. It does NOT start the game.
+          Run from PowerShell:
+          ./GuestPreflight.ps1 -GameDir "PATH_TO_INSTALLED_XPERIA"
+          Actual game execution, rendering, audio and controller forwarding still
+          require full Android/JNI/GLES host services.
+          No original game data is included.
+          '@ | Set-Content "$root/README.txt"
+          Compress-Archive -Path "$root/*" -DestinationPath 'dist/XperiaWindowsGuestRuntime.zip' -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xperia-windows-arm-guest-runtime
+          path: dist/XperiaWindowsGuestRuntime.zip
+          retention-days: 20
+          if-no-files-found: error
