@@ -127,6 +127,29 @@ jobs:
       - name: Run fixture tests
         run: python -m unittest discover -s tests -v
 
+      - name: Validate native camera and material decoding against original APK on same-repo PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'rm -f "$RUNNER_TEMP/apk-m3g-test.apk" "$RUNNER_TEMP/original-main-menu.m3g" "$RUNNER_TEMP/original-native-m3g-probe"' EXIT
+          curl --fail --silent --show-error --location --retry 3 --max-time 720 \
+            --max-filesize 400000000 --output "$RUNNER_TEMP/apk-m3g-test.apk" \
+            https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes/releases/download/dead_space_mobile_fixes/Deas.Space.Mobile.Fixes.apk
+          test "$(wc -c < "$RUNNER_TEMP/apk-m3g-test.apk" | tr -d ' ')" = 325769461
+          python - <<'PY'
+          import os,zipfile
+          from pathlib import Path
+          with zipfile.ZipFile(os.environ["RUNNER_TEMP"]+"/apk-m3g-test.apk") as apk:
+              name="assets/published/models/main_menu.m3g"
+              record=apk.getinfo(name)
+              assert 0<record.file_size<32*1024*1024
+              Path(os.environ["RUNNER_TEMP"]+"/original-main-menu.m3g").write_bytes(apk.read(name))
+          PY
+          g++ -std=c++17 -O2 -Wall -Wextra -I include \
+            src/original_m3g_scene.cpp apps/original_m3g_scene_probe.cpp \
+            -o "$RUNNER_TEMP/original-native-m3g-probe"
+          "$RUNNER_TEMP/original-native-m3g-probe" "$RUNNER_TEMP/original-main-menu.m3g"
       - name: Inventory repository on pull requests (no private APK)
         if: github.event_name == 'pull_request'
         run: |
