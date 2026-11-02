@@ -160,8 +160,18 @@ OriginalUiSbin decode_original_ui_sbin(const std::uint8_t* data,
             return fail("Original frontend sprite descriptor invalid");
         std::size_t source_at=0,dest_at=0;
         if(!pointer(source_id,12,1,source_at) ||
-           !pointer(dest_id,12,1,dest_at))
-            return fail("Original frontend source/destination rectangle missing");
+           !pointer(dest_id,12,1,dest_at)) {
+            out.error="Original frontend rectangle missing at sprite "+
+                std::to_string(n)+", object "+std::to_string(id)+
+                ", source "+std::to_string(source_id)+
+                ", destination "+std::to_string(dest_id);
+            if(source_id<hdr.n/4)
+                out.error+=", source tag "+std::to_string(u32(hdr.p+source_id*4)%8);
+            if(dest_id<hdr.n/4)
+                out.error+=", destination tag "+std::to_string(u32(hdr.p+dest_id*4)%8);
+            const auto problem=out.error;
+            return fail(problem.c_str());
+        }
         const auto read_rect=[&](std::size_t at) {
             const auto* b=records.p+at+2;
             return OriginalUiRectangle{u16(b),u16(b+2),u16(b+4),u16(b+6)};
