@@ -179,6 +179,19 @@ int main(){
             {jni.env_address,0,0,0},result,error));
         assert(error.find("JNIEnv table entry 6")!=std::string::npos);
     }
+    // Genuine ARM32 AAPCS stack parameter handoff: fifth, sixth and seventh
+    // parameters are visible in the original ARM instructions at [SP+0/4/8].
+    put32(elf,base+0xf00,0xe59d0000u); // LDR R0,[SP]
+    put32(elf,base+0xf04,0xe59d1004u); // LDR R1,[SP,#4]
+    put32(elf,base+0xf08,0xe0800001u); // ADD R0,R0,R1
+    put32(elf,base+0xf0c,0xe59d1008u); // LDR R1,[SP,#8]
+    put32(elf,base+0xf10,0xe0800001u); // ADD R0,R0,R1
+    put32(elf,base+0xf14,0xe12fff1eu); // BX LR
+    assert(runner.invoke_aapcs(base+0xf00,{1,2,3,4,7,9,11},
+                               result,error));
+    assert(result==27u);
+    assert(!runner.invoke_aapcs(base+0xf00,std::vector<u32>(17,1),
+                                result,error));
     // Fail closed rather than claim to boot unsupported game services.
     assert(!runner.invoke(0xffffffffu,{0,0,0,0},result,error));
     assert(!error.empty());
