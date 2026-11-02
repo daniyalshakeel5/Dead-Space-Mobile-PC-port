@@ -363,9 +363,9 @@ bool GuestLibcBridge::dispatch(
             }
             result=static_cast<std::uint32_t>(sec);break;
         }
-        case 25: { // __cxa_guard_acquire: ARM EABI 8-byte guard
-            auto* guard=image.writeable(a,8);
-            if(!guard || (a&7u))
+        case 25: { // __cxa_guard_acquire: ARM EABI 4-byte guard
+            auto* guard=image.writeable(a,4);
+            if(!guard || (a&3u))
                 throw std::runtime_error("Invalid or misaligned C++ static guard");
             if(guard[0]){result=0;break;}
             // This bridge does not implement blocking pthread waits.
@@ -375,15 +375,15 @@ bool GuestLibcBridge::dispatch(
             result=1;break;
         }
         case 26: { // __cxa_guard_release
-            auto* guard=image.writeable(a,8);
-            if(!guard || (a&7u) || !initializing_guards_.erase(a))
+            auto* guard=image.writeable(a,4);
+            if(!guard || (a&3u) || !initializing_guards_.erase(a))
                 throw std::runtime_error("C++ static guard released without acquire");
             guard[0]=1;
             result=0;break;
         }
         case 27: { // __cxa_guard_abort
-            auto* guard=image.writeable(a,8);
-            if(!guard || (a&7u) || !initializing_guards_.erase(a))
+            auto* guard=image.writeable(a,4);
+            if(!guard || (a&3u) || !initializing_guards_.erase(a))
                 throw std::runtime_error("C++ static guard aborted without acquire");
             guard[0]=0;
             result=0;break;
