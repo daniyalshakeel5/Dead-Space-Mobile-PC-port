@@ -29,7 +29,7 @@ target_include_directories(ds_port_im_menu PUBLIC include)
 add_executable(ds_im_menu_scene_probe apps/im_menu_scene_probe.cpp)
 target_link_libraries(ds_im_menu_scene_probe PRIVATE ds_port_im_menu)
 
-add_library(ds_port_im_ui STATIC src/im_ui_image.cpp src/original_ui_sbin.cpp src/original_ui_interaction.cpp)
+add_library(ds_port_im_ui STATIC src/im_ui_image.cpp src/original_ui_sbin.cpp src/original_ui_interaction.cpp src/original_ui_layout.cpp)
 target_include_directories(ds_port_im_ui PUBLIC include)
 add_executable(ds_im_ui_probe apps/im_ui_probe.cpp)
 target_link_libraries(ds_im_ui_probe PRIVATE ds_port_im_ui)
