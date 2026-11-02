@@ -8,6 +8,7 @@
 #include "ds_port/original_menu_gl.hpp"
 #include "ds_port/original_menu_scene_graph.hpp"
 #include "ds_port/original_m3g_scene.hpp"
+#include "ds_port/original_menu_animation.hpp"
 #ifdef DS_NATIVE_EXTERNAL_M3G_TEXTURES
 #include "ds_port/m3g_container.hpp"
 #endif
@@ -177,6 +178,16 @@ bool load_original_menu_stage(const std::string& root) {
                  <<native_scene.error<<"\\n";
         return false;
     }
+    // Decode the real 32 JSR-184 animation tracks and their original
+    // controller timelines before the first menu draw.
+    const auto motion=ds_port::decode_original_menu_motion(
+        scene_bytes.data(),scene_bytes.size());
+    if(!motion.decoded) {
+        std::cerr<<"Original menu animation decoder failed: "<<motion.error<<"\\n";
+        return false;
+    }
+    std::cerr<<"Original menu animation tracks ready: "<<motion.tracks.size()
+             <<", original controllers "<<motion.controllers.size()<<"\\n";
     if(!load_original_external_textures(root,native_scene)) {
         std::cerr<<"Original 3D menu external textures unavailable.\\n";
         return false;
@@ -199,8 +210,12 @@ bool load_original_menu_stage(const std::string& root) {
     const char* video=std::getenv("SDL_VIDEODRIVER");
     if(!video || std::string_view(video)!="dummy") {
         std::string renderer_error;
+        const ds_port::OriginalMenuAnimationRuntime animation_runtime{
+            &motion,&native_scene.nodes,&native_scene.camera,
+            &native_scene.materials,true};
         const auto render_result=ds_port::run_original_menu_gl(
-            scene,draw,native_scene.images,resolved.frame,renderer_error);
+            scene,draw,native_scene.images,resolved.frame,renderer_error,
+            &animation_runtime);
         if(render_result==ds_port::OriginalMenuGpuStatus::GraphicsUnavailable ||
            render_result==ds_port::OriginalMenuGpuStatus::InvalidScene ||
            render_result==ds_port::OriginalMenuGpuStatus::IncompleteOriginalScene) {
