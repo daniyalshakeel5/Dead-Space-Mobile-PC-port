@@ -13,7 +13,11 @@ bool validate_original_ui_draw_list(
         known.insert(sprite.object_id);
     if(list.size()>4096) {error="Too many original UI draw items";return false;}
     for(const auto& draw:list) {
-        if(!known.count(draw.sprite_object_id)) {
+        if(draw.hit_only) {
+            if(!draw.interactive || !draw.action_id) {
+                error="Original UI hit region missing action owner";return false;
+            }
+        }else if(!known.count(draw.sprite_object_id)) {
             error="Original UI sprite ID absent from recovered atlas";return false;
         }
         if(draw.width<=0||draw.height<=0||draw.width>16384||
@@ -21,10 +25,12 @@ bool validate_original_ui_draw_list(
            draw.x>16384 || draw.y>16384){
             error="Original UI screen rectangle out of bounds";return false;
         }
-        const auto sprite=std::find_if(db.sprites.begin(),db.sprites.end(),
-            [&](const OriginalUiSprite& s){return s.object_id==draw.sprite_object_id;});
-        if(sprite->atlas>=atlases.size()||!atlases[sprite->atlas].decoded){
-            error="Original UI texture atlas unavailable";return false;
+        if(!draw.hit_only) {
+            const auto sprite=std::find_if(db.sprites.begin(),db.sprites.end(),
+                [&](const OriginalUiSprite& s){return s.object_id==draw.sprite_object_id;});
+            if(sprite->atlas>=atlases.size()||!atlases[sprite->atlas].decoded){
+                error="Original UI texture atlas unavailable";return false;
+            }
         }
     }
     error.clear();return true;
@@ -37,7 +43,7 @@ OriginalUiHit hit_test_original_ui(
         if(!d.interactive||d.width<=0||d.height<=0)continue;
         if(std::int64_t(x)>=d.x && std::int64_t(x)<std::int64_t(d.x)+d.width &&
            std::int64_t(y)>=d.y && std::int64_t(y)<std::int64_t(d.y)+d.height)
-            return {true,d.sprite_object_id};
+            return {true,d.action_id?d.action_id:d.sprite_object_id};
     }
     return {};
 }
