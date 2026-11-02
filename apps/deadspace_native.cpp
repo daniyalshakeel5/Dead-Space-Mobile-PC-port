@@ -386,13 +386,26 @@ int main(int argc, char** argv) {
     }
     if(boot_imported_apk) {
 #if defined(DS_NATIVE_APK_IMPORT) && defined(DS_NATIVE_SPLASH_PRESENTATION)
-        const auto imported=ds_port::install_apk_assets(user_apk,private_asset_dir);
-        if(!imported.success) {
-            std::cerr<<"Private original asset install failed: "<<imported.error<<"\\n";
-            return 4;
+        // --boot-apk is safe to run more than once. The private
+        // extraction directory is not overwritten, and reuse is
+        // allowed only when the exact boot resources exist.
+        if(ds_port::has_original_native_menu_boot_assets(private_asset_dir)) {
+            std::cerr<<"Using previously installed original game assets: "
+                     <<private_asset_dir<<"\\n";
+        } else {
+            const auto imported=ds_port::install_apk_assets(
+                user_apk,private_asset_dir);
+            if(!imported.success) {
+                std::cerr<<"Private original asset install failed: "
+                         <<imported.error<<"\\n";
+                std::cerr<<"If the destination already exists but is incomplete, "
+                            "choose a new unused --assets-dir. Existing files "
+                            "are not overwritten.\\n";
+                return 4;
+            }
+            std::cerr<<"Installed "<<imported.assets_installed
+                     <<" user-owned APK assets. Entering native boot.\\n";
         }
-        std::cerr<<"Installed "<<imported.assets_installed
-                 <<" user-owned APK assets. Entering native boot.\\n";
         present_splash=true;
 #else
         std::cerr<<"--boot-apk requires SDL2 and -DDS_BUILD_ASSET_INSTALLER=ON.\\n";

@@ -1,4 +1,5 @@
 #include "ds_port/deadspace_paths.hpp"
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -105,5 +106,21 @@ DeadSpaceAssetLayout inspect_deadspace_assets(const fs::path& root){
         ? "Published-data marker present (Xperia Play layout)."
         : "Published-data marker absent; game editions may differ.";
     return layout;
+}
+bool has_original_native_menu_boot_assets(const fs::path& root){
+    constexpr std::array<std::string_view,5u> required{{
+        "published/texturepacks_ui/splash_ea.m3g",
+        "published/texturepacks_ui/splash_deadspace.m3g",
+        "published/texturepacks_ui/ui_frontend.m3g",
+        "published/layoutdata/layouts.xml.sb",
+        "published/models/main_menu.m3g"
+    }};
+    for(const auto& relative:required){
+        const auto path=resolve_game_asset_path(root,relative,true);
+        if(path.status!=GamePathStatus::Resolved)return false;
+        std::error_code ec;
+        if(fs::file_size(path.path,ec)==0u||ec)return false;
+    }
+    return true;
 }
 }

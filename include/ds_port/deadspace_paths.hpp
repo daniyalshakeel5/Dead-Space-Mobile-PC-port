@@ -25,4 +25,8 @@ struct DeadSpaceAssetLayout {
 // The marker is established for the Xperia Play edition only, so
 // its absence does not mean another edition's APK is invalid.
 DeadSpaceAssetLayout inspect_deadspace_assets(const std::filesystem::path& root);
+// Check the exact original resources required to enter the existing
+// reconstructed EA splash -> 3D menu boot path. Never use just an
+// unrelated APK marker to claim the installation is reusable.
+bool has_original_native_menu_boot_assets(const std::filesystem::path& root);
 }

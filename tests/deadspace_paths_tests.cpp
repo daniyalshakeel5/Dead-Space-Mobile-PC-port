@@ -43,6 +43,25 @@ int main(){
         root/"assets"/"published"/"data"/"achievements.sb",ec);
     if(!ec)CHECK(ds_port::resolve_game_asset_path(
         root,"published/data/achievements.sb",true).status==ds_port::GamePathStatus::UnsafePath);
+    // Boot reuse requires the exact splash, menu, layout and UI
+    // assets, rather than a marker from one particular APK edition.
+    fs::remove(root/"assets"/"published"/"data"/"achievements.sb",ec);
+    fs::create_directories(root/"assets"/"published"/"texturepacks_ui");
+    fs::create_directories(root/"assets"/"published"/"layoutdata");
+    fs::create_directories(root/"assets"/"published"/"models");
+    CHECK(!ds_port::has_original_native_menu_boot_assets(root));
+    for(const auto* name:{
+        "texturepacks_ui/splash_ea.m3g",
+        "texturepacks_ui/splash_deadspace.m3g",
+        "texturepacks_ui/ui_frontend.m3g",
+        "layoutdata/layouts.xml.sb",
+        "models/main_menu.m3g"}){
+        std::ofstream(root/"assets"/"published"/fs::u8path(name),
+                      std::ios::binary)<<"test";
+    }
+    CHECK(ds_port::has_original_native_menu_boot_assets(root));
+    fs::remove(root/"assets"/"published"/"models"/"main_menu.m3g");
+    CHECK(!ds_port::has_original_native_menu_boot_assets(root));
     fs::remove_all(root);
     return 0;
 }
