@@ -63,12 +63,17 @@ GuestLibcBridge::GuestLibcBridge() {
 std::unordered_map<std::string,std::uint32_t>
 GuestLibcBridge::plan_guest_imports(
     const GuestElf32& elf,std::string& error,
-    const std::unordered_map<std::string,std::uint32_t>& data_symbols) {
+    const std::unordered_map<std::string,std::uint32_t>& data_symbols,
+    const std::unordered_map<std::string,std::uint32_t>& host_functions) {
     std::unordered_map<std::string,std::uint32_t> combined=symbols_;
     try {
         for(const auto& entry:data_symbols) {
             if(!entry.second || !combined.emplace(entry).second)
                 throw std::runtime_error("Duplicate/invalid Bionic guest data symbol: "+entry.first);
+        }
+        for(const auto& entry:host_functions) {
+            if(!entry.second || !combined.emplace(entry).second)
+                throw std::runtime_error("Duplicate/invalid graphics host symbol: "+entry.first);
         }
         if(!unresolved_imports_.empty())
             throw std::runtime_error("Guest import plan already installed");
