@@ -122,9 +122,10 @@ int main() {
     const auto first=svc.take_destructors(0x111u);
     assert(first.size()==1 && first[0].function==guest_dtor &&
            first[0].argument==p && first[0].dso==0x111u);
-    const auto second=svc.take_destructors(0);
-    assert(second.size()==1 && second[0].argument==q &&
-           second[0].dso==0x222u);
+    const auto remaining_destructors=svc.take_destructors(0);
+    assert(remaining_destructors.size()==1 &&
+           remaining_destructors[0].argument==q &&
+           remaining_destructors[0].dso==0x222u);
     assert(svc.take_destructors(0).empty());
     regs.fill(0);
     assert(svc.dispatch(31,regs,image,error)); // __errno
