@@ -43,20 +43,34 @@ For subsequent launches:
 ./deadspace_native --boot-splash --assets-dir ./installed-deadspace
 ```
 
+## Recovered native menu
+
+The boot path now loads the real `layouts.xml.sb` frontend database,
+317 original atlas sprites, and the original 480×320 menu UI canvas.
+It renders the 3D background with genuine geometry/camera/13 external
+scene textures and decodes 32 original M3G animation tracks.
+
+The original UI_MAIN screen has six source-defined interactive controls.
+The Profile, Options and Extras screens are composed from recovered
+layout data, not fabricated full-screen atlas images.
+
+**Controls:** Mouse clicks select original on-screen hit regions.
+Tab/Shift+Tab and arrow keys cycle original clickable elements, Enter
+activates the focused element, and Escape invokes an actual original
+BTN_BACK entity when present. When the original JNI event queue is
+unavailable, these actions use the reconstructed PC menu state machine;
+they are not claimed to reproduce the entire Android UI controller.
+
+The frontend keeps its native 3:2 aspect ratio on widescreen displays.
+Clicks in pillarbox/letterbox margins are not treated as menu presses.
+
 ## Current limitations
 
-The original EA and Dead Space splash screens and recovered **3D menu
-background** load using the game's genuine geometry, camera, 13 external
-texture resources and 17 appearance bindings.
+Only menu transitions with recovered layout evidence are enabled.
+Starting a profile or launching gameplay still requires additional
+reconstructed engine callbacks. Original audio playback, gameplay
+simulation and full menu interaction behavior remain incomplete.
 
-The original 2D frontend layout, animations, engine-owned input event
-queue, audio playback and full game simulation are **not implemented**.
-Menu clicks and keys are forwarded to reconstructed JNI interfaces, but
-without the original runtime event services they cannot change game state.
-
-Closing the window is supported. The process may exit with code 20 to
-indicate that full gameplay startup is still unavailable.
-
-The builds have no game assets, ARM emulator, or translation runtime.
-The recovered native 3D menu draw was verified headlessly with Mesa GL
-in GitHub Actions; real PC graphics compatibility still needs testing.
+The builds contain no game assets, ARM emulator or translation runtime.
+Headless Mesa OpenGL and real-APK tests validate the native menu render
+and UI layout; real hardware compatibility still requires testing.
