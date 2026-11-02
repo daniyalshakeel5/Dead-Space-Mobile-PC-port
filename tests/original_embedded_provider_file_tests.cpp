@@ -92,6 +92,28 @@ int main(){
         provider.data(),provider.size(),fd,out.data(),3u);
     assert(read.status==S::Completed&&read.original_r0==3u);
     assert(std::memcmp(out.data(),"TWO",3)==0);
+    // Original APK read-only whence table: origin 1 relative to the
+    // current cursor, origin 2 relative to end, exactly as ARM lseek.
+    seek=original_embedded_provider_seek_file_0x273034(
+        provider.data(),provider.size(),fd,-3,1);
+    assert(seek.status==S::Completed&&seek.original_r0==1u);
+    pos=original_embedded_provider_position_file_0x271794(
+        provider.data(),provider.size(),fd,0);
+    assert(pos.status==S::Completed&&pos.original_r0==5u);
+    seek=original_embedded_provider_seek_file_0x273034(
+        provider.data(),provider.size(),fd,-5,2);
+    assert(seek.status==S::Completed&&seek.original_r0==1u);
+    read=original_embedded_provider_read_file_0x2716f8(
+        provider.data(),provider.size(),fd,out.data(),5u);
+    assert(read.status==S::Completed&&read.original_r0==5u);
+    assert(std::memcmp(out.data(),"THREE",5)==0);
+    // Original ARM falls back to SEEK_SET when origin is outside 0..2.
+    seek=original_embedded_provider_seek_file_0x273034(
+        provider.data(),provider.size(),fd,5,99);
+    assert(seek.status==S::Completed&&seek.original_r0==1u);
+    pos=original_embedded_provider_position_file_0x271794(
+        provider.data(),provider.size(),fd,0);
+    assert(pos.status==S::Completed&&pos.original_r0==5u);
     // Original file-mode read returns zero at EOF.
     seek=original_embedded_provider_seek_file_0x273034(
         provider.data(),provider.size(),fd,static_cast<std::int32_t>(n),0);
@@ -105,7 +127,13 @@ int main(){
     assert(get(provider.data()+0xa0u)!=0u); // original errno storage
     seek=original_embedded_provider_seek_file_0x273034(
         provider.data(),provider.size(),fd,0,1);
-    assert(seek.status==S::NeedsOriginalFileService);
+    assert(seek.status==S::Completed&&seek.original_r0==1u);
+    seek=original_embedded_provider_seek_file_0x273034(
+        provider.data(),provider.size(),fd,0,2);
+    assert(seek.status==S::Completed&&seek.original_r0==1u);
+    pos=original_embedded_provider_position_file_0x271794(
+        provider.data(),provider.size(),fd,0u);
+    assert(pos.status==S::Completed&&pos.original_r0==n);
     // Unsupported original memory-backed mode needs codec.
     put(provider.data()+0xa4u,1u);
     read=original_embedded_provider_read_file_0x2716f8(

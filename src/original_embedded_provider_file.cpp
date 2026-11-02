@@ -66,16 +66,17 @@ OriginalEmbeddedProviderResult original_embedded_provider_seek_file_0x273034(
         return {S::Completed,0};
     if(!matches_explicit_host_fd(p,host_fd))
         return {S::InvalidHostFileBinding,0};
-    // ARM 0x273058..0x273068 maps original origin=0 to
-    // whence 0, then calls the PLT at 0x35350 -> libc lseek.
-    // The original mapping of origins 1 and 2 uses an embedded
-    // table and must be recovered before enabling them.
-    if(origin!=0u)return {S::NeedsOriginalFileService,0};
+    // Verified original APK 0x273034 ARM dispatch and its real
+    // read-only table at 0x0042F0F4 (run 41426559665):
+    // original origin 0 -> SEEK_SET, 1 -> SEEK_CUR, 2 -> SEEK_END.
+    // Original SUB/CMP/MOVHI path maps every other origin to SEEK_SET.
+    // This is the *original* behavior, not an Android compatibility shim.
+    const int whence=origin==1u?SEEK_CUR:origin==2u?SEEK_END:SEEK_SET;
     errno=0;
 #ifdef _WIN32
-    const auto at=::_lseek(host_fd,static_cast<long>(offset),SEEK_SET);
+    const auto at=::_lseek(host_fd,static_cast<long>(offset),whence);
 #else
-    const auto at=::lseek(host_fd,static_cast<off_t>(offset),SEEK_SET);
+    const auto at=::lseek(host_fd,static_cast<off_t>(offset),whence);
 #endif
     if(at<0){
         // ARM 0x27310C..0x273118 obtains errno via original

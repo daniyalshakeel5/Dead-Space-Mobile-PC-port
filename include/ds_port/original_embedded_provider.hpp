@@ -51,11 +51,12 @@ OriginalEmbeddedProviderResult original_embedded_provider_position_0x271794(
 OriginalEmbeddedProviderResult original_embedded_provider_read_file_0x2716f8(
     const void* mapped_provider,std::size_t accessible_bytes,
     int native_fd,void* destination,std::size_t requested_bytes) noexcept;
-// Original ARM 0x273034 mode=0 file seek invokes PLT 0x35350
-// (confirmed libc lseek), with SEEK_SET and original signed offset.
-// On failure the original stores errno into provider+0xA0.
-// Modes 1 and 2 require the still-untranslated original seek
-// dispatch table, so are not executed through this entry point.
+// Original ARM 0x273034 file seek invokes the verified libc lseek
+// PLT 0x35350. The original APK read-only dispatch table at
+// 0x0042F0F4 was resolved and instruction-verified by CI 41426559665:
+// original origin 0=SEEK_SET, 1=SEEK_CUR, 2=SEEK_END,
+// all other origin values=SEEK_SET. Negative signed offsets are valid;
+// failures store the host errno in original provider+0xA0.
 OriginalEmbeddedProviderResult original_embedded_provider_seek_file_0x273034(
     void* mapped_provider,std::size_t accessible_bytes,
     int native_fd,std::int32_t original_offset,
