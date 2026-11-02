@@ -59,5 +59,29 @@ int main(){
     assert(ds4_vita_android_key(Ds4Button::Circle)==4);
     assert(ds4_vita_android_key(Ds4Button::Options)==108);
     assert(ds4_vita_android_key(Ds4Button::Unknown)==-1);
+    std::vector<Ds4GuestKeyEvent> keys;
+    Ds4GuestKeySink key_sink{&keys,
+        [](void* ctx,const Ds4GuestKeyEvent& event) {
+            static_cast<std::vector<Ds4GuestKeyEvent>*>(ctx)->push_back(event);
+        }};
+    Ds4GuestButtonState buttons{};
+    ds4_emit_guest_button(buttons,Ds4Button::Cross,true,key_sink);
+    ds4_emit_guest_button(buttons,Ds4Button::Cross,true,key_sink);
+    assert(keys.size()==1 && keys[0].android_key==23 && keys[0].pressed);
+    ds4_emit_guest_button(buttons,Ds4Button::Options,true,key_sink);
+    assert(keys.size()==2 && keys[1].android_key==108);
+    ds4_emit_guest_button(buttons,Ds4Button::Unknown,true,key_sink);
+    assert(keys.size()==2);
+    ds4_release_guest_buttons(buttons,key_sink);
+    assert(keys.size()==4);
+    assert(keys[2].android_key==23 && !keys[2].pressed);
+    assert(keys[3].android_key==108 && !keys[3].pressed);
+    assert(buttons.pressed_mask==0);
+    ds4_release_guest_buttons(buttons,key_sink);
+    assert(keys.size()==4);
+    ds4_emit_guest_button(buttons,Ds4Button::Circle,true,key_sink);
+    ds4_emit_guest_button(buttons,Ds4Button::Circle,false,key_sink);
+    assert(keys.size()==6 && keys[4].android_key==4 &&
+           keys[4].pressed && !keys[5].pressed);
     return 0;
 }
