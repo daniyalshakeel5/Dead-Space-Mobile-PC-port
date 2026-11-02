@@ -11,6 +11,9 @@ on:
       - 'tests/Test-Launcher.ps1'
       - 'tests/Test-Installer-Synthetic.ps1'
       - '.github/workflows/xperia-windows-arm-runtime.yml'
+concurrency:
+  group: xperia-windows-runtime-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -26,9 +29,21 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'WPF launcher tests failed' }
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/Test-Installer-Synthetic.ps1
           if ($LASTEXITCODE -ne 0) { throw 'Installer archive tests failed' }
+      - name: Install pinned Boost header dependency for Dynarmic
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $archive=Join-Path $env:RUNNER_TEMP 'boost_1_86_0.zip'
+          $dest=Join-Path $env:RUNNER_TEMP 'boost_1_86_0'
+          Invoke-WebRequest -Uri 'https://archives.boost.io/release/1.86.0/source/boost_1_86_0.zip' -OutFile $archive
+          Expand-Archive -LiteralPath $archive -DestinationPath $env:RUNNER_TEMP -Force
+          if(-not (Test-Path -LiteralPath (Join-Path $dest 'boost/version.hpp') -PathType Leaf)){
+            throw 'Pinned Boost 1.86.0 header tree missing'
+          }
+          Add-Content -Path $env:GITHUB_ENV -Value "XPERIA_BOOST_ROOT=$dest"
       - name: Configure Windows x64 Dynarmic guest runtime
         shell: pwsh
-        run: cmake -S experimental/xperia_armjit -B build/armjit -A x64 -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S experimental/xperia_armjit -B build/armjit -A x64 -DBoost_INCLUDE_DIR="$env:XPERIA_BOOST_ROOT" -DBoost_NO_BOOST_CMAKE=ON -DCMAKE_BUILD_TYPE=Release
       - name: Compile ARM32 JIT, ELF loader, Bionic and guest callbacks
         shell: pwsh
         run: cmake --build build/armjit --config Release --parallel 4
