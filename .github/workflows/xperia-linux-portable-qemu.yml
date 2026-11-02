@@ -1,0 +1,102 @@
+name: Portable Linux QEMU Xperia Play runtime (no user Docker)
+on:
+  push:
+    branches: [work/deadspace-xperia-arm-wrapper-2026-11-02]
+    paths:
+      - "linux-portable/**"
+      - ".github/workflows/xperia-linux-portable-qemu.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-x86_64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate original-free Linux launch sources
+        shell: bash
+        run: |
+          bash -n "linux-portable/Run Dead Space.sh"
+          ! grep -E 'docker|wsl.exe' "linux-portable/Run Dead Space.sh"
+      - name: Retrieve original-free GPL ARM loader from upstream public release
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/upstream"
+          curl -fL --retry 4 --retry-delay 3 --max-time 240 -o "$RUNNER_TEMP/portmaster.zip" \
+            https://github.com/EapRules/deadspace-native-arm/releases/download/v1.2.8/deadspace-portmaster.zip
+          unzip -q "$RUNNER_TEMP/portmaster.zip" -d "$RUNNER_TEMP/upstream"
+          echo "Public original-free port distribution:"
+          find "$RUNNER_TEMP/upstream" -maxdepth 5 -type f | head -60
+          while IFS= read -r -d '' item; do
+            if file "$item" | grep -Eq 'ELF 32-bit.*ARM'; then
+              if [[ "$(basename "$item")" == "deadspace" ]]; then
+                cp "$item" "$RUNNER_TEMP/deadspace-armhf"
+                echo "ARM_LOADER=$item"
+              fi
+            fi
+          done < <(find "$RUNNER_TEMP/upstream" -type f -print0)
+          test -s "$RUNNER_TEMP/deadspace-armhf" || {
+            echo "ARM game loader not found in upstream release — don't publish an empty runtime."
+            exit 2
+          }
+      - name: Obtain bundled x86 QEMU, unzip and ARMHF Linux desktop libraries
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo dpkg --add-architecture armhf
+          sudo sed -i '/^Types: deb$/a Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources
+          printf '%s\n' \
+            'deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports noble main universe restricted multiverse' \
+            'deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports noble-updates main universe restricted multiverse' \
+            'deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports noble-security main universe restricted multiverse' |
+            sudo tee /etc/apt/sources.list.d/armhf.list
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            qemu-user-static busybox-static \
+            libc6:armhf libgcc-s1:armhf libstdc++6:armhf \
+            zlib1g:armhf libzip4:armhf libbsd0:armhf \
+            libsdl2-2.0-0:armhf libegl1:armhf libgles1:armhf \
+            libgl1-mesa-dri:armhf libgbm1:armhf libglapi-mesa:armhf
+      - name: Package and execute real upstream ARM loader --version via bundled QEMU
+        shell: bash
+        run: |
+          set -euxo pipefail
+          dest="$RUNNER_TEMP/DeadSpaceMobile-Xperia-Linux"
+          mkdir -p "$dest/bin" "$dest/sysroot/lib" "$dest/sysroot/usr/lib" "$dest/licenses/armhf"
+          cp /usr/bin/qemu-arm-static "$dest/bin/qemu-arm-static"
+          cp /bin/busybox "$dest/bin/busybox"
+          cp "$RUNNER_TEMP/deadspace-armhf" "$dest/bin/deadspace-armhf"
+          sudo cp -a /lib/arm-linux-gnueabihf "$dest/sysroot/lib/"
+          sudo cp -a /usr/lib/arm-linux-gnueabihf "$dest/sysroot/usr/lib/"
+          sudo cp -a /lib/ld-linux-armhf.so.3 "$dest/sysroot/lib/"
+          cp 'linux-portable/Run Dead Space.sh' "$dest/Run Dead Space.sh"
+          cp 'linux-portable/Dead Space Mobile.desktop' "$dest/Dead Space Mobile.desktop"
+          cp 'linux-portable/README.md' "$dest/README.md"
+          for pkg in $(dpkg-query -W | awk '{print $1}' | grep ':armhf$'); do
+            base="$(echo "$pkg" | cut -d: -f1)"
+            notice="/usr/share/doc/$base/copyright"
+            test ! -f "$notice" || cp "$notice" "$dest/licenses/armhf/$base.copyright"
+          done
+          cp /usr/share/doc/qemu-user-static/copyright "$dest/licenses/QEMU.copyright"
+          cp /usr/share/doc/busybox-static/copyright "$dest/licenses/BusyBox.copyright"
+          curl -fL --retry 3 --max-time 60 \
+            https://raw.githubusercontent.com/EapRules/deadspace-native-arm/main/LICENSE \
+            -o "$dest/licenses/EapRules-GPL-3.0.txt"
+          chmod +x "$dest/bin/"* "$dest/Run Dead Space.sh" "$dest/Dead Space Mobile.desktop"
+          echo "QEMU host binary:"
+          "$dest/bin/qemu-arm-static" --version | head -1
+          echo "Actual upstream GNU/Linux ARM32 Dead Space loader executed through QEMU:"
+          "$dest/bin/qemu-arm-static" -L "$dest/sysroot" "$dest/bin/deadspace-armhf" --version
+          test ! -e "$dest/game-data"
+          du -sh "$dest"
+          cd "$RUNNER_TEMP"
+          zip -q -r "$GITHUB_WORKSPACE/DeadSpaceMobile-Xperia-Linux-x86_64-QEMU.zip" DeadSpaceMobile-Xperia-Linux
+      - name: Publish original-free Linux player test ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeadSpaceMobile-Xperia-Linux-x86_64-QEMU
+          path: DeadSpaceMobile-Xperia-Linux-x86_64-QEMU.zip
+          if-no-files-found: error
+          retention-days: 30
