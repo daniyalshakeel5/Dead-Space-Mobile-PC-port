@@ -40,6 +40,7 @@ on:
       - "tests/test_deadspace_im_numeric_probe.py"
       - "tools/deadspace_im_native_verify.py"
       - "src/original_m3g_scene.cpp"
+      - "src/original_menu_gl.cpp"
       - "apps/original_m3g_scene_probe.cpp"
       - "src/im_mesh.cpp"
       - "include/ds_port/im_mesh.hpp"
