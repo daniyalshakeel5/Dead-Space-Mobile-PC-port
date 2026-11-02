@@ -14,6 +14,7 @@ bool native_menu_pointer(NativeMenuInputState& state,
     state.mouse_held=(event!=1);
     const float u=std::clamp(float(x)/float(width),0.f,1.f);
     const float v=std::clamp(float(y)/float(height),0.f,1.f);
+    state.last_u=u;state.last_v=v;
     cb.pointer(cb.context,event,kMenuModule,kPointer,u,v);
     return true;
 }
