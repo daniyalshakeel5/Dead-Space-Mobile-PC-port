@@ -42,9 +42,10 @@ GuestLibcBridge::GuestLibcBridge() {
         "fopen","fread","fseek","ftell","fclose",
         "__android_log_write","gettimeofday","clock_gettime","time",
         "__cxa_guard_acquire","__cxa_guard_release","__cxa_guard_abort",
-        "__cxa_pure_virtual"
+        "__cxa_pure_virtual", "__aeabi_atexit", "__cxa_atexit",
+        "__errno", "__cxa_finalize"
     };
-    for(unsigned i=0;i<28;++i){
+    for(unsigned i=0;i<=last_svc;++i){
         const std::uint32_t id=i+1;
         symbols_.emplace(names[i],veneer_base+i*8);
         const std::uint32_t instructions[2]={0xef000000u|id,0xe12fff1eu};
@@ -64,7 +65,7 @@ bool GuestLibcBridge::dispatch(
     GuestElf32& image,std::string& failure,GuestHeap* heap,
     GuestFileSystem* files) const noexcept {
     try {
-        if(id<1||id>28)
+        if(id<1||id>last_svc)
             throw std::runtime_error("Unknown Android libc SVC service");
         const auto a=regs[0],b=regs[1],n=regs[2];
         std::uint32_t result=0;
@@ -334,11 +335,44 @@ bool GuestLibcBridge::dispatch(
         }
         case 28:
             throw std::runtime_error("Original ARM code invoked __cxa_pure_virtual");
+        case 29: // __aeabi_atexit(object, destructor, dso)
+        case 30: { // __cxa_atexit(destructor, argument, dso)
+            const auto function=id==29?b:a;
+            const auto argument=id==29?a:b;
+            if(!function || !image.read(function&~1u,2))
+                throw std::runtime_error("Unmapped ARM C++ destructor function");
+            if(destructors_.size()>=65536u)
+                throw std::runtime_error("ARM registered destructor limit");
+            destructors_.push_back({function,argument,n});
+            result=0;break;
+        }
+        case 31: { // __errno() -> pointer to guest-owned ARM32 int
+            constexpr std::uint32_t kErrno=0x72000000u;
+            if(!image.read(kErrno,4)) {
+                if(image.read(kErrno,1)||image.read(kErrno+3,1))
+                    throw std::runtime_error("Guest errno storage overlaps memory");
+                image.segments.push_back({kErrno,std::vector<std::uint8_t>(4,0)});
+            }
+            result=kErrno;break;
+        }
+        case 32: // __cxa_finalize requires translated ARM destructors
+            throw std::runtime_error("C++ finalizers require guest JIT callback runner");
         }
         regs[0]=result;
         failure.clear();return true;
     }catch(const std::exception& err){
         failure=err.what();return false;
     }
+}
+std::vector<GuestLibcBridge::Destructor>
+GuestLibcBridge::take_destructors(std::uint32_t dso) {
+    std::vector<Destructor> selected;
+    // Reverse original registration order, with exactly-once removal.
+    for(auto it=destructors_.rbegin();it!=destructors_.rend();++it)
+        if(dso==0 || it->dso==dso)selected.push_back(*it);
+    destructors_.erase(std::remove_if(destructors_.begin(),destructors_.end(),
+        [dso](const Destructor& item){return dso==0||item.dso==dso;}),
+        destructors_.end());
+    return selected;
 }
 } // namespace xperia
