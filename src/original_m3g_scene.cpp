@@ -169,13 +169,14 @@ OriginalM3gScene decode_original_m3g_scene(const std::uint8_t* data,std::size_t 
         out.nodes.clear();out.materials.clear();out.images.clear();return out;
     };
     if(!data||size<30||size>64u*1024u*1024u||
-       !std::equal(std::begin(magic),std::end(magic),data)||
+       !std::equal(magic,magic+12,data)||
        data[12]!=0||u32(data+13)!=size-12)return fail("Invalid IM-M3G framing");
     std::vector<Obj> objects;
     std::size_t pos=21;
     while(pos<size-4&&objects.size()<20000) {
         if(size-4-pos<5)return fail("Truncated M3G object");
-        const auto type=data[pos++],n=u32(data+pos);pos+=4;
+        const std::uint8_t type=data[pos++];
+        const std::uint32_t n=u32(data+pos);pos+=4;
         if(n>size-4-pos)return fail("Out of bounds M3G object");
         objects.push_back({type,data+pos,n});pos+=n;
     }
