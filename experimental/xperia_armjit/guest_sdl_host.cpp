@@ -19,7 +19,11 @@ const char* const names[]={
 "glGetError","glColor4f","glDepthFunc","glDepthMask","glFinish",
 "glFlush","glClearDepthf","glFrustumf","glTexEnvf","glTexEnvi",
 "glAlphaFunc","glShadeModel","glHint","glScissor","glPixelStorei",
-"glTexParameterf","glLineWidth","glCullFace","glFrontFace"
+"glTexParameterf","glLineWidth","glCullFace","glFrontFace",
+"glGetString","glGetIntegerv","glGetFloatv","glGetBooleanv",
+"glNormalPointer","glLightfv","glMaterialfv","glFogfv",
+"glLoadMatrixf","glMultMatrixf","glNormal3f","glColor4ub",
+"glPointSize","glTexEnvfv"
 };
 constexpr std::size_t count=sizeof(names)/sizeof(names[0]);
 unsigned element_bytes(unsigned type){
@@ -235,9 +239,11 @@ bool GuestSdlHost::apply_arrays(GuestElf32& g,std::uint32_t last,
         if(which==0)glVertexPointer(d.size,d.type,d.stride,ptr);
         if(which==1)glColorPointer(d.size,d.type,d.stride,ptr);
         if(which==2)glTexCoordPointer(d.size,d.type,d.stride,ptr);
+        if(which==3)glNormalPointer(d.type,d.stride,ptr);
         return true;
     };
-    if(!bind(vertex_,0)||!bind(color_,1)||!bind(texcoord_,2)){
+    if(!bind(vertex_,0)||!bind(color_,1)||!bind(texcoord_,2)||
+       !bind(normal_,3)){
         error="OpenGL client vertex array unmapped in ARM guest";return false;
     }
     return true;
@@ -317,6 +323,7 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
             if(cap==GL_VERTEX_ARRAY)vertex_.enabled=enabled;
             if(cap==GL_COLOR_ARRAY)color_.enabled=enabled;
             if(cap==GL_TEXTURE_COORD_ARRAY)texcoord_.enabled=enabled;
+            if(cap==GL_NORMAL_ARRAY)normal_.enabled=enabled;
             break;
         }
         case 20:vertex_={static_cast<int>(a(0)),static_cast<int>(a(1)),
@@ -367,6 +374,78 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
         case 41:glLineWidth(f(0));break;
         case 42:glCullFace(a(0));break;
         case 43:glFrontFace(a(0));break;
+        case 44: { // glGetString: return ARM32 guest storage, never an x86 ptr
+            const auto enum_value=a(0);
+            if(enum_value<GL_VENDOR||enum_value>GL_EXTENSIONS)
+                throw std::runtime_error("Unsupported GLES string selector");
+            constexpr std::uint32_t base=0x74500000u;
+            if(!guest.read(base,1)){
+                if(guest.read(base+65535u,1))
+                    throw std::runtime_error("Guest OpenGL strings memory collision");
+                guest.segments.push_back({base,std::vector<std::uint8_t>(65536,0)});
+            }
+            const auto* src=glGetString(enum_value);
+            if(!src)throw std::runtime_error("Host GL string unavailable");
+            const auto size=std::strlen(reinterpret_cast<const char*>(src));
+            if(size>=16384u)
+                throw std::runtime_error("Host GL query string too large");
+            const auto guest_addr=base+(enum_value-GL_VENDOR)*16384u;
+            auto* dst=guest.writeable(guest_addr,size+1u);
+            if(!dst)throw std::runtime_error("Guest GL string buffer unmapped");
+            std::memcpy(dst,src,size+1u);
+            result=guest_addr;break;
+        }
+        case 45:case 46:case 47: { // glGet{Integer,Float,Boolean}v
+            const auto p=a(0);
+            const unsigned components=p==GL_VIEWPORT||p==GL_SCISSOR_BOX||
+                p==GL_CURRENT_COLOR||p==GL_COLOR_CLEAR_VALUE?4u:
+                p==GL_MODELVIEW_MATRIX||p==GL_PROJECTION_MATRIX||
+                p==GL_TEXTURE_MATRIX?16u:p==GL_MAX_VIEWPORT_DIMS?2u:1u;
+            const unsigned per=which==47?1u:4u;
+            auto* dst=guest.writeable(a(1),components*per);
+            if(!dst)throw std::runtime_error("GL query output not guest mapped");
+            if(which==45){
+                GLint values[16]={};glGetIntegerv(p,values);
+                for(unsigned i=0;i<components;++i)
+                    for(unsigned j=0;j<4;++j)
+                        dst[i*4+j]=std::uint8_t(std::uint32_t(values[i])>>(8*j));
+            }else if(which==46){
+                GLfloat values[16]={};glGetFloatv(p,values);
+                std::memcpy(dst,values,components*4u);
+            }else{
+                GLboolean values[16]={};glGetBooleanv(p,values);
+                std::memcpy(dst,values,components);
+            }
+            break;
+        }
+        case 48:normal_={3,static_cast<int>(a(0)),static_cast<int>(a(1)),
+                         a(2),normal_.enabled};break;
+        case 49:case 50:case 51:case 57:{ // light, material, fog, tex-env floats
+            const auto ptr=a(which==51?1:2);
+            const auto n=(which==51)?4u:4u;
+            const auto* src=guest.read(ptr,n*4u);
+            if(!src)throw std::runtime_error("GLES1 float vector not guest mapped");
+            GLfloat value[4]={};std::memcpy(value,src,sizeof(value));
+            if(which==49)glLightfv(a(0),a(1),value);
+            if(which==50)glMaterialfv(a(0),a(1),value);
+            if(which==51)glFogfv(a(0),value);
+            if(which==57)glTexEnvfv(a(0),a(1),value);
+            break;
+        }
+        case 52:case 53:{
+            const auto* src=guest.read(a(0),16u*4u);
+            if(!src)throw std::runtime_error("GLES1 matrix outside guest memory");
+            GLfloat matrix[16];std::memcpy(matrix,src,sizeof(matrix));
+            if(which==52)glLoadMatrixf(matrix);
+            else glMultMatrixf(matrix);
+            break;
+        }
+        case 54:glNormal3f(f(0),f(1),f(2));break;
+        case 55:glColor4ub(static_cast<GLubyte>(a(0)),
+                           static_cast<GLubyte>(a(1)),
+                           static_cast<GLubyte>(a(2)),
+                           static_cast<GLubyte>(a(3)));break;
+        case 56:glPointSize(f(0));break;
         default:throw std::runtime_error("Unknown GLES1 dispatch index");
         }
         r[0]=result;
