@@ -72,7 +72,8 @@ OriginalUiComposedScreen compose_original_ui_screen(
         if(iter==screens.end()){ancestors.erase(name);return false;}
         for(const auto& entity:iter->second->entities) {
             if(!entity.visible||entity.vertices.empty())continue;
-            const std::string role=is_button(entity.name)?
+            const std::string role=(entity.type=="SUBLAYOUT" &&
+                inherited_role.empty() && is_button(entity.name))?
                 entity.name:inherited_role;
             const auto expected=icon_for_role(role);
             if((name=="UI_BUTTON_MAIN_ON"||name=="UI_BUTTON_MAIN_OFF") &&
