@@ -28,9 +28,9 @@ int main(){
     assert(!native_menu_key(state,cb,66,true));
     assert(native_menu_key(state,cb,4,true));
     native_menu_focus_lost(state,cb);
-    assert(trace.events.size()==6);
+    assert(trace.events.size()==7);
     assert(trace.events[0].module==600);
-    assert(trace.events[4].type==3&&trace.events[4].code==66);
-    assert(trace.events[5].type==3&&trace.events[5].code==4);
+    assert(trace.events[5].type==3&&trace.events[5].code==66);
+    assert(trace.events[6].type==3&&trace.events[6].code==4);
     return 0;
 }
