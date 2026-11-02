@@ -22,6 +22,7 @@ bool original_input_ready_0x27e97c(
 void original_bind_input_services(const OriginalInputBinding& input) noexcept {
     std::lock_guard<std::mutex> lock(runtime_mutex);
     bound=input;is_bound=true;
+    last_status=OriginalInputStatus::NotReady;
 }
 bool original_bind_input_mapped_runtime(
     const OriginalInputMappedOwners& mapped,
@@ -41,6 +42,7 @@ bool original_bind_input_mapped_runtime(
 void original_unbind_input_services() noexcept {
     std::lock_guard<std::mutex> lock(runtime_mutex);
     bound={};is_bound=false;
+    last_status=OriginalInputStatus::MissingOriginalService;
 }
 OriginalInputStatus original_last_input_status() noexcept{return last_status;}
 void original_emit_input(const OriginalInputPacket& packet) noexcept {
