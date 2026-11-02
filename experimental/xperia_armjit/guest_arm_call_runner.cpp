@@ -124,7 +124,7 @@ struct GuestArmCallRunner::Impl {
                     throw std::runtime_error("ARM guest exceeded bounded instruction budget");
                 const auto expected=GuestLibcBridge::veneer_base+
                     std::uint64_t(id-1u)*8u;
-                if(expected>UINT32_MAX || id>24)
+                if(expected>UINT32_MAX || id>28)
                     throw std::runtime_error("Unsupported Android SVC/import");
                 std::array<u32,16> copy=jit.Regs();
                 if(!bridge.dispatch(id,copy,image,error,&heap,files))
