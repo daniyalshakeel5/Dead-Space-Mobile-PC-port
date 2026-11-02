@@ -1,6 +1,7 @@
 #include "ds_port/original_ui_layout.hpp"
 #include <algorithm>
 #include <cstring>
+#include <cmath>
 #include <unordered_map>
 namespace ds_port {
 namespace {
@@ -101,6 +102,93 @@ OriginalLayoutDatabase decode_original_layout_sbin(
             static_cast<std::uint8_t>(encoded&7)});
     }
     out.records.assign(data.data,data.data+data.size);
+    const auto name_of=[&](std::uint16_t id)->std::string {
+        return id==0||id>out.names.size()?"":out.names[id-1];
+    };
+    const auto read_float=[&](const std::uint8_t* p)->float {
+        const auto bits=u32(p);
+        float result=0.f;
+        std::memcpy(&result,&bits,4);
+        return result;
+    };
+    const auto array=[&](std::uint32_t object_id,std::uint16_t type,
+                         std::size_t stride,const std::uint8_t*& contents,
+                         std::uint32_t& count)->bool {
+        if(!object_id||object_id>=out.references.size())return false;
+        const auto& ref=out.references[object_id];
+        if(ref.tag!=2||ref.byte_offset>out.records.size()||
+           out.records.size()-ref.byte_offset<8)return false;
+        const auto* ptr=out.records.data()+ref.byte_offset;
+        count=u32(ptr+4);
+        if(u16(ptr)!=16||u16(ptr+2)!=type||count>20000||
+           count>(out.records.size()-ref.byte_offset-8)/stride)
+            return false;
+        contents=ptr+8;return true;
+    };
+    for(const auto& ref:out.references) {
+        if(ref.tag!=0||ref.byte_offset>out.records.size()||
+           out.records.size()-ref.byte_offset<10)
+            continue;
+        const auto* layout=out.records.data()+ref.byte_offset;
+        if(u16(layout)!=3)continue; // standard SBIN Layout structure
+        const auto screen_name=name_of(u16(layout+2));
+        const auto entity_id=u32(layout+6);
+        if(screen_name.empty())
+            return fail("Original UI layout has invalid name");
+        const std::uint8_t* entities=nullptr;
+        std::uint32_t count=0;
+        if(!array(entity_id,0,40,entities,count))
+            return fail("Original UI layout Entity array invalid");
+        OriginalLayoutScreen screen{};
+        screen.name=screen_name;
+        screen.entities.reserve(count);
+        for(std::uint32_t k=0;k<count;++k) {
+            const auto* e=entities+std::size_t(k)*40;
+            OriginalLayoutEntity entity{};
+            entity.name=name_of(u16(e+0));
+            entity.type=name_of(u16(e+2));
+            entity.image=name_of(u16(e+4));
+            entity.font=name_of(u16(e+6));
+            entity.text_id=name_of(u16(e+8));
+            entity.sublayout=name_of(u16(e+10));
+            entity.align=name_of(u16(e+12));
+            entity.scrolling=e[14]!=0;
+            entity.blend=name_of(u16(e+16));
+            entity.color=name_of(u16(e+18));
+            entity.width=read_float(e+20);
+            entity.height=read_float(e+24);
+            entity.flags=u32(e+28);
+            entity.visible=e[32]!=0;
+            const std::uint32_t vertex_id=u32(e+36);
+            if(!std::isfinite(entity.width)||!std::isfinite(entity.height)||
+               std::fabs(entity.width)>65536.f||
+               std::fabs(entity.height)>65536.f)
+                return fail("Original UI entity dimensions invalid");
+            if(vertex_id) {
+                const std::uint8_t* vertices=nullptr;
+                std::uint32_t verts=0;
+                if(!array(vertex_id,5,16,vertices,verts)||verts>32)
+                    return fail("Original UI Vertex array invalid");
+                for(std::uint32_t v=0;v<verts;++v) {
+                    const auto* p=vertices+std::size_t(v)*16;
+                    OriginalLayoutVertex vertex{
+                        read_float(p),read_float(p+4),
+                        read_float(p+8),read_float(p+12)};
+                    if(!std::isfinite(vertex.x)||!std::isfinite(vertex.y)||
+                       !std::isfinite(vertex.anchor_x)||
+                       !std::isfinite(vertex.anchor_y)||
+                       std::fabs(vertex.x)>65536.f||
+                       std::fabs(vertex.y)>65536.f)
+                        return fail("Original UI vertex coordinate invalid");
+                    entity.vertices.push_back(vertex);
+                }
+            }
+            screen.entities.push_back(std::move(entity));
+        }
+        out.screens.push_back(std::move(screen));
+    }
+    if(out.screens.empty())
+        return fail("Original UI Layout records missing");
     if(!out.contains_name("UI_MAIN")||!out.contains_name("BTN_PLAY"))
         return fail("Original main-menu layout identifiers missing");
     out.decoded=true;return out;
