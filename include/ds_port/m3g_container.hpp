@@ -65,6 +65,13 @@ M3gRgbaImage decode_m3g_rgba_image(const std::uint8_t* data, std::size_t size);
 // IronMonkey Image2D code 116, only when bytes exactly match a complete
 // ETC1 mip pyramid. Decodes BASE LEVEL RGB to RGBA8 in memory; mip levels
 // are validated but not exposed. Visual orientation is unverified.
+// Validated JSR-184 texture pack reader for the game's external
+// scene Image2D objects. Accepts a single immutable RGB/RGBA
+// Image2D across structurally checked sections, including zlib sections;
+// unlike the narrow two-section RGBA reader this does not presume the
+// pack contains exactly three objects.
+M3gRgbaImage decode_m3g_scene_texture_image(
+    const std::uint8_t* data,std::size_t size);
 M3gRgbaImage decode_m3g_etc1_image(const std::uint8_t* data, std::size_t size);
 
 }  // namespace ds_port
