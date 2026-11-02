@@ -11,6 +11,9 @@ struct OriginalUiDraw {
     std::uint32_t sprite_object_id=0;
     int x=0,y=0,width=0,height=0;
     bool interactive=false;
+    // A helper hit rectangle has no texture; action_id identifies its owner.
+    bool hit_only=false;
+    std::uint32_t action_id=0;
 };
 struct OriginalUiHit {
     bool found=false;
@@ -31,6 +34,7 @@ struct OriginalUiRuntime {
     const std::vector<OriginalUiDraw>* draw_commands=nullptr;
     void* context=nullptr;
     void (*on_activate)(void*,std::uint32_t)=nullptr;
+    void (*on_hover)(void*,std::uint32_t)=nullptr;
 };
 bool validate_original_ui_draw_list(
     const OriginalUiSbin& database,
