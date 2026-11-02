@@ -184,6 +184,24 @@ jobs:
           cat "$RUNNER_TEMP/native-scene-boot.log"
           test "$boot_exit" = 20
           grep -F "Original menu camera 478" "$RUNNER_TEMP/native-scene-boot.log"
+          # Render an actual OpenGL frame with Mesa's software rasterizer
+          # under virtual X11, then verify that geometry produced pixels.
+          # No copyrighted screenshot is exported.
+          sudo apt-get install -y -qq xvfb libgl1-mesa-dri >/dev/null
+          set +e
+          LIBGL_ALWAYS_SOFTWARE=1 SDL_AUDIODRIVER=dummy \
+            DS_NATIVE_MENU_SMOKE_FRAMES=1 \
+            xvfb-run -a timeout 55s \
+            "$RUNNER_TEMP/native-scene-boot/deadspace_native" \
+            --boot-splash --assets-dir "$RUNNER_TEMP/native-scene-assets" \
+            > "$RUNNER_TEMP/native-scene-gpu.log" 2>&1
+          gpu_exit=$?
+          set -e
+          cat "$RUNNER_TEMP/native-scene-gpu.log"
+          test "$gpu_exit" = 20
+          grep -E "Original 3D menu GPU frame: .*nonblack pixels [1-9][0-9]*" \
+            "$RUNNER_TEMP/native-scene-gpu.log"
+
 
       - name: Inventory repository on pull requests (no private APK)
         if: github.event_name == 'pull_request'
