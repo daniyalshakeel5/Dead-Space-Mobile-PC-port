@@ -174,7 +174,7 @@ struct GuestArmCallRunner::Impl {
                     const auto callback=java->take_callback();
                     if(callback.address){
                         const auto saved=jit.Regs();
-                        const auto cpsr=jit.GetCpsr();
+                        const auto cpsr=jit.Cpsr();
                         u32 ignored=0;
                         if(!invoke(callback.address,callback.arguments,
                                    ignored,error,depth+1))
@@ -203,7 +203,7 @@ struct GuestArmCallRunner::Impl {
                     // Save the suspended original caller; running an ARM
                     // destructor uses a separate stack and a JIT reset.
                     const auto saved=jit.Regs();
-                    const auto cpsr=jit.GetCpsr();
+                    const auto cpsr=jit.Cpsr();
                     const auto callbacks=bridge.take_destructors(saved[0]);
                     for(const auto& callback:callbacks) {
                         u32 ignored=0;
@@ -229,7 +229,7 @@ struct GuestArmCallRunner::Impl {
                         if(!image.read(callback&~1u,2))
                             throw std::runtime_error("Unmapped guest pthread_once callback");
                         const auto saved=jit.Regs();
-                        const auto cpsr=jit.GetCpsr();
+                        const auto cpsr=jit.Cpsr();
                         word[0]=1;word[1]=word[2]=word[3]=0;
                         u32 ignored=0;
                         if(!invoke(callback,{0,0,0,0},ignored,error,depth+1))
