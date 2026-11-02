@@ -1,6 +1,11 @@
 #pragma once
 #include <filesystem>
-#include <SDL.h>
+// SDL types intentionally forward-declared here. Including SDL.h in
+// the native game's public header redefines main to SDL_main on
+// Windows and prevents the executable's actual entry point from linking.
+struct SDL_Renderer;
+struct SDL_Texture;
+struct SDL_Rect;
 namespace ds_port {
 enum class OriginalSplashResult {
     Completed, MissingOriginalAssets, ImageDecodeFailed, GraphicsUnavailable,
