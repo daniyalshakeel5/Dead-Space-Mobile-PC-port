@@ -7,6 +7,7 @@
 #ifdef DS_NATIVE_ORIGINAL_MENU_GL
 #include "ds_port/original_menu_gl.hpp"
 #include "ds_port/original_menu_scene_graph.hpp"
+#include "ds_port/original_m3g_scene.hpp"
 #endif
 #include "ds_port/im_ui_image.hpp"
 #include <filesystem>
@@ -17,6 +18,7 @@
 #include "ds_port/asset_install.hpp"
 #endif
 #include <array>
+#include <cstdlib>
 #include <cstdint>
 #include <iostream>
 #include <string>
@@ -66,16 +68,38 @@ bool load_original_menu_stage(const std::string& root) {
     std::cerr<<"Original menu topology: "<<topology.child_parent.size()
              <<" validated child-parent links, "<<topology.unresolved_groups
              <<" unresolved groups.\\n";
+    const auto native_scene=ds_port::decode_original_m3g_scene(
+        scene_bytes.data(),scene_bytes.size());
+    if(!native_scene.decoded) {
+        std::cerr<<"Original 3D menu scene decode failed: "
+                 <<native_scene.error<<"\\n";
+        return false;
+    }
     const auto resolved=ds_port::resolve_original_menu_scene(
-        scene,draw,ui.images,{}, {}, {});
+        scene,draw,native_scene.images,native_scene.nodes,
+        native_scene.camera,native_scene.materials);
     if(!resolved.valid) {
-        std::cerr<<"Original GPU menu blocked: "<<resolved.error<<"\\n";
-    } else {
+        std::cerr<<"Original 3D menu scene cannot render: "
+                 <<resolved.error<<"\\n";
+        return false;
+    }
+    std::cerr<<"Original menu camera "<<native_scene.camera.node_id
+             <<", "<<native_scene.nodes.size()<<" transformed scene nodes, "
+             <<native_scene.group_links<<" hierarchy links, "
+             <<native_scene.materials.size()<<" material bindings, "
+             <<native_scene.images.size()<<" scene textures decoded.\\n";
+    // Headless CI validates all original data without creating an OpenGL
+    // window using SDL's dummy video driver.
+    const char* video=std::getenv("SDL_VIDEODRIVER");
+    if(!video || std::string_view(video)!="dummy") {
         std::string renderer_error;
-        const auto result=ds_port::run_original_menu_gl(
-            scene,draw,ui.images,resolved.frame,renderer_error);
-        if(result==ds_port::OriginalMenuGpuStatus::GraphicsUnavailable) {
-            std::cerr<<"Native renderer failed: "<<renderer_error<<"\\n";
+        const auto render_result=ds_port::run_original_menu_gl(
+            scene,draw,native_scene.images,resolved.frame,renderer_error);
+        if(render_result==ds_port::OriginalMenuGpuStatus::GraphicsUnavailable ||
+           render_result==ds_port::OriginalMenuGpuStatus::InvalidScene ||
+           render_result==ds_port::OriginalMenuGpuStatus::IncompleteOriginalScene) {
+            std::cerr<<"Original 3D menu renderer failed: "
+                     <<renderer_error<<"\\n";
             return false;
         }
     }
