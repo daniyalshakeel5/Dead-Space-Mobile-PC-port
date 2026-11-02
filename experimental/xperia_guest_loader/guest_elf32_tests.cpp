@@ -59,6 +59,7 @@ int main(){
     assert(image.read_u32(0x10001354)==0u);
     assert(image.pending_imports.size()==1u);
     assert(image.pending_imports[0].name=="guest_android_fn");
+    assert(image.pending_imports[0].symbol_type==2);
     // The linker must fail atomically until the matching guest thunk
     // address is supplied; no external function is ever invoked.
     assert(!image.bind_imports({},error));
