@@ -80,6 +80,41 @@ keyboard, touch and virtual-stick mapping. The actual ARM game
 requires native-to-guest ABI dispatch (softfp), runtime queue and
 callbacks; it cannot consume the bridge until the JIT services exist.
 
+## Verified integration checkpoints
+
+- Exact binary identity of the user-provided Xperia Play ELF checked locally:
+  SHA1 0ed42b611415015807f759ec9b5457857143ce39,
+  matching the Vita port exactly.
+- Original-free ELF preflight synthetic suite passes both Linux/Windows:
+  https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41463000643
+- Real Dynarmic A32-to-x86-64 instruction execution passed Linux:
+  https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41462563178
+- Native C++ ELF PT_LOAD mapper and R_ARM_RELATIVE relocation tests
+  passed Linux and Windows:
+  https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41463391390
+- Joined proof: a relocated synthetic ELF32 ARM code section executes
+  through Dynarmic on x86-64 and writes the expected value into the
+  loader's sparse ELF guest memory. Linux JIT run passed:
+  https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41463670448
+
+The **actual** user's ARM ELF was statically inspected (392 undefined
+dynamic imports) but has NOT been run in the JIT. Three components
+are connected: ELF address mapping, relative relocations, and A32 JIT.
+The ~1,236 non-relative relocation sites (ABS32, GLOB_DAT, JUMP_SLOT)
+need symbol resolution, followed by guest-to-host thunking for Bionic,
+C++, JNI, GLES, VFP, audio and files.
+
+## Pragmatic playable-route option
+
+EapRules reports its Xperia Play loader reaching an interactive 3D
+game through qemu-arm user mode on Linux x86-64 with llvmpipe.
+That is a potentially faster short-term playability proof than rewriting
+all Android ABI thunks for Dynarmic. It does NOT establish good gaming
+performance, nor a working native Windows executable. A Windows
+WSL2/Wine-style adaptation would need its own compatibility testing.
+The independent Dynarmic path above avoids copying the GPL ARM-specific
+loader while establishing a portable x86 JIT boundary.
+
 ## Known non-working parts
 
 The original Xperia game has NOT been executed on x86-64.
