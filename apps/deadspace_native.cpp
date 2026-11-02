@@ -113,6 +113,24 @@ bool load_original_external_textures(const std::string& root,
             std::cerr<<"Original texture pack decode unsupported: "<<path
                      <<" (IM-M3G: "<<im.error<<", external: "
                      <<decoded.error<<")\\n";
+#ifdef DS_NATIVE_EXTERNAL_M3G_TEXTURES
+            const auto report=ds_port::scan_m3g_container(
+                payload.data(),payload.size(),64u*1024u*1024u,
+                ds_port::M3gScanMode::DiagnosticOpaqueVariant);
+            std::cerr<<"Original texture metadata: "<<payload.size()
+                     <<" bytes; standard M3G="<<report.valid
+                     <<"; sections="<<report.section_count
+                     <<"; objects="<<report.object_count
+                     <<"; images="<<report.image2d_objects
+                     <<"; standard_images="<<report.image2d_standard_payloads
+                     <<"; nonstandard_images="<<report.image2d_unrecognized_payloads
+                     <<"; image_formats_99="<<report.image2d_format_counts[3]
+                     <<"; image_formats_100="<<report.image2d_format_counts[4]
+                     <<"; first_bytes=";
+            for(std::size_t head=0;head<payload.size()&&head<12;++head)
+                std::cerr<<int(payload[head])<<",";
+            std::cerr<<"; reason="<<report.error<<"\\n";
+#endif
             return false;
         }
         scene.images[i]=std::move(decoded);
