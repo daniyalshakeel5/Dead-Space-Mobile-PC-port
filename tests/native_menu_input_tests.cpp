@@ -1,5 +1,8 @@
 #include "ds_port/native_menu_input.hpp"
 #include "ds_port/original_input_events.hpp"
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <cassert>
 #include <vector>
 struct Event {int type,code,module;float x,y;};
