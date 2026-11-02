@@ -99,7 +99,20 @@ jobs:
               for name in ("published/texturepacks_ui/splash_ea.m3g",
                            "published/texturepacks_ui/splash_deadspace.m3g",
                            "published/models/main_menu.m3g",
-                           "published/texturepacks_ui/ui_frontend.m3g"):
+                           "published/texturepacks_ui/ui_frontend.m3g",
+                           "published/textures/texture_env_main_menu_objects_02.m3g",
+                           "published/textures/texture_env_sprawl_starfield_01.m3g",
+                           "published/textures/texture_FX_HoloBackPanel.m3g",
+                           "published/textures/texture_FX_InteractDoorBacking.m3g",
+                           "published/textures/texture_FX_Dash.m3g",
+                           "published/textures/texture_FX_D_logo_Grey.m3g",
+                           "published/textures/texture_FX_GenBorder.m3g",
+                           "published/textures/texture_env_generic_fog_01.m3g",
+                           "published/textures/texture_floor_shadow.m3g",
+                           "published/textures/texture_env_main_menu_01.m3g",
+                           "published/textures/texture_env_main_menu_starfield.m3g",
+                           "published/textures/texture_env_main_menu_objects.m3g",
+                           "published/textures_uncompressed/texture_env_generic_uv_particle.m3g"):
                   source_name="assets/"+name
                   info=source.getinfo(source_name)
                   if info.file_size>32*1024*1024:raise RuntimeError("boot resource oversized")
