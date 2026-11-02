@@ -150,6 +150,41 @@ jobs:
             src/original_m3g_scene.cpp apps/original_m3g_scene_probe.cpp \
             -o "$RUNNER_TEMP/original-native-m3g-probe"
           "$RUNNER_TEMP/original-native-m3g-probe" "$RUNNER_TEMP/original-main-menu.m3g"
+          # Exercise the actual native executable through the recovered
+          # camera, transforms and renderer contract (headless only).
+          sudo apt-get update -qq >/dev/null
+          sudo apt-get install -y -qq libsdl2-dev libgl-dev >/dev/null
+          cmake -S . -B "$RUNNER_TEMP/native-scene-boot" \
+            -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=OFF \
+            -DDS_BUILD_BOOT_SPLASH=ON >/dev/null
+          cmake --build "$RUNNER_TEMP/native-scene-boot" \
+            --target deadspace_native --parallel 2 >/dev/null
+          python - <<'PY'
+          import os,zipfile
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])/"native-scene-assets"/"assets"
+          with zipfile.ZipFile(os.environ["RUNNER_TEMP"]+"/apk-m3g-test.apk") as apk:
+              for name in ("published/texturepacks_ui/splash_ea.m3g",
+                           "published/texturepacks_ui/splash_deadspace.m3g",
+                           "published/models/main_menu.m3g",
+                           "published/texturepacks_ui/ui_frontend.m3g"):
+                  item=apk.getinfo("assets/"+name)
+                  assert 0<item.file_size<32*1024*1024
+                  dst=root/name
+                  dst.parent.mkdir(parents=True,exist_ok=True)
+                  dst.write_bytes(apk.read("assets/"+name))
+          PY
+          set +e
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software \
+            timeout 35s "$RUNNER_TEMP/native-scene-boot/deadspace_native" \
+            --boot-splash --assets-dir "$RUNNER_TEMP/native-scene-assets" \
+            > "$RUNNER_TEMP/native-scene-boot.log" 2>&1
+          boot_exit=$?
+          set -e
+          cat "$RUNNER_TEMP/native-scene-boot.log"
+          test "$boot_exit" = 20
+          grep -F "Original menu camera 478" "$RUNNER_TEMP/native-scene-boot.log"
+
       - name: Inventory repository on pull requests (no private APK)
         if: github.event_name == 'pull_request'
         run: |
