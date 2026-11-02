@@ -212,8 +212,10 @@ of those Bionic-compatible memory/string services:
   a reusable bounded AAPCS/softfp function call boundary with an
   owned 256 KiB guest stack, JIT callback/dispatch loop and explicit
   constructor ordering. Runs synthetic code; its separate
-  cross-platform validation is still a requirement before using any
-  original game code.
+  synthetic ARM function-call and constructor tests passed on
+  the x86-64 Linux JIT:
+  https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41480879311.
+  This has **not** executed any original game instructions.
 
 No proprietary game code or assets were added to the repository.
 **Passing synthetic ARM code is not the same as running the original ELF.**
