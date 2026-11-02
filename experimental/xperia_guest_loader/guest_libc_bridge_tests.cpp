@@ -136,6 +136,16 @@ int main() {
     assert(svc.dispatch(31,regs,image,error));
     assert(regs[0]==errno_ptr && image.read(errno_ptr,1)[0]==13);
     assert(!svc.dispatch(32,regs,image,error)); // JIT callback required
+    // ARM EABI guards are exactly four bytes, including at 4-byte
+    // alignment (not necessarily 8-byte), e.g. an ELF .bss tail.
+    const auto four_byte_guard=0x10001ffcu;
+    regs[0]=four_byte_guard;
+    assert(svc.dispatch(25,regs,image,error) && regs[0]==1);
+    regs[0]=four_byte_guard;
+    assert(svc.dispatch(26,regs,image,error) && regs[0]==0);
+    assert(image.read(four_byte_guard,4)[0]==1);
+    regs[0]=four_byte_guard;
+    assert(svc.dispatch(25,regs,image,error) && regs[0]==0);
     // Guest pthread mutex state machine: real uncontended lock and unlock.
     const auto mutex_ptr=0x10001840u;
     regs.fill(0);regs[0]=mutex_ptr;regs[1]=0;
