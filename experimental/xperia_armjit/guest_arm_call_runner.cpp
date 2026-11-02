@@ -153,6 +153,34 @@ struct GuestArmCallRunner::Impl {
                     jit.Regs()=saved;
                     jit.SetCpsr(cpsr);
                     copy[0]=0;
+                } else if(id==GuestLibcBridge::once_svc) {
+                    // Android pthread_once invokes the actual original ARM
+                    // function, not a host stub. This runner has one guest
+                    // thread; concurrent callers must be rejected explicitly.
+                    const u32 control=copy[0],callback=copy[1];
+                    auto* word=image.writeable(control,4);
+                    if(!word || (control&3u))
+                        throw std::runtime_error("Invalid guest pthread_once control");
+                    const auto state=image.read_u32(control);
+                    if(state==0){
+                        if(!image.read(callback&~1u,2))
+                            throw std::runtime_error("Unmapped guest pthread_once callback");
+                        const auto saved=jit.Regs();
+                        const auto cpsr=jit.GetCpsr();
+                        word[0]=1;word[1]=word[2]=word[3]=0;
+                        u32 ignored=0;
+                        if(!invoke(callback,{0,0,0,0},ignored,error,depth+1))
+                            return false;
+                        word=image.writeable(control,4);
+                        if(!word || image.read_u32(control)!=1)
+                            throw std::runtime_error("Guest pthread_once control overwritten");
+                        word[0]=2;word[1]=word[2]=word[3]=0;
+                        jit.Reset();
+                        jit.Regs()=saved;
+                        jit.SetCpsr(cpsr);
+                    }else if(state!=2)
+                        throw std::runtime_error("Reentrant pthread_once requires guest scheduler");
+                    copy[0]=0;
                 } else if(!bridge.dispatch(id,copy,image,error,&heap,files))
                     return false;
                 jit.Regs()[0]=copy[0];
