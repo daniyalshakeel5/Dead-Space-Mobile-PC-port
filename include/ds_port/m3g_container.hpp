@@ -70,6 +70,11 @@ M3gRgbaImage decode_m3g_rgba_image(const std::uint8_t* data, std::size_t size);
 // Image2D across structurally checked sections, including zlib sections;
 // unlike the narrow two-section RGBA reader this does not presume the
 // pack contains exactly three objects.
+// IronMonkey single-section uncompressed texture variant verified against
+// original APK: declared raw size equals section total, and checksum field
+// is zero. This never weakens checksum validation for standard M3G sections.
+M3gRgbaImage decode_m3g_ironmonkey_uncompressed_image(
+    const std::uint8_t* data,std::size_t size);
 M3gRgbaImage decode_m3g_scene_texture_image(
     const std::uint8_t* data,std::size_t size);
 M3gRgbaImage decode_m3g_etc1_image(const std::uint8_t* data, std::size_t size);
