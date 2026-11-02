@@ -24,6 +24,7 @@ public:
     bool install(GuestElf32& guest,std::string& error);
     bool code_byte(std::uint32_t addr,std::uint8_t& value) const noexcept;
     bool handles(std::uint32_t id) const noexcept;
+    std::uint32_t return_pc(std::uint32_t id) const noexcept;
     bool dispatch(std::uint32_t id,std::array<std::uint32_t,16>& regs,
                   GuestElf32& guest,std::string& error) const noexcept;
     std::uint32_t vm() const noexcept {return vm_address;}
