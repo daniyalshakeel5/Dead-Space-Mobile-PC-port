@@ -54,6 +54,12 @@ bool GuestJniVm::handles(std::uint32_t id) const noexcept {
     return installed_ && ((id>=vm_svc_base && id<vm_svc_base+vm_slots) ||
            (id>=env_svc_base && id<env_svc_base+env_slots));
 }
+std::uint32_t GuestJniVm::return_pc(std::uint32_t id) const noexcept {
+    if(!handles(id))return 0;
+    const auto offset=id>=env_svc_base
+        ?vm_slots+(id-env_svc_base):(id-vm_svc_base);
+    return thunk_base+static_cast<std::uint32_t>(offset)*8u+4u;
+}
 bool GuestJniVm::dispatch(std::uint32_t id,
                           std::array<std::uint32_t,16>& regs,
                           GuestElf32& guest,std::string& error) const noexcept {
