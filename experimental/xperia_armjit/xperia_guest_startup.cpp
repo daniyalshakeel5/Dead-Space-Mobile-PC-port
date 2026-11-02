@@ -3,6 +3,7 @@
 #include "guest_heap.hpp"
 #include "guest_filesystem.hpp"
 #include "guest_arm_call_runner.hpp"
+#include "guest_jni_vm.hpp"
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -52,7 +53,10 @@ int main(int argc,char** argv){
             throw std::runtime_error("ARM relocation binding failed: "+error);
         xperia::GuestHeap heap(elf);
         xperia::GuestFileSystem files(root);
-        xperia::GuestArmCallRunner guest(elf,services,heap,&files);
+        xperia::GuestJniVm java;
+        if(!java.install(elf,error))
+            throw std::runtime_error("ARM32 JNI guest environment failed: "+error);
+        xperia::GuestArmCallRunner guest(elf,services,heap,&files,&java);
         std::cerr<<"Executing "<<elf.initialization_order.size()
                  <<" ORIGINAL Xperia ARM ELF constructors via Dynarmic.\n";
         if(!guest.run_original_initializers(error))
