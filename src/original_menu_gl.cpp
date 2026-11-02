@@ -1,6 +1,7 @@
 #define SDL_MAIN_HANDLED
 #include "ds_port/original_menu_gl.hpp"
 #include "ds_port/original_menu_animation.hpp"
+#include "ds_port/original_ui_interaction.hpp"
 #include "ds_port/native_menu_input.hpp"
 #include "ds_port/original_input_jni_bridge.hpp"
 #include <SDL.h>
@@ -94,7 +95,8 @@ OriginalMenuGpuStatus run_original_menu_gl(
     const ImMenuGeometry& geometry,const OriginalMenuDrawStream& stream,
     const std::vector<M3gRgbaImage>& images,
     const OriginalMenuGpuFrame& frame,std::string& diagnostic,
-    const OriginalMenuAnimationRuntime* motion_runtime) {
+    const OriginalMenuAnimationRuntime* motion_runtime,
+    const OriginalUiRuntime* ui_runtime) {
     if(!validate_original_menu_gpu_frame(geometry,stream,images,frame,diagnostic))
         return OriginalMenuGpuStatus::IncompleteOriginalScene;
     if(SDL_InitSubSystem(SDL_INIT_VIDEO)!=0){
@@ -129,6 +131,46 @@ OriginalMenuGpuStatus run_original_menu_gl(
             static_cast<GLsizei>(img.width),static_cast<GLsizei>(img.height),0,
             GL_RGBA,GL_UNSIGNED_BYTE,img.pixels_rgba.data());
     }
+    bool has_ui_layer=false;
+    std::vector<GLuint> ui_textures;
+    OriginalUiInteractionState ui_input{};
+    if(ui_runtime && ui_runtime->database && ui_runtime->atlases &&
+       ui_runtime->draw_commands) {
+        std::string reason;
+        if(!validate_original_ui_draw_list(*ui_runtime->database,
+                *ui_runtime->atlases,*ui_runtime->draw_commands,reason)){
+            diagnostic="Original frontend draw commands rejected: "+reason;
+            release_all_textures();return OriginalMenuGpuStatus::InvalidScene;
+        }
+        ui_textures.resize(ui_runtime->atlases->size(),0);
+        glGenTextures(static_cast<GLsizei>(ui_textures.size()),ui_textures.data());
+        for(std::size_t i=0;i<ui_textures.size();++i){
+            const auto& a=ui_runtime->atlases->at(i);
+            if(!a.decoded)continue;
+            glBindTexture(GL_TEXTURE_2D,ui_textures[i]);
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+            glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,
+                static_cast<GLsizei>(a.width),static_cast<GLsizei>(a.height),
+                0,GL_RGBA,GL_UNSIGNED_BYTE,a.pixels_rgba.data());
+        }
+        has_ui_layer=true;
+    }
+    auto release_all_textures=[&](){
+        if(!ui_textures.empty())
+            glDeleteTextures(static_cast<GLsizei>(ui_textures.size()),
+                             ui_textures.data());
+        free_textures();
+    };
+    const auto ui_pointer=[&](OriginalUiPointerAction action,int x,int y){
+        if(!has_ui_layer)return;
+        const auto result=dispatch_original_ui_pointer(ui_input,
+            *ui_runtime->draw_commands,action,x,y);
+        if(result.activated && ui_runtime->on_activate)
+            ui_runtime->on_activate(ui_runtime->context,result.activated);
+    };
     struct PackedVertex{float xyz[3];float uv[2];};
     std::vector<PackedVertex> packed;
     packed.reserve(geometry.vertices.size());
@@ -167,6 +209,7 @@ OriginalMenuGpuStatus run_original_menu_gl(
             else if(e.type==SDL_WINDOWEVENT &&
                     e.window.event==SDL_WINDOWEVENT_FOCUS_LOST)
                 native_menu_focus_lost(input,callbacks);
+                ui_pointer(OriginalUiPointerAction::Cancel,0,0);
             else if(e.type==SDL_KEYDOWN && !e.key.repeat) {
                 if(e.key.keysym.sym==SDLK_ESCAPE)
                     native_menu_key(input,callbacks,4,true);
@@ -182,6 +225,14 @@ OriginalMenuGpuStatus run_original_menu_gl(
                     e.type==SDL_MOUSEMOTION) {
                 int width=0,height=0;
                 SDL_GetWindowSize(window.get(),&width,&height);
+                if(e.type==SDL_MOUSEMOTION)
+                    ui_pointer(OriginalUiPointerAction::Move,e.motion.x,e.motion.y);
+                else if(e.type==SDL_MOUSEBUTTONDOWN &&
+                        e.button.button==SDL_BUTTON_LEFT)
+                    ui_pointer(OriginalUiPointerAction::Down,e.button.x,e.button.y);
+                else if(e.type==SDL_MOUSEBUTTONUP &&
+                        e.button.button==SDL_BUTTON_LEFT)
+                    ui_pointer(OriginalUiPointerAction::Up,e.button.x,e.button.y);
                 if(e.type==SDL_MOUSEMOTION && input.mouse_held)
                     native_menu_pointer(input,callbacks,2,e.motion.x,e.motion.y,width,height);
                 else if(e.type==SDL_MOUSEBUTTONDOWN &&
@@ -235,13 +286,13 @@ OriginalMenuGpuStatus run_original_menu_gl(
                     *motion_runtime->nodes,elapsed,animated_nodes,
                     motion_runtime->preview_activate_controllers)){
                 diagnostic="Original menu keyframe sampling failed";
-                free_textures();return OriginalMenuGpuStatus::InvalidScene;
+                release_all_textures();return OriginalMenuGpuStatus::InvalidScene;
             }
             auto resolved=resolve_original_menu_scene(geometry,stream,images,
                 animated_nodes,*motion_runtime->camera,*motion_runtime->materials);
             if(!resolved.valid){
                 diagnostic="Animated original hierarchy rejected: "+resolved.error;
-                free_textures();return OriginalMenuGpuStatus::InvalidScene;
+                release_all_textures();return OriginalMenuGpuStatus::InvalidScene;
             }
             animated_frame=std::move(resolved.frame);
             draw_frame=&animated_frame;
@@ -313,12 +364,56 @@ OriginalMenuGpuStatus run_original_menu_gl(
                 }
             }
         }
+        if(has_ui_layer && !ui_runtime->draw_commands->empty()) {
+            glPushAttrib(GL_ENABLE_BIT|GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|
+                         GL_POLYGON_BIT|GL_TEXTURE_BIT);
+            glDisable(GL_DEPTH_TEST);glDepthMask(GL_FALSE);
+            glDisable(GL_CULL_FACE);glDisable(GL_ALPHA_TEST);
+            glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+            glEnable(GL_TEXTURE_2D);glColor4f(1,1,1,1);
+            glDisableClientState(GL_VERTEX_ARRAY);
+            glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+            glMatrixMode(GL_PROJECTION);glPushMatrix();glLoadIdentity();
+            glOrtho(0,w,h,0,-1,1);
+            glMatrixMode(GL_MODELVIEW);glPushMatrix();glLoadIdentity();
+            for(const auto& cmd:*ui_runtime->draw_commands){
+                auto sprite=std::find_if(ui_runtime->database->sprites.begin(),
+                    ui_runtime->database->sprites.end(),
+                    [&](const OriginalUiSprite& x){
+                        return x.object_id==cmd.sprite_object_id;
+                    });
+                if(sprite==ui_runtime->database->sprites.end())continue;
+                const auto& atlas=ui_runtime->atlases->at(sprite->atlas);
+                const auto& src=sprite->source_rect;
+                const auto& packed=sprite->atlas_rect;
+                const float x0=float(cmd.x)+float(cmd.width)*src.x/sprite->source_width;
+                const float y0=float(cmd.y)+float(cmd.height)*src.y/sprite->source_height;
+                const float x1=x0+float(cmd.width)*src.width/sprite->source_width;
+                const float y1=y0+float(cmd.height)*src.height/sprite->source_height;
+                const float u0=float(packed.x)/atlas.width;
+                const float v0=float(packed.y)/atlas.height;
+                const float u1=float(packed.x+packed.width)/atlas.width;
+                const float v1=float(packed.y+packed.height)/atlas.height;
+                glBindTexture(GL_TEXTURE_2D,ui_textures.at(sprite->atlas));
+                glBegin(GL_QUADS);
+                glTexCoord2f(u0,v0);glVertex2f(x0,y0);
+                glTexCoord2f(u1,v0);glVertex2f(x1,y0);
+                glTexCoord2f(u1,v1);glVertex2f(x1,y1);
+                glTexCoord2f(u0,v1);glVertex2f(x0,y1);
+                glEnd();
+            }
+            glMatrixMode(GL_MODELVIEW);glPopMatrix();
+            glMatrixMode(GL_PROJECTION);glPopMatrix();
+            glEnableClientState(GL_VERTEX_ARRAY);
+            glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+            glPopAttrib();
+        }
         // Optional one-frame production renderer smoke for GitHub's
         // software OpenGL runner. No framebuffer image is persisted.
         const char* smoke=std::getenv("DS_NATIVE_MENU_SMOKE_FRAMES");
         if(smoke && std::strcmp(smoke,"1")==0) {
             if(w>4096||h>4096) {
-                diagnostic="OpenGL smoke window dimensions exceeded";free_textures();
+                diagnostic="OpenGL smoke window dimensions exceeded";release_all_textures();
                 return OriginalMenuGpuStatus::InvalidScene;
             }
             std::vector<std::uint8_t> rgba(std::size_t(w)*h*4u);
@@ -348,7 +443,7 @@ OriginalMenuGpuStatus run_original_menu_gl(
                      <<", center RGB ("<<int(rgba[center])<<","
                      <<int(rgba[center+1])<<","<<int(rgba[center+2])<<")"
                      <<", GL error "<<unsigned(error)<<"\\n";
-            free_textures();
+            release_all_textures();
             if(error!=GL_NO_ERROR || nonblack==0 || diverse_colors<8) {
                 diagnostic="Original GPU scene generated no visible pixels or GL error";
                 return OriginalMenuGpuStatus::InvalidScene;
@@ -359,7 +454,7 @@ OriginalMenuGpuStatus run_original_menu_gl(
         SDL_GL_SwapWindow(window.get());
     }
     native_menu_focus_lost(input,callbacks);
-    free_textures();
+    release_all_textures();
     diagnostic.clear();
     return OriginalMenuGpuStatus::UserAborted;
 }
