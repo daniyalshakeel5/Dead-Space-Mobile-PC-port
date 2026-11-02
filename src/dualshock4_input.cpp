@@ -92,4 +92,23 @@ int ds4_vita_android_key(Ds4Button b) noexcept {
         default:return -1;
     }
 }
+void ds4_emit_guest_button(Ds4GuestButtonState& state,Ds4Button button,
+                           bool pressed,Ds4GuestKeySink sink) noexcept {
+    const int key=ds4_vita_android_key(button);
+    if(key<0)return;
+    const unsigned index=static_cast<unsigned>(button);
+    if(index>=32)return;
+    const std::uint32_t bit=std::uint32_t{1}<<index;
+    if(bool(state.pressed_mask&bit)==pressed)return;
+    if(pressed)state.pressed_mask|=bit;
+    else state.pressed_mask&=~bit;
+    if(sink.emit)sink.emit(sink.context,{key,pressed});
+}
+void ds4_release_guest_buttons(Ds4GuestButtonState& state,
+                               Ds4GuestKeySink sink) noexcept {
+    for(unsigned index=0;index<static_cast<unsigned>(Ds4Button::Unknown);++index) {
+        if(!(state.pressed_mask&(std::uint32_t{1}<<index)))continue;
+        ds4_emit_guest_button(state,static_cast<Ds4Button>(index),false,sink);
+    }
+}
 } // namespace ds_port
