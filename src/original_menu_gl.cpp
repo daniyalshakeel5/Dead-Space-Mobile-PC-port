@@ -416,6 +416,16 @@ OriginalMenuGpuStatus run_original_menu_gl(
                 }
             }
         }
+        // A real two-pass GPU smoke detects a UI that decoded and
+        // submitted draw calls but never changed the framebuffer.
+        std::vector<std::uint8_t> pre_ui_pixels;
+        if(inspect_smoke && has_ui_layer &&
+           !ui_runtime->draw_commands->empty() && w<=4096 && h<=4096){
+            pre_ui_pixels.resize(std::size_t(w)*h*4u);
+            glPixelStorei(GL_PACK_ALIGNMENT,1);
+            glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,
+                         pre_ui_pixels.data());
+        }
         if(has_ui_layer && !ui_runtime->draw_commands->empty()) {
             const auto viewport=original_ui_viewport(w,h);
             if(viewport.width<=0||viewport.height<=0){
@@ -483,6 +493,16 @@ OriginalMenuGpuStatus run_original_menu_gl(
             glPixelStorei(GL_PACK_ALIGNMENT,1);
             glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,rgba.data());
             const auto error=glGetError();
+            std::size_t ui_changed_pixels=0;
+            if(!pre_ui_pixels.empty()){
+                for(std::size_t i=0;i<rgba.size();i+=4u)
+                    if(std::memcmp(pre_ui_pixels.data()+i,rgba.data()+i,4)!=0)
+                        ++ui_changed_pixels;
+                std::cerr<<"Original 2D frontend GPU overlay: "
+                         <<ui_runtime->draw_commands->size()
+                         <<" original UI draw/hit commands, changed pixels "
+                         <<ui_changed_pixels<<"\\n";
+            }
             std::size_t nonblack=0;
             std::array<bool,4096> color_buckets{};
             std::size_t diverse_colors=0;
@@ -507,8 +527,9 @@ OriginalMenuGpuStatus run_original_menu_gl(
                      <<int(rgba[center+1])<<","<<int(rgba[center+2])<<")"
                      <<", GL error "<<unsigned(error)<<"\\n";
             release_all_textures();
-            if(error!=GL_NO_ERROR || nonblack==0 || diverse_colors<8) {
-                diagnostic="Original GPU scene generated no visible pixels or GL error";
+            if(error!=GL_NO_ERROR || nonblack==0 || diverse_colors<8 ||
+               (!pre_ui_pixels.empty() && ui_changed_pixels==0)) {
+                diagnostic="Original GPU scene/frontend generated no visible pixels or GL error";
                 return OriginalMenuGpuStatus::InvalidScene;
             }
             diagnostic.clear();
