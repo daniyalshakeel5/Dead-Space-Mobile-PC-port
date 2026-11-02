@@ -1,5 +1,6 @@
 #include "ds_port/original_frame_dispatch.hpp"
 #include "ds_port/deadspace_paths.hpp"
+#include "ds_port/original_host_asset_io.hpp"
 #ifdef DS_NATIVE_SPLASH_PRESENTATION
 #include "ds_port/original_splash_host.hpp"
 #include "ds_port/im_menu_scene.hpp"
@@ -18,7 +19,6 @@
 #endif
 #include "ds_port/im_ui_image.hpp"
 #include <filesystem>
-#include <fstream>
 #include <vector>
 #endif
 #ifdef DS_NATIVE_APK_IMPORT
@@ -36,15 +36,8 @@ constexpr int kNeedRecoveredEngine=20;
 #ifdef DS_NATIVE_SPLASH_PRESENTATION
 bool read_original_bounded(const std::string& root,const char* name,
                            std::vector<std::uint8_t>& data) {
-    const auto p=ds_port::resolve_game_asset_path(root,name,true);
-    if(p.status!=ds_port::GamePathStatus::Resolved)return false;
-    std::ifstream in(p.path,std::ios::binary|std::ios::ate);
-    if(!in)return false;
-    const auto n=in.tellg();
-    if(n<=0 || static_cast<std::uint64_t>(n)>64ull*1024*1024)return false;
-    data.resize(static_cast<std::size_t>(n));
-    in.seekg(0);
-    return bool(in.read(reinterpret_cast<char*>(data.data()),n));
+    return ds_port::read_original_asset_file(root,name,
+        64u*1024u*1024u,data);
 }
 // Actual native boot stage after the splashes. This does not render or
 // simulate a menu: it establishes whether the original scene AND the

@@ -1,11 +1,10 @@
 #define SDL_MAIN_HANDLED
 #include "ds_port/original_splash_host.hpp"
-#include "ds_port/deadspace_paths.hpp"
+#include "ds_port/original_host_asset_io.hpp"
 #include "ds_port/im_ui_image.hpp"
 #include <SDL.h>
 #include <algorithm>
 #include <cstdint>
-#include <fstream>
 #include <memory>
 #include <vector>
 
@@ -18,17 +17,9 @@ struct SdlQuit { ~SdlQuit(){SDL_Quit();} };
 bool read_bounded_original_image(
     const std::filesystem::path& root,const char* path,
     M3gRgbaImage& image,bool& found) {
-    const auto file=resolve_game_asset_path(root,path,true);
-    found=file.status==GamePathStatus::Resolved;
-    if(!found)return false;
-    std::ifstream in(file.path,std::ios::binary|std::ios::ate);
-    if(!in)return false;
-    const auto n=in.tellg();
-    if(n<=0 || static_cast<std::uint64_t>(n)>16ull*1024*1024)
+    std::vector<std::uint8_t> bytes;
+    if(!read_original_asset_file(root,path,16u*1024u*1024u,bytes,&found))
         return false;
-    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(n));
-    in.seekg(0);
-    if(!in.read(reinterpret_cast<char*>(bytes.data()),n))return false;
     auto decoded=decode_im_ui_rgba_images(bytes.data(),bytes.size());
     if(!decoded.decoded||decoded.images.size()!=1)return false;
     image=std::move(decoded.images.front());

@@ -41,7 +41,15 @@ target_link_libraries(ds_original_ui_interactive_smoke PRIVATE ds_port_im_ui)
 add_library(ds_port_game_paths STATIC src/deadspace_paths.cpp)
 target_include_directories(ds_port_game_paths PUBLIC include)
 
+# Actual native game's resource reads use verified original provider
+# read/size/seek contracts through explicit host-bound Windows/Linux fds.
+add_library(ds_original_host_asset_io STATIC src/original_host_asset_io.cpp)
+target_include_directories(ds_original_host_asset_io PUBLIC include)
+target_link_libraries(ds_original_host_asset_io PUBLIC
+    ds_port_game_paths ds_original_native_abi)
+
 add_executable(deadspace_native apps/deadspace_native.cpp)
+target_link_libraries(deadspace_native PRIVATE ds_original_host_asset_io)
 target_link_libraries(deadspace_native PRIVATE ds_port_game_paths)
 target_link_libraries(deadspace_native PRIVATE ds_original_native_abi)
 
@@ -222,6 +230,10 @@ endif()
 
 if(DS_ENABLE_TESTS)
     enable_testing()
+    add_executable(ds_original_host_asset_io_tests tests/original_host_asset_io_tests.cpp)
+    target_link_libraries(ds_original_host_asset_io_tests PRIVATE ds_original_host_asset_io)
+    add_test(NAME ds_original_arm_file_provider_boot_loader
+             COMMAND ds_original_host_asset_io_tests)
     add_executable(ds_native_lifecycle_tests tests/native_lifecycle_tests.cpp)
     target_link_libraries(ds_native_lifecycle_tests PRIVATE ds_native_lifecycle)
     add_test(NAME ds_native_original_lifecycle_order COMMAND ds_native_lifecycle_tests)
