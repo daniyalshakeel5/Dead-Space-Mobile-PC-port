@@ -78,7 +78,7 @@ jobs:
           for oldlib in "$RUNNER_TEMP"/upstream/deadspace/libs.armhf/*.so*; do
             base="$(basename "$oldlib")"
             test -e "$dest/sysroot/usr/lib/arm-linux-gnueabihf/$base" ||
-              cp -L "$oldlib" "$dest/sysroot/usr/lib/arm-linux-gnueabihf/$base"
+              sudo cp -L "$oldlib" "$dest/sysroot/usr/lib/arm-linux-gnueabihf/$base"
           done
           cp -a "$RUNNER_TEMP/upstream/deadspace/licenses" "$dest/licenses/upstream-portmaster"
           cp 'linux-portable/Run Dead Space.sh' "$dest/Run Dead Space.sh"
