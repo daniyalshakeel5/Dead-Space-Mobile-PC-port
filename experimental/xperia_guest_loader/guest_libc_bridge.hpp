@@ -16,6 +16,14 @@ class GuestLibcBridge {
 public:
     static constexpr std::uint32_t veneer_base=0x70000000u;
     GuestLibcBridge();
+    // Bind only observed ELF function symbols to named SVC fail traps.
+    // Undefined objects/ambiguous symbols are rejected, never fabricated.
+    std::unordered_map<std::string,std::uint32_t> plan_guest_imports(
+        const GuestElf32& elf,std::string& error);
+    std::string unresolved_import(std::uint32_t svc_id) const;
+    std::size_t unresolved_import_count() const noexcept {
+        return unresolved_imports_.size();
+    }
     const std::unordered_map<std::string,std::uint32_t>& symbols() const noexcept {
         return symbols_;
     }
@@ -36,6 +44,7 @@ public:
 private:
     std::unordered_map<std::string,std::uint32_t> symbols_;
     std::vector<std::uint8_t> code_;
+    std::unordered_map<std::uint32_t,std::string> unresolved_imports_;
     mutable std::unordered_set<std::uint32_t> initializing_guards_;
     std::vector<Destructor> destructors_;
     // Guest ARM address keyed synchronization objects. The guest runtime
