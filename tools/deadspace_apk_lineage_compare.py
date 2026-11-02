@@ -94,11 +94,25 @@ def metadata(apk: Path) -> dict:
         }
 
 
+def asset_directory_groups(assets: dict[str, tuple[int, int]]) -> dict[str, int]:
+    """Coarse directory counts; no individual proprietary asset filenames."""
+    counts = Counter()
+    for path in assets:
+        parts = path.split("/")
+        counts["/".join(parts[:min(3, len(parts) - 1)])] += 1
+    return dict(sorted(counts.items(), key=lambda x: (-x[1], x[0]))[:25])
+
+
 def comparison(a: dict, b: dict) -> dict:
     a_assets, b_assets = a["assets"], b["assets"]
     common = a_assets.keys() & b_assets.keys()
     same = sum(a_assets[k] == b_assets[k] for k in common)
     changed = [k for k in common if a_assets[k] != b_assets[k]]
+    renamed_old = Counter(a_assets[k] for k in a_assets.keys() - b_assets.keys())
+    renamed_new = Counter(b_assets[k] for k in b_assets.keys() - a_assets.keys())
+    # This identifies candidates that retained ZIP payload length and CRC32
+    # but changed asset path. Not cryptographic evidence of asset identity.
+    renamed_candidates = sum((renamed_old & renamed_new).values())
     old_libs = {x.get("sha256"): x for x in a["native_libraries"] if x.get("elf") and x.get("sha256")}
     new_libs = {x.get("sha256"): x for x in b["native_libraries"] if x.get("elf") and x.get("sha256")}
     matches = old_libs.keys() & new_libs.keys()
@@ -115,6 +129,9 @@ def comparison(a: dict, b: dict) -> dict:
             "changed_size_or_crc32_count": len(changed),
             "original_only_count": len(a_assets.keys() - b_assets.keys()),
             "reference_only_count": len(b_assets.keys() - a_assets.keys()),
+            "cross_path_matching_size_and_crc32_count": renamed_candidates,
+            "original_directory_groups": asset_directory_groups(a_assets),
+            "reference_directory_groups": asset_directory_groups(b_assets),
             "changed_extensions": dict(sorted(Counter(extension(k) for k in changed).items())),
         },
         "native_elf_byte_identical_matches": [

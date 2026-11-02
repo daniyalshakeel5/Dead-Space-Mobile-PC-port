@@ -71,8 +71,20 @@ References:
 The Reanimated APK is about 715 MB; our existing known original/Fixes
 APK is 325,769,461 bytes. **The file-size difference proves nothing about
 game-code differences**: modded textures and runtime data can account for
-growth. The games are likely related, but neither the exact native binary
-identity nor asset-path compatibility is proven.
+growth. **Real-APK GitHub Actions comparison 41432386853 has now proved**
+that the original ARM ELF `lib/armeabi/libDeadSpace.so` is byte-identical
+to Reanimated's `assets/game/libDeadSpace32.so`: both are 6,672,749 bytes
+and SHA-256 `2fc87e9a5afa1028d91a9770d23ffd04b45fb5dbc8d3800ed6b31e34223a490b`.
+Reanimated additionally ships its separate AArch64
+`lib/arm64-v8a/libdsr.so` (4,415,408 bytes). **These native libraries
+are not source code**. Exact original game logic identity is established
+for the matched ARM ELF; altered behavior may be in the new runtime.
+
+The first comparison found zero identical original asset paths between
+the 1,731 original and 1,955 reference assets. This **does not** imply
+all original asset data changed: the remaster reorganized its assets.
+A follow-up compares asset length/CRC32 signatures across renamed paths
+without exporting any game data.
 
 On an isolated machine or **ephemeral GitHub runner**, with both APKs
 obtained legally by the tester, execute our existing metadata inventory
@@ -113,8 +125,9 @@ original `IM`/`M3G` decoders without tests.
 4. **Post-boot optional enhancements:** resolution-scaling and sampler
    quality options, correct laser/reticle accessibility, SFX priority and
    animation-synced reload audio; keep faithful baseline distinct from mods.
-5. **Unverified:** Reanimated's native DLL/ELF contents, exact original
-   game revision, compatibility of the HD pack, any real engine patch code,
+5. **Verified:** original ARM ELF identity across both released APKs (SHA-256).
+   **Still unverified:** reference game's actual HD asset byte compatibility,
+   any unpublished runtime source or internal renderer patch code,
    and reproducibility of 60 FPS on low-end hardware.
 
 No original game data or third-party binary has been copied by this audit.

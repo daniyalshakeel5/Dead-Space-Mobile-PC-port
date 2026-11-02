@@ -39,12 +39,27 @@ class LineageTests(unittest.TestCase):
             self.assertEqual(assets["changed_size_or_crc32_count"], 1)
             self.assertEqual(assets["original_only_count"], 1)
             self.assertEqual(assets["reference_only_count"], 2)  # new asset plus native ELF moved under assets/
+            self.assertEqual(assets["cross_path_matching_size_and_crc32_count"], 0)
+            self.assertEqual(assets["original_directory_groups"]["assets/published/old.bin"], 1)
             self.assertEqual(assets["changed_extensions"], {".bin": 1})
             self.assertEqual(len(result["native_elf_byte_identical_matches"]), 1)
             self.assertEqual(result["reference"]["native_libraries"][-1]["elf_machine"], "AArch64" if result["reference"]["native_libraries"][-1]["path"].startswith("lib/arm64") else "ARM32")
             # Individual copyrighted asset paths are not emitted in summaries.
             self.assertNotIn("assets", result["original"])
             self.assertNotIn("assets", result["reference"])
+    def test_renamed_asset_same_crc_and_size_is_only_a_candidate(self):
+        with tempfile.TemporaryDirectory() as folder:
+            a, b = Path(folder) / "a.apk", Path(folder) / "b.apk"
+            with ZipFile(a, "w") as z:
+                z.writestr("assets/published/data/game.bin", b"level payload")
+            with ZipFile(b, "w") as z:
+                z.writestr("assets/game/published/data/game.bin", b"level payload")
+            v = comparison(metadata(a), metadata(b))["asset_comparison"]
+            self.assertEqual(v["shared_path_count"], 0)
+            self.assertEqual(v["original_only_count"], 1)
+            self.assertEqual(v["reference_only_count"], 1)
+            self.assertEqual(v["cross_path_matching_size_and_crc32_count"], 1)
+
     def test_reject_duplicate_member_paths(self):
         with tempfile.TemporaryDirectory() as folder:
             p = Path(folder) / "duplicate.apk"
