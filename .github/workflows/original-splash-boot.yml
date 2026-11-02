@@ -10,6 +10,8 @@ on:
       - "src/original_splash_host.cpp"
       - "src/im_ui_image.cpp"
       - "src/im_menu_scene.cpp"
+      - "src/native_menu_input.cpp"
+      - "src/original_menu_gl.cpp"
       - "include/ds_port/im_ui_image.hpp"
       - "include/ds_port/original_splash_host.hpp"
       - "CMakeLists.txt"
@@ -40,9 +42,9 @@ jobs:
           -DDS_BUILD_BOOT_SPLASH=ON -DDS_BUILD_INPUT_PROBE=ON
           -DDS_BUILD_ASSET_INSTALLER=ON
       - name: Compile native game executable and test UI decoder
-        run: cmake --build build --target deadspace_native ds_im_ui_image_tests ds_im_menu_scene_tests ds_original_menu_draw_stream_tests ds_original_menu_gl_tests ds_original_menu_scene_graph_tests ds_im_menu_scene_probe --parallel 2
+        run: cmake --build build --target deadspace_native ds_im_ui_image_tests ds_im_menu_scene_tests ds_original_menu_draw_stream_tests ds_original_menu_gl_tests ds_original_menu_scene_graph_tests ds_native_menu_input_tests ds_im_menu_scene_probe --parallel 2
       - name: Verify synthetic IM-M3G Image2D cases
-        run: ctest --test-dir build --output-on-failure -R "ds_original_im_m3g_(splash_ui_decoder|menu_uv_geometry)|ds_original_menu_native_draw_batches|ds_original_menu_gl_scene_contract|ds_original_menu_scene_hierarchy"
+        run: ctest --test-dir build --output-on-failure -R "ds_original_im_m3g_(splash_ui_decoder|menu_uv_geometry)|ds_original_menu_native_draw_batches|ds_original_menu_gl_scene_contract|ds_original_menu_scene_hierarchy|ds_original_jni_menu_input"
       - name: Fetch original APK only into private ephemeral runner
         shell: bash
         run: |
