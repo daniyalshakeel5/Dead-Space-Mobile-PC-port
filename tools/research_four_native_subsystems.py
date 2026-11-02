@@ -35,6 +35,14 @@ with zipfile.ZipFile(apk) as archive:
         for typ in (5,9,14):
             ls=[len(p) for t,p in items if t==typ]
             print("TRANSFORMS_CAMERA type",typ,"minlen",min(ls),"maxlen",max(ls))
+        animated=collections.Counter()
+        for node_id,blob in nodes:
+            for offset in range(len(blob)-3):
+                id_=struct.unpack_from("<I",blob,offset)[0]
+                if ref(id_) in (1,2,17):
+                    animated[(items[node_id-1][0],offset,ref(id_))]+=1
+        print("TRANSFORMS_CAMERA possible animation reference offsets",
+              animated.most_common(20))
         print("TRANSFORMS_CAMERA matrix semantics UNVERIFIED")
     elif mode=="materials":
         appearances=[(i+1,p) for i,(t,p) in enumerate(items) if t==3]
@@ -65,6 +73,17 @@ with zipfile.ZipFile(apk) as archive:
         for typ in (1,2,17):
             counts=collections.Counter(len(p) for t,p in items if t==typ)
             print("ANIMATION type",typ,"lengths",sorted(counts.items())[:25])
+        for typ in (1,2,17):
+            frequency=collections.Counter()
+            for t,p in items:
+                if t!=typ:continue
+                for offset in range(len(p)-3):
+                    target=struct.unpack_from("<I",p,offset)[0]
+                    targettype=ref(target)
+                    if targettype in (1,2,17):
+                        frequency[(offset,targettype)]+=1
+            print("ANIMATION potential reference offsets type",typ,
+                  frequency.most_common(20))
         print("ANIMATION playback equations UNVERIFIED")
     else:
         library_names=[n for n in names if n.startswith("lib/") and n.endswith(".so")]
