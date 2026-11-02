@@ -64,6 +64,28 @@ int main() {
     assert(svc.code_byte(veneer+3,byte)&&byte==0xef); // SVC #1
     assert(svc.code_byte(veneer+4,byte)&&byte==0x1e); // BX LR
     assert(!svc.code_byte(0x1000,byte));
+    // Original ARM32 C++ static local initialization ABI.
+    const auto guard=0x10001800u;
+    regs.fill(0);regs[0]=guard;
+    assert(svc.dispatch(25,regs,image,error) && regs[0]==1);
+    regs[0]=guard;
+    assert(!svc.dispatch(25,regs,image,error)); // reentrant acquire must fail
+    regs[0]=guard;
+    assert(svc.dispatch(26,regs,image,error)); // release
+    assert(image.read(guard,8)[0]==1);
+    regs[0]=guard;
+    assert(svc.dispatch(25,regs,image,error) && regs[0]==0);
+    assert(!svc.dispatch(28,regs,image,error)); // pure virtual traps
+    const auto aborted=guard+8;
+    regs[0]=aborted;
+    assert(svc.dispatch(25,regs,image,error) && regs[0]==1);
+    regs[0]=aborted;
+    assert(svc.dispatch(27,regs,image,error));
+    assert(image.read(aborted,8)[0]==0);
+    regs[0]=aborted;
+    assert(svc.dispatch(25,regs,image,error) && regs[0]==1);
+    regs[0]=aborted;
+    assert(svc.dispatch(27,regs,image,error));
     assert(!svc.symbols().count("glDrawArrays"));
     assert(svc.symbols().count("malloc")); // implemented by bounded GuestHeap
     assert(svc.symbols().count("open") && svc.symbols().count("read"));
