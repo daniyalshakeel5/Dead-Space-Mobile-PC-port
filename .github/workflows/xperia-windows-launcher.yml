@@ -1,0 +1,46 @@
+name: Xperia WPF launcher - Windows portable package
+on:
+  push:
+    branches:
+      - work/deadspace-xperia-arm-wrapper-2026-11-02
+    paths:
+      - "launcher/**"
+      - "tests/Test-Launcher.ps1"
+      - "docs/XPERIA_LAUNCHER.md"
+      - ".github/workflows/xperia-windows-launcher.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  win-launcher:
+    runs-on: windows-2022
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Windows PowerShell logic and original Diamond Rush WPF layout
+        shell: powershell
+        run: powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File tests/Test-Launcher.ps1
+      - name: Compile Windows GUI entry stub, without a console window
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $source=Get-Content -LiteralPath launcher/LauncherStub.cs -Raw
+          Add-Type -TypeDefinition $source -Language CSharp -ReferencedAssemblies 'System.Windows.Forms' -OutputAssembly 'dist/DeadSpaceLauncher.exe' -OutputType WindowsApplication
+          if(-not (Test-Path 'dist/DeadSpaceLauncher.exe')){throw 'GUI executable not built'}
+      - name: Package asset-free launcher and offline installer
+        shell: powershell
+        run: |
+          $root='dist/DeadSpaceMobile-Xperia-Launcher'
+          New-Item -ItemType Directory -Force "$root/launcher" | Out-Null
+          Copy-Item 'dist/DeadSpaceLauncher.exe' "$root/DeadSpaceLauncher.exe"
+          Copy-Item 'launcher/Core.ps1','launcher/Installer.ps1','launcher/Launcher.ps1','launcher/Launcher.xaml' "$root/launcher/"
+          Copy-Item 'docs/XPERIA_LAUNCHER.md' "$root/README.md"
+          if(Get-ChildItem $root -Recurse -File | Where-Object {$_.Extension -in @('.apk','.zip','.so','.ktx','.m3g','.sb','.jar')}){throw 'Copyrighted original assets in launcher package'}
+          Compress-Archive -Path "$root/*" -DestinationPath 'dist/DeadSpaceMobile-Xperia-Launcher-Windows-x64.zip' -Force
+          Write-Output ('Launcher ZIP bytes: '+(Get-Item 'dist/DeadSpaceMobile-Xperia-Launcher-Windows-x64.zip').Length)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deadspace-xperia-windows-wpf-launcher
+          path: dist/DeadSpaceMobile-Xperia-Launcher-Windows-x64.zip
+          if-no-files-found: error
+          retention-days: 20
