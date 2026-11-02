@@ -4,6 +4,7 @@
 #include "guest_filesystem.hpp"
 #include "guest_arm_call_runner.hpp"
 #include "guest_jni_vm.hpp"
+#include "guest_bionic_data.hpp"
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -38,9 +39,12 @@ int main(int argc,char** argv){
         if(!elf.open(data,error))
             throw std::runtime_error("ARM ELF load failed: "+error);
         xperia::GuestLibcBridge services;
+        xperia::GuestBionicData bionic;
+        if(!bionic.install(elf,error))
+            throw std::runtime_error("Bionic guest data allocation failed: "+error);
         // Function imports not needed by early constructors become distinct
         // error traps. Imported data and ambiguous symbols stay blocked.
-        auto planned=services.plan_guest_imports(elf,error);
+        auto planned=services.plan_guest_imports(elf,error,bionic.symbols());
         if(planned.empty()) {
             std::cerr<<"XPERIA_STARTUP_BLOCKED: "<<error<<"\n";
             return 4;
