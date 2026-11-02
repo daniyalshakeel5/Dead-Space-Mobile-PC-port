@@ -16,6 +16,9 @@ struct ImUiPack {
     bool decoded=false;
     std::string error;
     std::vector<M3gRgbaImage> images;
+    // Original Image2D user parameter 500 contains a complete SBIN
+    // frontend sprite database (schema, names, source/dest rectangles).
+    std::vector<std::uint8_t> frontend_sbin;
 };
 ImUiPack decode_im_ui_rgba_images(
     const std::uint8_t* data,std::size_t bytes);
