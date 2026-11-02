@@ -7,6 +7,7 @@
 #include <chrono>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <cstring>
 #include <stdexcept>
 
@@ -57,6 +58,49 @@ GuestLibcBridge::GuestLibcBridge() {
             for(unsigned j=0;j<4;++j)
                 code_.push_back(std::uint8_t(ins>>(8u*j)));
     }
+}
+std::unordered_map<std::string,std::uint32_t>
+GuestLibcBridge::plan_guest_imports(const GuestElf32& elf,std::string& error) {
+    std::unordered_map<std::string,std::uint32_t> combined=symbols_;
+    try {
+        if(!unresolved_imports_.empty())
+            throw std::runtime_error("Guest import plan already installed");
+        std::map<std::string,unsigned> missing;
+        for(const auto& rel:elf.pending_imports) {
+            if(combined.count(rel.name))continue;
+            // The original ELF uses STT_FUNC=2 for callable external
+            // imports. STT_OBJECT / STT_NOTYPE can represent data and must
+            // not be redirected into SVC instructions.
+            if(rel.symbol_type!=2u)
+                throw std::runtime_error("Unimplemented guest data/ambiguous ELF symbol: "+rel.name);
+            if(rel.kind==2u && rel.addend!=0u)
+                throw std::runtime_error("Unimplemented imported function with ABS32 addend: "+rel.name);
+            ++missing[rel.name];
+        }
+        if(missing.size()>2048u)
+            throw std::runtime_error("Guest unsupported function inventory exceeds cap");
+        // Stable alphabetical enumeration gives reproducible imported
+        // symbols and first-fault reports across operating systems.
+        for(const auto& kv:missing) {
+            const auto id=static_cast<std::uint32_t>(
+                last_svc+unresolved_imports_.size()+1u);
+            const auto slot=veneer_base+static_cast<std::uint32_t>(code_.size());
+            unresolved_imports_.emplace(id,kv.first);
+            combined.emplace(kv.first,slot);
+            const std::uint32_t instructions[2]={0xef000000u|id,0xe12fff1eu};
+            for(auto ins:instructions)
+                for(unsigned byte=0;byte<4;++byte)
+                    code_.push_back(std::uint8_t(ins>>(byte*8u)));
+        }
+        error.clear();return combined;
+    }catch(const std::exception& ex){
+        error=ex.what();
+        return {};
+    }
+}
+std::string GuestLibcBridge::unresolved_import(std::uint32_t id) const {
+    const auto it=unresolved_imports_.find(id);
+    return it==unresolved_imports_.end()?std::string{}:it->second;
 }
 bool GuestLibcBridge::code_byte(std::uint32_t address,
                                 std::uint8_t& value) const noexcept {
