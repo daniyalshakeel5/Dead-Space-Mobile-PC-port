@@ -37,7 +37,7 @@ add_test(NAME xperia_elf_mapped_a32_jit COMMAND xperia_elf_jit_synthetic)
 
 # ARM guest service integration: real A32 BLX -> SVC -> native memcpy
 # -> guest BX LR; service code is original-free and fail-closed.
-add_library(xperia_arm_guest_libc STATIC ../xperia_guest_loader/guest_libc_bridge.cpp ../xperia_guest_loader/guest_heap.cpp ../xperia_guest_loader/guest_filesystem.cpp)
+add_library(xperia_arm_guest_libc STATIC ../xperia_guest_loader/guest_libc_bridge.cpp ../xperia_guest_loader/guest_heap.cpp ../xperia_guest_loader/guest_filesystem.cpp ../xperia_guest_loader/guest_jni_vm.cpp)
 target_include_directories(xperia_arm_guest_libc PUBLIC ../xperia_guest_loader)
 target_compile_features(xperia_arm_guest_libc PUBLIC cxx_std_17)
 target_link_libraries(xperia_arm_guest_libc PUBLIC xperia_guest_elf32)
@@ -55,6 +55,10 @@ add_executable(xperia_guest_abi_tests
 target_link_libraries(xperia_guest_abi_tests PRIVATE xperia_arm_guest_libc)
 add_test(NAME xperia_guest_bionic_cpp_lifetime_and_errno
     COMMAND xperia_guest_abi_tests)
+
+add_executable(xperia_guest_jni_vm_tests ../xperia_guest_loader/guest_jni_vm_tests.cpp)
+target_link_libraries(xperia_guest_jni_vm_tests PRIVATE xperia_arm_guest_libc)
+add_test(NAME xperia_guest_jni_vm_aapcs_tables COMMAND xperia_guest_jni_vm_tests)
 
 # Reusable original ARM lifecycle call runner with explicit exit trampoline,
 # a real stack and service-trap dispatcher. No copyrighted ARM code.
