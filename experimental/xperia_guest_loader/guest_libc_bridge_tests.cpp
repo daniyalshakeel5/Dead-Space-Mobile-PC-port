@@ -86,6 +86,29 @@ int main() {
     assert(svc.dispatch(25,regs,image,error) && regs[0]==1);
     regs[0]=aborted;
     assert(svc.dispatch(27,regs,image,error));
+    // Android Bionic old NDK atomics use return conventions that differ
+    // from std::atomic<bool> CAS and from post-increment arithmetic.
+    const auto atomic_ptr=0x10001880u;
+    auto* atomic_target=image.writeable(atomic_ptr,4);
+    assert(atomic_target);
+    std::memset(atomic_target,0,4);
+    regs.fill(0);regs[0]=0;regs[1]=17;regs[2]=atomic_ptr;
+    assert(svc.dispatch(45,regs,image,error) && regs[0]==0);
+    assert(image.read_u32(atomic_ptr)==17);
+    regs[0]=0;regs[1]=42;regs[2]=atomic_ptr;
+    assert(svc.dispatch(45,regs,image,error) && regs[0]==1);
+    assert(image.read_u32(atomic_ptr)==17);
+    regs[0]=9;regs[1]=atomic_ptr;
+    assert(svc.dispatch(46,regs,image,error) && regs[0]==17);
+    assert(image.read_u32(atomic_ptr)==9);
+    regs[0]=atomic_ptr;
+    assert(svc.dispatch(47,regs,image,error) && regs[0]==9);
+    assert(image.read_u32(atomic_ptr)==10);
+    regs[0]=atomic_ptr;
+    assert(svc.dispatch(48,regs,image,error) && regs[0]==10);
+    assert(image.read_u32(atomic_ptr)==9);
+    regs[0]=0x10001881u;
+    assert(!svc.dispatch(48,regs,image,error));
     // Original Android ARM C++ object lifecycle and errno TLS ABI.
     const auto guest_dtor=0x10001900u;
     regs.fill(0);
