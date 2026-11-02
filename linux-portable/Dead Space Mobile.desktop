@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Dead Space Mobile — Xperia Play
+Comment=Portable original Dead Space Mobile using Linux QEMU ARM
+Icon=applications-games
+Categories=Game;
+Terminal=true
+Exec=sh -c 'cd "$(dirname "$1")" && exec bash "./Run Dead Space.sh"' _ %k
+StartupNotify=false
