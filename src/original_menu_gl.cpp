@@ -204,6 +204,17 @@ OriginalMenuGpuStatus run_original_menu_gl(
         glDepthMask(GL_TRUE);
         glClearColor(0,0,0,1);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        const char* requested_smoke=std::getenv("DS_NATIVE_MENU_SMOKE_FRAMES");
+        const bool inspect_smoke=requested_smoke&&std::strcmp(requested_smoke,"1")==0;
+        std::uint32_t last_center=0xffffffffu;
+        if(inspect_smoke){
+            std::uint8_t clear_pixel[4]{};
+            glReadPixels(w/2,h/2,1,1,GL_RGBA,GL_UNSIGNED_BYTE,clear_pixel);
+            std::cerr<<"Original GPU cleared center RGB ("<<int(clear_pixel[0])<<","
+                     <<int(clear_pixel[1])<<","<<int(clear_pixel[2])<<")\\n";
+            last_center=std::uint32_t(clear_pixel[0])<<16u|
+                        std::uint32_t(clear_pixel[1])<<8u|clear_pixel[2];
+        }
         glMatrixMode(GL_PROJECTION);glLoadMatrixf(frame.projection.data());
         for(const auto& batch:stream.batches){
             const auto& object=*transforms.at(batch.mesh_object_index);
@@ -251,6 +262,22 @@ OriginalMenuGpuStatus run_original_menu_gl(
             }else glDisable(GL_TEXTURE_2D);
             glDrawElements(GL_TRIANGLES,static_cast<GLsizei>(batch.index_count),
                 GL_UNSIGNED_INT,geometry.indices.data()+batch.first_index);
+            if(inspect_smoke){
+                std::uint8_t center_pixel[4]{};
+                glReadPixels(w/2,h/2,1,1,GL_RGBA,GL_UNSIGNED_BYTE,center_pixel);
+                const std::uint32_t rgb=std::uint32_t(center_pixel[0])<<16u|
+                    std::uint32_t(center_pixel[1])<<8u|center_pixel[2];
+                if(rgb!=last_center){
+                    std::cerr<<"Original GPU center changed after mesh "
+                             <<batch.mesh_object_index<<" appearance "
+                             <<batch.appearance_object_index
+                             <<" textured="<<mat.use_texture
+                             <<" RGB=("<<int(center_pixel[0])<<","
+                             <<int(center_pixel[1])<<","<<int(center_pixel[2])
+                             <<")\\n";
+                    last_center=rgb;
+                }
+            }
         }
         // Optional one-frame production renderer smoke for GitHub's
         // software OpenGL runner. No framebuffer image is persisted.
