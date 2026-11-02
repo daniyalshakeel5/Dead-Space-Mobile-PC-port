@@ -71,6 +71,7 @@ ImMenuGeometry decode_im_menu_geometry(const std::uint8_t* data,
         out.group_object_indices.clear();
         out.scene_node_records.clear();
         out.validated_group_children.clear();
+        out.possible_empty_group_indices.clear();
         out.scene_reference_candidates.clear();
         return out;
     };
@@ -123,6 +124,9 @@ ImMenuGeometry decode_im_menu_geometry(const std::uint8_t* data,
             if(!ambiguous && !accepted.empty())
                 out.validated_group_children.push_back({
                     static_cast<std::uint32_t>(i+1),std::move(accepted)});
+            else if(!ambiguous && accepted.empty() && group.size>=4 &&
+                    le32(group.p+group.size-4)==0)
+                out.possible_empty_group_indices.push_back(static_cast<std::uint32_t>(i+1));
         }
         // Inventory aligned raw index candidates only. This deliberately
         // does not assert which bytes represent parent/child relationships.
