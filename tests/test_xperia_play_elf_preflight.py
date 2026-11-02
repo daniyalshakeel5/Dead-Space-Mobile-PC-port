@@ -14,7 +14,7 @@ def fixture():
     for i,(k,v) in enumerate(tags):
         struct.pack_into("<II",b,0x100+8*i,k,v)
     struct.pack_into("<II",b,0x200,1,1)
-    b[0x240:0x245]=b"\0hi\0"
+    b[0x240:0x244]=b"\0hi\0"
     return b
 
 class XperiaTests(unittest.TestCase):
