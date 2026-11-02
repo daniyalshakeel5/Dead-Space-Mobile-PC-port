@@ -40,6 +40,21 @@ int main(){
     const int absolute_fd=fsys.open_readonly("/assets/published/data/level_index.sb",0);
     assert(absolute_fd>=3);
     assert(fsys.close(absolute_fd)==0);
+    const auto verify_alias=[&fsys](const char* alias){
+        const int handle=fsys.open_readonly(alias,0);
+        assert(handle>=3);
+        char payload[8]={};
+        assert(fsys.read(handle,payload,sizeof(payload))==8);
+        assert(std::memcmp(payload,"XRPGdata",8)==0);
+        assert(fsys.close(handle)==0);
+    };
+    verify_alias("appbundle:/published/data/level_index.sb");
+    verify_alias("deadspace/published/data/level_index.sb");
+    verify_alias("published/data/level_index.sb");
+    assert(fsys.open_readonly("appbundle:/../../outside/private.txt",0)==-1);
+    assert(fsys.open_readonly("appbundle:/published/../../../outside/private.txt",0)==-1);
+    assert(fsys.open_readonly("appbundle://etc/passwd",0)==-1);
+    assert(fsys.open_readonly("other:/published/data/level_index.sb",0)==-1);
     assert(fsys.open_readonly("assets/../outside/private.txt",0)==-1);
     assert(fsys.open_readonly("assets/published/data/../../outside/private.txt",0)==-1);
     assert(fsys.open_readonly("C:\\Windows\\win.ini",0)==-1);
