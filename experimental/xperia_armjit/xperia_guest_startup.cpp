@@ -70,6 +70,14 @@ int main(int argc,char** argv){
         xperia::GuestHeap heap(elf);
         xperia::GuestFileSystem files(root);
         xperia::GuestJniVm java;
+#ifdef _WIN32
+        java.set_audio_sink({&platform,
+            [](void* ctx,const std::uint8_t* data,std::size_t count,
+               std::string& message)->bool {
+                return static_cast<xperia::GuestSdlHost*>(ctx)
+                    ->queue_pcm16(data,count,message);
+            }});
+#endif
         java.set_content_ready(true); // verified installed assets/ mount
         if(!java.install(elf,error))
             throw std::runtime_error("ARM32 JNI guest environment failed: "+error);
@@ -95,9 +103,66 @@ int main(int argc,char** argv){
             throw std::runtime_error("Original JNI_OnLoad returned unsupported version");
         std::cerr<<"ORIGINAL_XPERIA_JNI_ONLOAD_COMPLETE: 0x"
                  <<std::hex<<version<<std::dec<<"\\n";
-        std::cerr<<"XPERIA_STARTUP_BLOCKED: Java application bootstrap, "
-                    "graphics and frame lifecycle still missing.\\n";
+#ifdef _WIN32
+        const auto required=[&](const char* name)->std::uint32_t {
+            const auto it=elf.jni_exports.find(name);
+            if(it==elf.jni_exports.end()||!it->second)
+                throw std::runtime_error(
+                    std::string("Original Xperia ARM JNI export missing: ")+name);
+            return it->second;
+        };
+        // Actual initialization order from the Xperia-compatible Vita
+        // loader: audio before NativeOnCreate, then surface then draw.
+        const auto audio=required("Java_com_ea_EAAudioCore_AndroidEAAudioCore_Init");
+        std::uint32_t ignored=0;
+        std::cerr<<"ORIGINAL_XPERIA_AUDIO_INIT_BEGIN\\n";
+        if(!guest.invoke_aapcs(audio,
+             {xperia::GuestJniVm::env_address,0,
+              xperia::GuestJniVm::audio_track_address,
+              1024u*1024u,2,44100},ignored,error))
+            throw std::runtime_error("Original Xperia audio initialization: "+error);
+        std::cerr<<"ORIGINAL_XPERIA_AUDIO_INIT_COMPLETE\\n";
+        const auto create=required("Java_com_ea_blast_MainActivity_NativeOnCreate");
+        const auto surface=required("Java_com_ea_blast_AndroidRenderer_NativeOnSurfaceCreated");
+        const auto frame=required("Java_com_ea_blast_AndroidRenderer_NativeOnDrawFrame");
+        if(!guest.invoke(create,{0,0,0,0},ignored,error))
+            throw std::runtime_error("Original Xperia NativeOnCreate: "+error);
+        std::cerr<<"ORIGINAL_XPERIA_NATIVE_CREATE_COMPLETE\\n";
+        if(!guest.invoke(surface,{0,0,0,0},ignored,error))
+            throw std::runtime_error("Original Xperia NativeOnSurfaceCreated: "+error);
+        std::cerr<<"ORIGINAL_XPERIA_SURFACE_CREATED\\n";
+        const auto visibility=elf.jni_exports.find(
+            "Java_com_ea_blast_KeyboardAndroid_NativeOnVisibilityChanged");
+        if(visibility!=elf.jni_exports.end()&&visibility->second){
+            if(!guest.invoke(visibility->second,
+                {xperia::GuestJniVm::env_address,0,600,1},ignored,error))
+                throw std::runtime_error("Original Xperia keyboard visibility: "+error);
+        }
+        xperia::GuestXperiaInput controls;
+        if(!controls.bind(elf,error))
+            throw std::runtime_error("Original Xperia controller JNI binding: "+error);
+        std::cerr<<"ORIGINAL_XPERIA_GAME_FRAME_LOOP_BEGIN\\n";
+        std::uint64_t frames=0;
+        bool quit=false;
+        while(!quit){
+            platform.pump(controls,quit);
+            if(quit)break;
+            if(!controls.flush(guest,error))
+                throw std::runtime_error("Original Xperia controller dispatch: "+error);
+            if(!guest.invoke(frame,{0,0,0,0},ignored,error))
+                throw std::runtime_error("Original Xperia NativeOnDrawFrame #"+
+                                         std::to_string(frames+1)+": "+error);
+            platform.swap();
+            if(++frames<=5||frames%120==0)
+                std::cerr<<"ORIGINAL_XPERIA_FRAMES="<<frames<<"\\n";
+        }
+        std::cerr<<"ORIGINAL_XPERIA_EXIT frames="<<frames<<"\\n";
+        return 0;
+#else
+        std::cerr<<"XPERIA_STARTUP_BLOCKED: Windows SDL graphics "
+                    "and frame host are not available on this platform.\\n";
         return 5;
+#endif
     }catch(const std::exception& e){
         std::cerr<<"XPERIA_STARTUP_FAILED: "<<e.what()<<"\n";
         return 2;
