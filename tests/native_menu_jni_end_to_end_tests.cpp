@@ -38,10 +38,27 @@ static std::uint32_t word(const std::array<std::uint8_t,48>& data,int off) {
 int main() {
     EventHarness h;
     std::array<std::uint8_t,4> readiness={1,0,0,0};
-    OriginalInputServices service{
-        0x1234,0x5678,0x9abc,0xdef0,&alloc,&enqueue,&h
+    // Exercise production mapped-runtime binding rather than bypassing it
+    // with a directly injected OriginalInputServices struct.
+    std::array<std::uint8_t,4> allocator_slot{},queue_slot{};
+    std::array<std::uint8_t,4> allocator_object{},queue_object{};
+    std::array<std::uint8_t,48> allocator_vtable{},queue_vtable{};
+    auto put=[](auto& bytes,int offset,std::uint32_t value) {
+        for(int i=0;i<4;++i)bytes[offset+i]=std::uint8_t(value>>(i*8));
     };
-    original_bind_input_services({service,readiness.data(),readiness.size()});
+    put(allocator_slot,0,0x1234);put(queue_slot,0,0x9abc);
+    put(allocator_object,0,0x1110);put(queue_object,0,0x2220);
+    put(allocator_vtable,0x0c,0x5678);
+    put(queue_vtable,0x20,0xdef0);
+    OriginalInputMappedOwners owners{};
+    owners.allocator={allocator_slot.data(),allocator_slot.size(),
+        0x1234,allocator_object.data(),allocator_object.size(),
+        0x1110,allocator_vtable.data(),allocator_vtable.size()};
+    owners.queue={queue_slot.data(),queue_slot.size(),
+        0x9abc,queue_object.data(),queue_object.size(),
+        0x2220,queue_vtable.data(),queue_vtable.size()};
+    assert(original_bind_input_mapped_runtime(
+        owners,readiness.data(),readiness.size(),alloc,enqueue,&h));
     assert(original_last_input_status()==OriginalInputStatus::NotReady);
     NativeMenuInputCallbacks callbacks{};
     callbacks.pointer=[](void*,int event,int module,int id,float x,float y) {
