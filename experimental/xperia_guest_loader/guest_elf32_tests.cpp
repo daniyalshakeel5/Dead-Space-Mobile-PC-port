@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <unordered_map>
 using namespace xperia;
 static void put16(std::vector<std::uint8_t>& b,unsigned at,std::uint16_t v){
     b.at(at)=std::uint8_t(v);b.at(at+1)=std::uint8_t(v>>8);
@@ -22,15 +23,28 @@ static std::vector<std::uint8_t> fixture(){
     put32(b,52,1);put32(b,56,0);put32(b,60,0x1000);
     put32(b,68,2048);put32(b,72,2048);put32(b,76,7);
     put32(b,84,2);put32(b,88,256);put32(b,92,0x1100);
-    put32(b,100,6*8);put32(b,104,6*8);
+    put32(b,100,11*8);put32(b,104,11*8);
     put32(b,256,17);put32(b,260,0x1280); // DT_REL
     put32(b,264,18);put32(b,268,16); // DT_RELSZ
     put32(b,272,19);put32(b,276,8); // DT_RELENT
     put32(b,280,2);put32(b,284,0); // DT_PLTRELSZ
-    put32(b,288,0);
+    put32(b,288,4);put32(b,292,0x1200); // DT_HASH
+    put32(b,296,5);put32(b,300,0x1240); // DT_STRTAB
+    put32(b,304,6);put32(b,308,0x1220); // DT_SYMTAB
+    put32(b,312,10);put32(b,316,32); // DT_STRSZ
+    put32(b,320,11);put32(b,324,16); // DT_SYMENT
+    put32(b,328,0);
+    // SysV hash reports two ELF dynsym entries.
+    put32(b,0x200,1);put32(b,0x204,2);
+    put32(b,0x230,1); // dynsym[1].st_name
+    b[0x23c]=0x12; // defined? no; global function symbol
+    const char symbol[]="guest_android_fn";
+    b[0x240]=0;
+    for(std::size_t i=0;i<sizeof(symbol);++i)
+        b[0x241+i]=static_cast<std::uint8_t>(symbol[i]);
     // Two REL targets: one relative and one external JUMP_SLOT.
     put32(b,0x280,0x1350);put32(b,0x284,23);
-    put32(b,0x288,0x1354);put32(b,0x28c,22);
+    put32(b,0x288,0x1354);put32(b,0x28c,22|(1u<<8));
     put32(b,0x350,0x00001234);
     return b;
 }
@@ -43,6 +57,17 @@ int main(){
     assert(image.remaining_relocations==1);
     assert(image.read_u32(0x10001350)==0x10001234u);
     assert(image.read_u32(0x10001354)==0u);
+    assert(image.pending_imports.size()==1u);
+    assert(image.pending_imports[0].name=="guest_android_fn");
+    // The linker must fail atomically until the matching guest thunk
+    // address is supplied; no external function is ever invoked.
+    assert(!image.bind_imports({},error));
+    assert(!error.empty()&&image.read_u32(0x10001354)==0u);
+    const std::unordered_map<std::string,std::uint32_t> services{
+        {"guest_android_fn",0x30001000u}};
+    assert(image.bind_imports(services,error));
+    assert(error.empty()&&image.remaining_relocations==0);
+    assert(image.read_u32(0x10001354)==0x30001000u);
     // Old incorrectly unrebased guest virtual addresses MUST NOT work.
     assert(image.read(0x1350,4)==nullptr);
     assert(image.writeable(0x1350,4)==nullptr);
