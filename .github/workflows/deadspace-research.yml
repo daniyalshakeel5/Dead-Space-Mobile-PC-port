@@ -39,6 +39,8 @@ on:
       - "tools/deadspace_im_numeric_probe.py"
       - "tests/test_deadspace_im_numeric_probe.py"
       - "tools/deadspace_im_native_verify.py"
+      - "src/original_m3g_scene.cpp"
+      - "apps/original_m3g_scene_probe.cpp"
       - "src/im_mesh.cpp"
       - "include/ds_port/im_mesh.hpp"
       - "apps/im_mesh_extract.cpp"
@@ -159,6 +161,24 @@ jobs:
             exit 1
           fi
           echo "Release size matches private Library asset metadata: $actual_size bytes. SHA-256 equivalence unverified."
+          # Verify the recovered native camera/hierarchy/material decoder with
+          # actual copyrighted bytes only inside the ephemeral runner.
+          python - <<'PY'
+          import os,zipfile
+          from pathlib import Path
+          with zipfile.ZipFile(os.environ["RUNNER_TEMP"]+"/deadspace.apk") as apk:
+              name="assets/published/models/main_menu.m3g"
+              record=apk.getinfo(name)
+              assert 0<record.file_size<32*1024*1024
+              Path(os.environ["RUNNER_TEMP"]+"/original-main-menu.m3g").write_bytes(apk.read(name))
+          PY
+          g++ -std=c++17 -O2 -Wall -Wextra -I include \
+            src/original_m3g_scene.cpp apps/original_m3g_scene_probe.cpp \
+            -o "$RUNNER_TEMP/original-native-m3g-probe"
+          "$RUNNER_TEMP/original-native-m3g-probe" \
+            "$RUNNER_TEMP/original-main-menu.m3g"
+          rm -f "$RUNNER_TEMP/original-main-menu.m3g" "$RUNNER_TEMP/original-native-m3g-probe"
+
           # Never emit original file contents, ZIP member names, game-library
           # symbols, private URLs or raw report JSON to public CI logs/artifacts.
           python tools/deadspace_audit.py --root . \
