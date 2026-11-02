@@ -43,4 +43,15 @@ enum class Ds4Button : std::uint8_t {
     DpadRight,Options,Share,Unknown
 };
 int ds4_vita_android_key(Ds4Button button) noexcept;
+// Edge-triggered Android key events. Release on disconnect/focus loss.
+struct Ds4GuestKeyEvent {int android_key=0;bool pressed=false;};
+struct Ds4GuestKeySink {
+    void* context=nullptr;
+    void (*emit)(void*,const Ds4GuestKeyEvent&)=nullptr;
+};
+struct Ds4GuestButtonState {std::uint32_t pressed_mask=0;};
+void ds4_emit_guest_button(Ds4GuestButtonState& state,Ds4Button button,
+                           bool pressed,Ds4GuestKeySink sink) noexcept;
+void ds4_release_guest_buttons(Ds4GuestButtonState& state,
+                               Ds4GuestKeySink sink) noexcept;
 } // namespace ds_port
