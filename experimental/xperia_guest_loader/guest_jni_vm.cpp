@@ -20,18 +20,25 @@ struct Class {
 };
 constexpr Class classes[]={
     {"com/eamobile/Query"},{"com/ea/EAIO/EAIO"},
-    {"java/lang/String"},{"android/os/Build"}
+    {"java/lang/String"},{"android/os/Build"},
+    {"android/media/AudioTrack"}
 };
 struct Method {
     unsigned owner;
     const char* name;
     const char* signature;
+    bool is_static;
 };
 constexpr Method methods[]={
-    {0,"isContentReady","()Z"},
-    {0,"getTotalMemory","()J"},
-    {0,"getVersion","()Ljava/lang/String;"},
-    {1,"Startup","(Landroid/content/res/AssetManager;)V"}
+    {0,"isContentReady","()Z",true},
+    {0,"getTotalMemory","()J",true},
+    {0,"getVersion","()Ljava/lang/String;",true},
+    {1,"Startup","(Landroid/content/res/AssetManager;)V",true},
+    {4,"write","([SII)I",false},
+    {4,"play","()V",false},
+    {4,"stop","()V",false},
+    {4,"release","()V",false},
+    {4,"getMinBufferSize","(III)I",true}
 };
 bool guest_string(GuestElf32& guest,std::uint32_t addr,std::string& output){
     output.clear();
@@ -71,6 +78,7 @@ bool GuestJniVm::install(GuestElf32& guest,std::string& error) {
         if(!data)throw std::runtime_error("JNI version string unmapped");
         std::memcpy(data,version,sizeof(version));
         put32(guest.writeable(kString,4),kVersion);
+        put32(guest.writeable(audio_track_address,4),kClassBase+4u*16u);
         auto it=guest.jni_exports.find("Java_com_ea_EAIO_EAIO_Startup");
         if(it!=guest.jni_exports.end())
             eaio_startup_=it->second;
@@ -168,7 +176,8 @@ bool GuestJniVm::dispatch(std::uint32_t id,
         }
         const auto owner=(r1-kClassBase)/16u;
         for(unsigned i=0;i<sizeof(methods)/sizeof(methods[0]);++i)
-            if(methods[i].owner==owner && name==methods[i].name &&
+            if(methods[i].owner==owner && methods[i].is_static &&
+               name==methods[i].name &&
                signature==methods[i].signature){
                 regs[0]=kMethodBase+16u*i;error.clear();return true;
             }
@@ -176,7 +185,8 @@ bool GuestJniVm::dispatch(std::uint32_t id,
               std::string(classes[owner].name)+"."+name+signature;
         return false;
     }
-    if(slot==117 || slot==114 || slot==132 || slot==141){
+    if(slot==117 || slot==114 || slot==132 || slot==141 ||
+       slot==129){
         if(r2<kMethodBase || (r2-kMethodBase)%16u ||
            (r2-kMethodBase)/16u>=sizeof(methods)/sizeof(methods[0])){
             error="JNI static invocation invalid method ID";return false;
@@ -192,6 +202,9 @@ bool GuestJniVm::dispatch(std::uint32_t id,
         if(index==2 && slot==114){ // Query.getVersion()
             regs[0]=kString;error.clear();return true;
         }
+        if(index==8 && slot==129){
+            regs[0]=4096;error.clear();return true;
+        }
         if(index==3 && slot==141){ // EAIO.Startup(AssetManager)V
             if(!eaio_startup_){
                 error="Xperia original ELF lacks Java_com_ea_EAIO_EAIO_Startup";return false;
@@ -204,6 +217,108 @@ bool GuestJniVm::dispatch(std::uint32_t id,
         }
         error="Unimplemented Xperia static method execution: "+
               std::string(methods[index].name);return false;
+    }
+    if(slot==31){ // GetObjectClass
+        if(r1!=audio_track_address){
+            error="JNI GetObjectClass unknown guest Java object";return false;
+        }
+        regs[0]=kClassBase+4u*16u;error.clear();return true;
+    }
+    if(slot==33){ // GetMethodID(jclass, method, signature)
+        if(r1!=kClassBase+4u*16u){
+            error="JNI GetMethodID unsupported non-AudioTrack class";return false;
+        }
+        std::string name,sig;
+        if(!guest_string(guest,r2,name)||
+           !guest_string(guest,regs[3],sig)){
+            error="JNI GetMethodID invalid name/signature";return false;
+        }
+        for(unsigned i=0;i<sizeof(methods)/sizeof(methods[0]);++i)
+            if(methods[i].owner==4 && !methods[i].is_static &&
+               name==methods[i].name && sig==methods[i].signature){
+                regs[0]=kMethodBase+16u*i;error.clear();return true;
+            }
+        error="Original AudioTrack method missing: "+name+sig;return false;
+    }
+    if(slot==178){ // NewShortArray(jsize)
+        if(static_cast<std::int32_t>(r1)<0||r1>524288u ||
+           next_array_>0x75600000u-r1*2u-4096u){
+            error="JNI short array exceeds ARM memory limit";return false;
+        }
+        const auto bytes=16u+r1*2u;
+        const auto reserved=(bytes+4095u)&~4095u;
+        const auto addr=next_array_;
+        if(guest.read(addr,1)||guest.read(addr+reserved-1u,1)){
+            error="JNI short array overlaps ARM memory";return false;
+        }
+        guest.segments.push_back({addr,std::vector<std::uint8_t>(reserved,0)});
+        short_arrays_.emplace(addr,ShortArray{addr+16u,r1});
+        next_array_+=reserved;
+        regs[0]=addr;error.clear();return true;
+    }
+    if(slot==171 || slot==186 || slot==194 || slot==210){
+        const auto it=short_arrays_.find(r1);
+        if(it==short_arrays_.end()){
+            error="Unknown guest JNI short array";return false;
+        }
+        const auto arr=it->second;
+        if(slot==171){regs[0]=arr.length;error.clear();return true;}
+        if(slot==186){ // GetShortArrayElements, no host copy
+            if(r2){
+                auto* flag=guest.writeable(r2,1);
+                if(!flag){error="JNI isCopy out of guest bounds";return false;}
+                *flag=0;
+            }
+            regs[0]=arr.data;error.clear();return true;
+        }
+        if(slot==194){regs[0]=0;error.clear();return true;}
+        // SetShortArrayRegion(array,start,len,source)
+        const auto start=r2,amount=regs[3];
+        if(start>arr.length || amount>arr.length-start){
+            error="JNI SetShortArrayRegion out of range";return false;
+        }
+        std::uint32_t source=0;
+        try{source=guest.read_u32(regs[13]);}
+        catch(...){error="JNI SetShortArrayRegion ARM stack unmapped";return false;}
+        const auto* from=guest.read(source,amount*2u);
+        auto* to=guest.writeable(arr.data+start*2u,amount*2u);
+        if(!from||!to){error="JNI short region guest pointers unmapped";return false;}
+        std::memmove(to,from,amount*2u);
+        regs[0]=0;error.clear();return true;
+    }
+    if(slot==49){ // AudioTrack.write(short[], offsetInShorts, sizeInShorts)
+        if(r1!=audio_track_address || r2!=kMethodBase+4u*16u){
+            error="Unknown JNI CallIntMethod receiver/method";return false;
+        }
+        const auto it=short_arrays_.find(regs[3]);
+        if(it==short_arrays_.end()){
+            error="AudioTrack.write unrecognized short array";return false;
+        }
+        std::uint32_t offset=0,number=0;
+        try{offset=guest.read_u32(regs[13]);number=guest.read_u32(regs[13]+4u);}
+        catch(...){error="AudioTrack.write AAPCS arguments unmapped";return false;}
+        if(offset>it->second.length||number>it->second.length-offset ||
+           number>524288u){
+            error="AudioTrack.write(short[]) range invalid";return false;
+        }
+        const auto* pcm=guest.read(it->second.data+offset*2u,number*2u);
+        if(!pcm||!audio_.enqueue){
+            error="AudioTrack PCM data or real audio output missing";return false;
+        }
+        if(!audio_.enqueue(audio_.context,pcm,number*2u,error))return false;
+        regs[0]=number;error.clear();return true;
+    }
+    if(slot==61){ // AudioTrack.play/stop/release
+        if(r1!=audio_track_address || r2<kMethodBase+5u*16u ||
+           r2>kMethodBase+7u*16u || (r2-kMethodBase)%16u){
+            error="Unknown JNI CallVoidMethod receiver/method";return false;
+        }
+        if(!audio_.enqueue){
+            error="AudioTrack output device not initialized";return false;
+        }
+        // The SDL output is opened and resumed by the Windows runtime.
+        // Actual write data is queued through slot 49 above.
+        regs[0]=0;error.clear();return true;
     }
     if(slot==168){ // GetStringUTFLength
         if(r1!=kString){error="Unknown original JNI String instance";return false;}
