@@ -1,0 +1,23 @@
+name: Xperia Play donor installer synthetic tests
+on:
+  push:
+    branches: [work/deadspace-xperia-arm-wrapper-2026-11-02]
+    paths:
+      - tools/xperia_vita_donor_install.py
+      - tests/test_xperia_vita_donor_install.py
+      - .github/workflows/xperia-vita-donor-install.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  unit:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests -p test_xperia_vita_donor_install.py -v
