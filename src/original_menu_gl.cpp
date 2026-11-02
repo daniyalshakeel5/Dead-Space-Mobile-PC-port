@@ -221,9 +221,16 @@ OriginalMenuGpuStatus run_original_menu_gl(
                 native_menu_focus_lost(input,callbacks);
                 ui_pointer(OriginalUiPointerAction::Cancel,0,0);
             }else if(e.type==SDL_KEYDOWN && !e.key.repeat) {
-                if(e.key.keysym.sym==SDLK_ESCAPE)
+                if(e.key.keysym.sym==SDLK_ESCAPE) {
                     native_menu_key(input,callbacks,4,true);
-                else if(e.key.keysym.sym==SDLK_RETURN)
+                    // While original event-queue owners remain unavailable,
+                    // invoke only the real named BTN_BACK from the active
+                    // source-layout screen. No invented game-state change.
+                    if(ui_runtime && ui_runtime->on_back &&
+                       original_runtime::original_last_input_status()!=
+                           original_runtime::OriginalInputStatus::Completed)
+                        ui_runtime->on_back(ui_runtime->context);
+                }else if(e.key.keysym.sym==SDLK_RETURN)
                     native_menu_key(input,callbacks,66,true);
             }else if(e.type==SDL_KEYUP &&
                      (e.key.keysym.sym==SDLK_RETURN ||
