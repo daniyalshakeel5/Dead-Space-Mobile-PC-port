@@ -45,7 +45,7 @@ GuestLibcBridge::GuestLibcBridge() {
         "__cxa_pure_virtual", "__aeabi_atexit", "__cxa_atexit",
         "__errno", "__cxa_finalize"
     };
-    for(unsigned i=0;i<=last_svc;++i){
+    for(unsigned i=0;i<last_svc;++i){
         const std::uint32_t id=i+1;
         symbols_.emplace(names[i],veneer_base+i*8);
         const std::uint32_t instructions[2]={0xef000000u|id,0xe12fff1eu};
