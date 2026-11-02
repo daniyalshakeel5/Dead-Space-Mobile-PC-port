@@ -15,7 +15,10 @@ int main(){
         {20,1000,177,192,{{0,{0,0,0,1}},{1000,{0,0,1,0}}}},
         {21,1000,176,193,{{0,{0,0,0}},{1000,{5,0,0}}}}
     };
-    motion.controllers={{18,1,1,0,2000,0,0}};
+    OriginalMotionController c{};
+    c.object_id=18;c.speed=1;c.weight=1;
+    c.active_start=0;c.active_end=2000;
+    motion.controllers={c};
     motion.tracks={{25,19,18,275},{26,20,18,268}};
     std::vector<OriginalSceneNode> base={
         {25,0,identity,true,1.f},{26,0,identity,true,1.f}};
