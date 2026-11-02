@@ -55,7 +55,7 @@ private:
         int size=0,type=0,stride=0;
         std::uint32_t ptr=0;
         bool enabled=false;
-    } vertex_,color_,texcoord_;
+    } vertex_,color_,texcoord_,normal_;
     bool apply_arrays(GuestElf32& guest,std::uint32_t highest,
                       std::string& error) noexcept;
     void button(GuestXperiaInput& input,int button,bool pressed) noexcept;
