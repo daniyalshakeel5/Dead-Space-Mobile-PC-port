@@ -84,6 +84,30 @@ int main(){
     assert(runner.invoke(base+0xa00,
         {0,0,0,libc.symbols().at("__cxa_finalize")},result,error));
     assert(elf.read_u32(base+0x900)==0u);
+    // Translate the actual guest pthread_once callback via A32, exactly
+    // once. A returned zero without executing the function is forbidden.
+    put32(elf,base+0xb00,0xe59f000cu); // LDR R0,[PC,#12]
+    put32(elf,base+0xb04,0xe5901000u); // LDR R1,[R0]
+    put32(elf,base+0xb08,0xe2811001u); // ADD R1,R1,#1
+    put32(elf,base+0xb0c,0xe5801000u); // STR R1,[R0]
+    put32(elf,base+0xb10,0xe12fff1eu); // BX LR
+    put32(elf,base+0xb14,base+0xbc0);
+    put32(elf,base+0xb80,0u);
+    put32(elf,base+0xbc0,0u);
+    assert(runner.invoke(base+0xa00,
+        {base+0xb80,base+0xb00,0,libc.symbols().at("pthread_once")},
+        result,error));
+    assert(result==0u && elf.read_u32(base+0xb80)==2u);
+    assert(elf.read_u32(base+0xbc0)==1u);
+    assert(runner.invoke(base+0xa00,
+        {base+0xb80,base+0xb00,0,libc.symbols().at("pthread_once")},
+        result,error));
+    assert(elf.read_u32(base+0xbc0)==1u);
+    put32(elf,base+0xb80,1u);
+    assert(!runner.invoke(base+0xa00,
+        {base+0xb80,base+0xb00,0,libc.symbols().at("pthread_once")},
+        result,error));
+    put32(elf,base+0xb80,2u);
     // Fail closed rather than claim to boot unsupported game services.
     assert(!runner.invoke(0xffffffffu,{0,0,0,0},result,error));
     assert(!error.empty());
