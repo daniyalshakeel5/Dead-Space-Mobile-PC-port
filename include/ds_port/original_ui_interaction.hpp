@@ -64,4 +64,13 @@ OriginalUiPointerResult dispatch_original_ui_pointer(
     OriginalUiInteractionState& state,
     const std::vector<OriginalUiDraw>& commands,
     OriginalUiPointerAction action,int x,int y);
+// The only window-pixel -> 480x320 canvas conversion entry point for
+// native frontend pointer events. This keeps hit testing consistent with
+// the letterboxed renderer on widescreen and resized desktop windows.
+// Outside-viewport clicks are treated as misses; Cancel clears any press.
+OriginalUiPointerResult dispatch_original_ui_window_pointer(
+    OriginalUiInteractionState& state,
+    const std::vector<OriginalUiDraw>& commands,
+    OriginalUiPointerAction action,int window_width,int window_height,
+    int pointer_x,int pointer_y);
 }
