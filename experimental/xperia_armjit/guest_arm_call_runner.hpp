@@ -4,6 +4,7 @@
 #include "guest_heap.hpp"
 #include "guest_jni_vm.hpp"
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -31,6 +32,9 @@ public:
     bool invoke_aapcs(std::uint32_t guest_address,
                       const std::vector<std::uint32_t>& arguments,
                       std::uint32_t& r0,std::string& error);
+    // External patches of guest ARM instructions require Dynarmic's
+    // translation cache to be explicitly invalidated before next execute.
+    void invalidate_code(std::uint32_t start,std::size_t length);
     bool run_original_initializers(std::string& error);
 private:
     struct Impl;
