@@ -166,16 +166,11 @@ OriginalMenuGpuStatus run_original_menu_gl(
     };
     const auto ui_pointer=[&](OriginalUiPointerAction action,int x,int y){
         if(!has_ui_layer)return;
-        int logical_x=-1,logical_y=-1;
-        if(action!=OriginalUiPointerAction::Cancel){
-            int window_width=0,window_height=0;
-            SDL_GetWindowSize(window.get(),&window_width,&window_height);
-            original_ui_window_to_canvas(window_width,window_height,x,y,
-                                         logical_x,logical_y);
-        }
+        int window_width=0,window_height=0;
+        SDL_GetWindowSize(window.get(),&window_width,&window_height);
         const auto previous=ui_input.hovered;
-        const auto result=dispatch_original_ui_pointer(ui_input,
-            *ui_runtime->draw_commands,action,logical_x,logical_y);
+        const auto result=dispatch_original_ui_window_pointer(ui_input,
+            *ui_runtime->draw_commands,action,window_width,window_height,x,y);
         if(result.hovered!=previous && ui_runtime->on_hover)
             ui_runtime->on_hover(ui_runtime->context,result.hovered);
         if(result.activated && ui_runtime->on_activate)
@@ -266,25 +261,20 @@ OriginalMenuGpuStatus run_original_menu_gl(
                     e.type==SDL_MOUSEMOTION) {
                 int width=0,height=0;
                 SDL_GetWindowSize(window.get(),&width,&height);
-                // The original compiled UI vertices use a 480x320
-                // logical viewport. SDL positions are window pixels.
-                const auto lx=[&](int x) {
-                    return width>0?int(double(x)*480.0/width):0;
-                };
-                const auto ly=[&](int y) {
-                    return height>0?int(double(y)*320.0/height):0;
-                };
+                // SDL mouse coordinates are window pixels. The original
+                // 480x320 viewport is applied once inside ui_pointer;
+                // pre-scaling here broke hit tests on widescreen windows.
                 if(e.type==SDL_MOUSEMOTION)
                     ui_pointer(OriginalUiPointerAction::Move,
-                               lx(e.motion.x),ly(e.motion.y));
+                               e.motion.x,e.motion.y);
                 else if(e.type==SDL_MOUSEBUTTONDOWN &&
                         e.button.button==SDL_BUTTON_LEFT)
                     ui_pointer(OriginalUiPointerAction::Down,
-                               lx(e.button.x),ly(e.button.y));
+                               e.button.x,e.button.y);
                 else if(e.type==SDL_MOUSEBUTTONUP &&
                         e.button.button==SDL_BUTTON_LEFT)
                     ui_pointer(OriginalUiPointerAction::Up,
-                               lx(e.button.x),ly(e.button.y));
+                               e.button.x,e.button.y);
                 if(e.type==SDL_MOUSEMOTION && input.mouse_held)
                     native_menu_pointer(input,callbacks,2,e.motion.x,e.motion.y,width,height);
                 else if(e.type==SDL_MOUSEBUTTONDOWN &&
