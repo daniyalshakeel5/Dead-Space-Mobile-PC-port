@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 namespace ds_port {
+struct OriginalMenuAnimationRuntime;
 // Renderer inputs must be recovered from the original executable/scene.
 // Arrays use OpenGL column-major convention; no generated default camera.
 struct OriginalMenuGpuSurface {
@@ -42,7 +43,8 @@ OriginalMenuGpuStatus run_original_menu_gl(
     const OriginalMenuDrawStream& stream,
     const std::vector<M3gRgbaImage>& original_images,
     const OriginalMenuGpuFrame& original_frame,
-    std::string& diagnostic);
+    std::string& diagnostic,
+    const OriginalMenuAnimationRuntime* motion_runtime=nullptr);
 bool validate_original_menu_gpu_frame(
     const ImMenuGeometry& geometry,const OriginalMenuDrawStream& stream,
     const std::vector<M3gRgbaImage>& images,
