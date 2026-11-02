@@ -24,6 +24,7 @@
 #ifdef DS_NATIVE_APK_IMPORT
 #include "ds_port/asset_install.hpp"
 #endif
+#include <algorithm>
 #include <array>
 #include <cstdlib>
 #include <cstdint>
