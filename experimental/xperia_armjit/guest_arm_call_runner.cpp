@@ -152,6 +152,18 @@ struct GuestArmCallRunner::Impl {
                     std::array<u32,16> regs=jit.Regs();
                     if(!java->dispatch(id,regs,image,error))
                         return false;
+                    const auto callback=java->take_callback();
+                    if(callback.address){
+                        const auto saved=jit.Regs();
+                        const auto cpsr=jit.GetCpsr();
+                        u32 ignored=0;
+                        if(!invoke(callback.address,callback.arguments,
+                                   ignored,error,depth+1))
+                            return false;
+                        jit.Reset();
+                        jit.Regs()=saved;
+                        jit.SetCpsr(cpsr);
+                    }
                     jit.Regs()[0]=regs[0];
                     jit.Regs()[15]=java->return_pc(id);
                     continue;
