@@ -40,9 +40,11 @@ GuestLibcBridge::GuestLibcBridge() {
         "malloc","calloc","free","realloc",
         "open","read","lseek","close",
         "fopen","fread","fseek","ftell","fclose",
-        "__android_log_write","gettimeofday","clock_gettime","time"
+        "__android_log_write","gettimeofday","clock_gettime","time",
+        "__cxa_guard_acquire","__cxa_guard_release","__cxa_guard_abort",
+        "__cxa_pure_virtual"
     };
-    for(unsigned i=0;i<24;++i){
+    for(unsigned i=0;i<28;++i){
         const std::uint32_t id=i+1;
         symbols_.emplace(names[i],veneer_base+i*8);
         const std::uint32_t instructions[2]={0xef000000u|id,0xe12fff1eu};
@@ -62,7 +64,7 @@ bool GuestLibcBridge::dispatch(
     GuestElf32& image,std::string& failure,GuestHeap* heap,
     GuestFileSystem* files) const noexcept {
     try {
-        if(id<1||id>24)
+        if(id<1||id>28)
             throw std::runtime_error("Unknown Android libc SVC service");
         const auto a=regs[0],b=regs[1],n=regs[2];
         std::uint32_t result=0;
@@ -305,6 +307,33 @@ bool GuestLibcBridge::dispatch(
             }
             result=static_cast<std::uint32_t>(sec);break;
         }
+        case 25: { // __cxa_guard_acquire: ARM EABI 8-byte guard
+            auto* guard=image.writeable(a,8);
+            if(!guard || (a&7u))
+                throw std::runtime_error("Invalid or misaligned C++ static guard");
+            if(guard[0]){result=0;break;}
+            // This bridge does not implement blocking pthread waits.
+            // Reentrant/cross-thread initialization must NOT report success.
+            if(!initializing_guards_.insert(a).second)
+                throw std::runtime_error("Concurrent C++ static initialization unsupported");
+            result=1;break;
+        }
+        case 26: { // __cxa_guard_release
+            auto* guard=image.writeable(a,8);
+            if(!guard || (a&7u) || !initializing_guards_.erase(a))
+                throw std::runtime_error("C++ static guard released without acquire");
+            guard[0]=1;
+            result=0;break;
+        }
+        case 27: { // __cxa_guard_abort
+            auto* guard=image.writeable(a,8);
+            if(!guard || (a&7u) || !initializing_guards_.erase(a))
+                throw std::runtime_error("C++ static guard aborted without acquire");
+            guard[0]=0;
+            result=0;break;
+        }
+        case 28:
+            throw std::runtime_error("Original ARM code invoked __cxa_pure_virtual");
         }
         regs[0]=result;
         failure.clear();return true;
