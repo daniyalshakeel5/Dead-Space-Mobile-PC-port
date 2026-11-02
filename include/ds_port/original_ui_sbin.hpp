@@ -12,11 +12,23 @@ struct OriginalUiStruct {
     std::string name;
     std::vector<OriginalUiField> fields;
 };
+struct OriginalUiRectangle {
+    std::uint16_t x=0,y=0,width=0,height=0;
+};
+struct OriginalUiSprite {
+    std::uint32_t object_id=0;
+    std::string name;
+    std::uint8_t atlas=0,content_scale=1;
+    std::uint16_t source_width=0,source_height=0;
+    OriginalUiRectangle source_rect;
+    OriginalUiRectangle atlas_rect;
+};
 struct OriginalUiSbin {
     bool decoded=false;
     std::string error;
     std::vector<std::string> names;
     std::vector<OriginalUiStruct> types;
+    std::vector<OriginalUiSprite> sprites;
     std::vector<std::uint8_t> object_headers;
     std::vector<std::uint8_t> object_data;
 };
