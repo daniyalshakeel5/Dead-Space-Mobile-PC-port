@@ -37,7 +37,9 @@ int main(){
     assert(fsys.close(fd)==0&&fsys.handle_count()==0);
     assert(fsys.close(fd)==-1); // double close
     assert(fsys.read(fd,data.data(),4)==-1);
-    assert(fsys.open_readonly("/assets/published/data/level_index.sb",0)>=3);
+    const int absolute_fd=fsys.open_readonly("/assets/published/data/level_index.sb",0);
+    assert(absolute_fd>=3);
+    assert(fsys.close(absolute_fd)==0);
     assert(fsys.open_readonly("assets/../outside/private.txt",0)==-1);
     assert(fsys.open_readonly("assets/published/data/../../outside/private.txt",0)==-1);
     assert(fsys.open_readonly("C:\\Windows\\win.ini",0)==-1);
