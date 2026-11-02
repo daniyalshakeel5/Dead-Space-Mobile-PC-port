@@ -257,12 +257,23 @@ OriginalM3gScene decode_original_m3g_scene(const std::uint8_t* data,std::size_t 
 
         }else if(o.type==6){
             OriginalComposite state{};
-            if(!c.flag(state.depth_test)||!c.flag(state.depth_write)||
-               !c.flag(state.color_write)||!c.flag(state.alpha_write)||
-               !c.byte(state.blending)||!c.byte(state.threshold)||
-               !c.real(state.factor)||!c.real(state.units)||!c.done()||
-               state.blending<64||state.blending>68)
-                return fail("Invalid original M3G CompositingMode");
+            bool parsed=true;
+            parsed=parsed&&c.flag(state.depth_test);
+            parsed=parsed&&c.flag(state.depth_write);
+            parsed=parsed&&c.flag(state.color_write);
+            parsed=parsed&&c.flag(state.alpha_write);
+            parsed=parsed&&c.byte(state.blending);
+            parsed=parsed&&c.byte(state.threshold);
+            parsed=parsed&&c.real(state.factor);
+            parsed=parsed&&c.real(state.units);
+            if(!parsed||!c.done()||state.blending<64||state.blending>68) {
+                out.error="Invalid M3G CompositingMode id="+std::to_string(id)+
+                    " field_offset="+std::to_string(c.at)+
+                    " total_bytes="+std::to_string(c.n)+
+                    " blending="+std::to_string(state.blending)+
+                    " parsed="+std::to_string(parsed);
+                return fail(out.error.c_str());
+            }
             compositors[id]=state;
         }else if(o.type==8){
             OriginalPolygon state{};
