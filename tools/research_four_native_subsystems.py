@@ -41,17 +41,24 @@ with zipfile.ZipFile(apk) as archive:
         textures=[i+1 for i,(t,_) in enumerate(items) if t==19]
         images=[i+1 for i,(t,_) in enumerate(items) if t==10]
         print("MATERIALS appearances",len(appearances),"texture_objects",len(textures),"image_objects",len(images))
-        # Distinguish plausible reference fields from proven links.
+        # Distinguish plausible references from validated mappings.
+        # For each source object use *unaligned* little-endian references,
+        # then report how often a single offset maps to a target type.
         for typ in (3,19):
             candidates=collections.Counter()
-            for t,p in items:
+            concrete=collections.defaultdict(list)
+            for i,(t,p) in enumerate(items,1):
                 if t!=typ:continue
                 for k in range(len(p)-3):
                     target=struct.unpack_from("<I",p,k)[0]
                     targettype=ref(target)
                     if targettype in (3,10,19):
                         candidates[(k,targettype)]+=1
-            print("MATERIALS candidate offsets type",typ,sorted(candidates.items(),key=lambda x:-x[1])[:15])
+                        concrete[(k,targettype)].append((i,target))
+            for key,count in candidates.most_common(20):
+                print("MATERIALS candidate offset/type",key,"hits",count,
+                      "distinct_sources",len(set(x for x,_ in concrete[key])),
+                      "distinct_targets",len(set(x for _,x in concrete[key])))
         print("MATERIALS original bindings UNVERIFIED")
     elif mode=="animation":
         print("ANIMATION tracks",sum(t==2 for t,_ in items),"controllers",sum(t==1 for t,_ in items),"transform_data",sum(t==17 for t,_ in items))
