@@ -17,6 +17,8 @@ constexpr u32 kStackBytes=256u*1024u;
 constexpr u32 kReturnTrap=0x71000000u;
 constexpr u32 kReturnSvc=0xff00u;
 constexpr unsigned kMaxTraps=256;
+constexpr unsigned kMaxNestedCalls=4;
+constexpr u32 kStackStride=0x00100000u;
 struct Host final : Dynarmic::A32::UserCallbacks {
     GuestElf32& image;
     const GuestLibcBridge& bridge;
@@ -90,12 +92,19 @@ struct GuestArmCallRunner::Impl {
         // and import veneers, allocated only once for the runner.
         if(image.read(kStack,1)||image.read(kStack+kStackBytes-1,1))
             throw std::runtime_error("ARM guest stack overlaps loaded ELF");
-        image.segments.push_back({kStack,std::vector<u8>(kStackBytes,0)});
+        for(unsigned depth=0;depth<kMaxNestedCalls;++depth){
+            const u32 start=kStack+depth*kStackStride;
+            if(image.read(start,1)||image.read(start+kStackBytes-1,1))
+                throw std::runtime_error("ARM guest callback stack overlaps loaded ELF");
+            image.segments.push_back({start,std::vector<u8>(kStackBytes,0)});
+        }
         host.jit=&jit;
     }
     bool invoke(u32 address,const std::array<u32,4>& args,
-                u32& result,std::string& error) {
+                u32& result,std::string& error,unsigned depth=0) {
         try{
+            if(depth>=kMaxNestedCalls)
+                throw std::runtime_error("ARM guest callback nesting limit");
             if(!image.read(address&~1u,2))
                 throw std::runtime_error("Original ARM function entry unmapped");
             // Constructors / JNI guest calls must start from a predictable
@@ -104,7 +113,7 @@ struct GuestArmCallRunner::Impl {
             jit.Regs().fill(0);
             jit.SetCpsr(0x10u | ((address&1u)?0x20u:0u));
             for(int i=0;i<4;++i)jit.Regs()[i]=args[i];
-            jit.Regs()[13]=kStack+kStackBytes; // 8/16 aligned
+            jit.Regs()[13]=kStack+depth*kStackStride+kStackBytes;
             jit.Regs()[14]=kReturnTrap;
             jit.Regs()[15]=address&~1u;
             for(unsigned i=0;i<kMaxTraps;++i){
@@ -124,10 +133,27 @@ struct GuestArmCallRunner::Impl {
                     throw std::runtime_error("ARM guest exceeded bounded instruction budget");
                 const auto expected=GuestLibcBridge::veneer_base+
                     std::uint64_t(id-1u)*8u;
-                if(expected>UINT32_MAX || id>28)
+                if(expected>UINT32_MAX || id>GuestLibcBridge::last_svc)
                     throw std::runtime_error("Unsupported Android SVC/import");
                 std::array<u32,16> copy=jit.Regs();
-                if(!bridge.dispatch(id,copy,image,error,&heap,files))
+                if(id==GuestLibcBridge::finalize_svc) {
+                    // Save the suspended original caller; running an ARM
+                    // destructor uses a separate stack and a JIT reset.
+                    const auto saved=jit.Regs();
+                    const auto cpsr=jit.GetCpsr();
+                    const auto callbacks=bridge.take_destructors(saved[0]);
+                    for(const auto& callback:callbacks) {
+                        u32 ignored=0;
+                        if(!invoke(callback.function,
+                                   {callback.argument,0,0,0},
+                                   ignored,error,depth+1))
+                            return false;
+                    }
+                    jit.Reset();
+                    jit.Regs()=saved;
+                    jit.SetCpsr(cpsr);
+                    copy[0]=0;
+                } else if(!bridge.dispatch(id,copy,image,error,&heap,files))
                     return false;
                 jit.Regs()[0]=copy[0];
                 jit.Regs()[15]=static_cast<u32>(expected)+4u; // BX LR
