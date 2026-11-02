@@ -22,6 +22,7 @@ std::uint32_t checked32(std::uint64_t n){
 bool GuestElf32::open(const std::vector<std::uint8_t>& bytes,
                       std::string& error) noexcept {
     segments.clear();pending_imports.clear();
+    initialization_order.clear();jni_exports.clear();
     remaining_relocations=0;relative_relocations=0;
     try {
         if(bytes.size()<52||bytes.size()>64u*1024u*1024u ||
@@ -191,9 +192,61 @@ bool GuestElf32::open(const std::vector<std::uint8_t>& bytes,
                 ++processed;
             }
         }
+        // Preserve constructor order from the ACTUAL original ARM ELF.
+        // DT_INIT runs before DT_INIT_ARRAY, after all relocations.
+        const auto has_tag=[&](std::uint32_t id){
+            return std::any_of(tags.begin(),tags.end(),
+                [id](const auto& pair){return pair.first==id;});
+        };
+        const auto add_constructor=[&](std::uint32_t guest_addr){
+            if(!guest_addr||guest_addr==0xffffffffu)return;
+            if(!read(guest_addr&~1u,2))
+                throw std::runtime_error("ARM initializer points outside mapped code");
+            initialization_order.push_back(guest_addr);
+        };
+        if(has_tag(12) && get(12))
+            add_constructor(checked32(std::uint64_t(guest_base)+get(12)));
+        if(has_tag(25)){
+            if(!has_tag(27))
+                throw std::runtime_error("DT_INIT_ARRAY missing DT_INIT_ARRAYSZ");
+            const auto sz=get(27);
+            if(sz%4||sz>65536u)
+                throw std::runtime_error("Malformed ELF init array");
+            if(sz){
+                const auto* list=read(checked32(
+                    std::uint64_t(guest_base)+get(25)),sz);
+                if(!list)
+                    throw std::runtime_error("Unmapped ARM init array");
+                for(std::uint32_t off=0;off<sz;off+=4)
+                    add_constructor(rd32(list+off));
+            }
+        }
+        // Make original JNI exports available by ELF SYMBOL NAME.
+        // No binary-specific hardcoded addresses, and never call them
+        // as host function pointers.
+        if(has_tag(4)&&has_tag(5)&&has_tag(6)&&has_tag(10)&&has_tag(11)){
+            const auto* hash=read(checked32(
+                std::uint64_t(guest_base)+get(4)),8);
+            if(!hash)throw std::runtime_error("Unmapped symbol hash");
+            const auto count=rd32(hash+4);
+            if(count>200000u)
+                throw std::runtime_error("Excessive ELF symbol count");
+            for(std::uint32_t idx=0;idx<count;++idx){
+                const auto sym=symbol(idx);
+                const bool is_jni=sym.name=="JNI_OnLoad" ||
+                    sym.name.rfind("Java_",0)==0;
+                if(!sym.defined || !is_jni)continue;
+                const auto value=checked32(
+                    std::uint64_t(sym.absolute?0:guest_base)+sym.value);
+                if(!read(value&~1u,2))
+                    throw std::runtime_error("Exported ARM JNI code unmapped");
+                jni_exports.emplace(sym.name,value);
+            }
+        }
         error.clear();return true;
     }catch(const std::exception& e) {
         error=e.what();segments.clear();pending_imports.clear();
+        initialization_order.clear();jni_exports.clear();
         remaining_relocations=0;relative_relocations=0;
         return false;
     }
