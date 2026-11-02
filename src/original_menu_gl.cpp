@@ -154,7 +154,7 @@ OriginalMenuGpuStatus run_original_menu_gl(
                 native_menu_focus_lost(input,callbacks);
             else if(e.type==SDL_KEYDOWN && !e.key.repeat) {
                 if(e.key.keysym.sym==SDLK_ESCAPE)
-                    quit_requested=true;
+                    native_menu_key(input,callbacks,4,true);
                 else if(e.key.keysym.sym==SDLK_RETURN)
                     native_menu_key(input,callbacks,66,true);
             }else if(e.type==SDL_KEYUP &&
