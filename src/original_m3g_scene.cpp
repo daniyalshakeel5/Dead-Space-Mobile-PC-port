@@ -267,12 +267,12 @@ OriginalM3gScene decode_original_m3g_scene(const std::uint8_t* data,std::size_t 
             parsed=parsed&&c.real(state.factor);
             parsed=parsed&&c.real(state.units);
             if(!parsed||!c.done()||state.blending<64||state.blending>68) {
-                out.error="Invalid M3G CompositingMode id="+std::to_string(id)+
+                const std::string detail="Invalid M3G CompositingMode id="+std::to_string(id)+
                     " field_offset="+std::to_string(c.at)+
                     " total_bytes="+std::to_string(c.n)+
                     " blending="+std::to_string(state.blending)+
                     " parsed="+std::to_string(parsed);
-                return fail(out.error.c_str());
+                return fail(detail.c_str());
             }
             compositors[id]=state;
         }else if(o.type==8){
