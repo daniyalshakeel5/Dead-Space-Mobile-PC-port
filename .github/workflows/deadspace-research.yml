@@ -5,6 +5,7 @@ on:
     branches:
       - work/deadspace-remote-preflight-2026-11-01
     paths:
+      - "tools/research_menu_texture_refs.py"
       - "tools/deadspace_audit.py"
       - "tools/deadspace_native_enum_recover.py"
       - "tools/deadspace_native_leaf_recover.py"
@@ -151,6 +152,7 @@ jobs:
             src/original_m3g_scene.cpp apps/original_m3g_scene_probe.cpp \
             -o "$RUNNER_TEMP/original-native-m3g-probe"
           "$RUNNER_TEMP/original-native-m3g-probe" "$RUNNER_TEMP/original-main-menu.m3g"
+          python tools/research_menu_texture_refs.py "$RUNNER_TEMP/original-main-menu.m3g"
           # Exercise the actual native executable through the recovered
           # camera, transforms and renderer contract (headless only).
           sudo apt-get update -qq >/dev/null
