@@ -170,7 +170,8 @@ jobs:
               for name in ("published/texturepacks_ui/splash_ea.m3g",
                            "published/texturepacks_ui/splash_deadspace.m3g",
                            "published/models/main_menu.m3g",
-                           "published/texturepacks_ui/ui_frontend.m3g"):
+                           "published/texturepacks_ui/ui_frontend.m3g",
+                           "published/layoutdata/layouts.xml.sb"):
                   item=apk.getinfo("assets/"+name)
                   assert 0<item.file_size<32*1024*1024
                   dst=root/name
@@ -226,6 +227,8 @@ jobs:
           cat "$RUNNER_TEMP/native-scene-gpu.log"
           test "$gpu_exit" = 20
           grep -E "Original 3D menu GPU frame: .*nonblack pixels [1-9][0-9]*" \
+            "$RUNNER_TEMP/native-scene-gpu.log"
+          grep -E "Original UI_MAIN: [1-9][0-9]* source-layout draw/hit commands" \
             "$RUNNER_TEMP/native-scene-gpu.log"
 
 
