@@ -129,6 +129,24 @@ int main() {
     regs[0]=guest_path;regs[1]=guest_output;
     assert(svc.dispatch(16,regs,image,error,nullptr,&assets));
     assert(regs[0]==0);
+    // Android log and clock ABI are real guest imports in Xperia v1.1.33.
+    const char tag[]="xperia-test";
+    const char message[]="engine boot";
+    std::memcpy(image.writeable(guest_path,sizeof(tag)),tag,sizeof(tag));
+    std::memcpy(image.writeable(guest_output,sizeof(message)),message,sizeof(message));
+    regs.fill(0);regs[0]=4;regs[1]=guest_path;regs[2]=guest_output;
+    assert(svc.dispatch(21,regs,image,error)); // __android_log_write
+    assert(regs[0]==sizeof(message)-1);
+    regs.fill(0);regs[0]=guest_output+64;regs[1]=guest_output+80;
+    assert(svc.dispatch(22,regs,image,error)); // gettimeofday
+    assert(regs[0]==0 && image.read_u32(guest_output+64)>1700000000u);
+    assert(image.read_u32(guest_output+68)<1000000u);
+    regs.fill(0);regs[0]=1;regs[1]=guest_output+96;
+    assert(svc.dispatch(23,regs,image,error)); // CLOCK_MONOTONIC
+    assert(regs[0]==0 && image.read_u32(guest_output+100)<1000000000u);
+    regs.fill(0);regs[0]=guest_output+112;
+    assert(svc.dispatch(24,regs,image,error)); // time
+    assert(regs[0]==image.read_u32(guest_output+112));
     fs::remove_all(install);
     return 0;
 }

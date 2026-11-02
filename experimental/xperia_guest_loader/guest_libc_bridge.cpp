@@ -4,6 +4,9 @@
 #include <algorithm>
 #include <climits>
 #include <cstdio>
+#include <chrono>
+#include <iostream>
+#include <limits>
 #include <cstring>
 #include <stdexcept>
 
@@ -36,9 +39,10 @@ GuestLibcBridge::GuestLibcBridge() {
         "memcpy","memmove","memset","memcmp","strlen","strcmp","strncmp",
         "malloc","calloc","free","realloc",
         "open","read","lseek","close",
-        "fopen","fread","fseek","ftell","fclose"
+        "fopen","fread","fseek","ftell","fclose",
+        "__android_log_write","gettimeofday","clock_gettime","time"
     };
-    for(unsigned i=0;i<20;++i){
+    for(unsigned i=0;i<24;++i){
         const std::uint32_t id=i+1;
         symbols_.emplace(names[i],veneer_base+i*8);
         const std::uint32_t instructions[2]={0xef000000u|id,0xe12fff1eu};
@@ -58,7 +62,7 @@ bool GuestLibcBridge::dispatch(
     GuestElf32& image,std::string& failure,GuestHeap* heap,
     GuestFileSystem* files) const noexcept {
     try {
-        if(id<1||id>20)
+        if(id<1||id>24)
             throw std::runtime_error("Unknown Android libc SVC service");
         const auto a=regs[0],b=regs[1],n=regs[2];
         std::uint32_t result=0;
@@ -224,6 +228,82 @@ bool GuestLibcBridge::dispatch(
             if(!files)throw std::runtime_error("Guest asset mount unavailable");
             result=static_cast<std::uint32_t>(files->close(static_cast<int>(a)));
             break;
+        }
+        case 21: { // __android_log_write(priority, tag, text)
+            auto guest_log_string=[&](std::uint32_t pointer,std::size_t cap){
+                std::string value;
+                if(!pointer)return value;
+                for(std::size_t i=0;i<cap;++i){
+                    if(std::uint64_t(pointer)+i>UINT32_MAX)
+                        throw std::runtime_error("ARM log pointer wrap");
+                    const auto character=byte(image,pointer+static_cast<std::uint32_t>(i));
+                    if(!character)return value;
+                    value.push_back(character>=32u?char(character):'.');
+                }
+                throw std::runtime_error("Unterminated ARM log string");
+            };
+            auto tag=guest_log_string(b,255);
+            auto msg=guest_log_string(n,8192);
+            std::clog<<"[xperia-android/"<<(a&255u)<<"/"<<tag<<"] "<<msg<<"\n";
+            result=static_cast<std::uint32_t>(msg.size());
+            break;
+        }
+        case 22: { // gettimeofday(struct timeval*, struct timezone*)
+            if(!a)throw std::runtime_error("ARM gettimeofday requires timeval pointer");
+            using namespace std::chrono;
+            const auto us=duration_cast<microseconds>(
+                system_clock::now().time_since_epoch()).count();
+            const auto sec=us/1000000ll;
+            if(sec<0||sec>INT32_MAX)
+                throw std::runtime_error("ARM32 timeval time_t overflow");
+            auto* tv=image.writeable(a,8);
+            if(!tv)throw std::runtime_error("ARM gettimeofday timeval unmapped");
+            const auto put=[&](std::uint8_t* slot,std::uint32_t value){
+                for(int i=0;i<4;++i)slot[i]=static_cast<std::uint8_t>(value>>(8*i));
+            };
+            put(tv,static_cast<std::uint32_t>(sec));
+            put(tv+4,static_cast<std::uint32_t>(us%1000000));
+            if(b){
+                auto* zone=image.writeable(b,8);
+                if(!zone)throw std::runtime_error("ARM timezone pointer unmapped");
+                put(zone,0);put(zone+4,0);
+            }
+            result=0;break;
+        }
+        case 23: { // clock_gettime(clockid_t, struct timespec*)
+            using namespace std::chrono;
+            if(!b)throw std::runtime_error("ARM clock_gettime requires timespec");
+            std::int64_t ns=0;
+            if(a==0u)ns=duration_cast<nanoseconds>(
+                system_clock::now().time_since_epoch()).count();
+            else if(a==1u||a==4u)ns=duration_cast<nanoseconds>(
+                steady_clock::now().time_since_epoch()).count();
+            else {result=UINT32_MAX;break;} // EINVAL/unsupported clock id
+            auto* ts=image.writeable(b,8);
+            if(!ts)throw std::runtime_error("ARM timespec pointer unmapped");
+            const auto sec=ns/1000000000ll;
+            if(sec<0||sec>INT32_MAX)
+                throw std::runtime_error("ARM32 timespec time_t overflow");
+            const auto put=[&](std::uint8_t* slot,std::uint32_t value){
+                for(int i=0;i<4;++i)slot[i]=static_cast<std::uint8_t>(value>>(8*i));
+            };
+            put(ts,static_cast<std::uint32_t>(sec));
+            put(ts+4,static_cast<std::uint32_t>(ns%1000000000ll));
+            result=0;break;
+        }
+        case 24: { // time(time_t* optional)
+            using namespace std::chrono;
+            const auto sec=duration_cast<seconds>(
+                system_clock::now().time_since_epoch()).count();
+            if(sec<0||sec>INT32_MAX)
+                throw std::runtime_error("ARM32 time_t overflow");
+            if(a){
+                auto* out=image.writeable(a,4);
+                if(!out)throw std::runtime_error("ARM time(time_t*) pointer unmapped");
+                for(int i=0;i<4;++i)out[i]=std::uint8_t(
+                    std::uint32_t(sec)>>(8*i));
+            }
+            result=static_cast<std::uint32_t>(sec);break;
         }
         }
         regs[0]=result;
