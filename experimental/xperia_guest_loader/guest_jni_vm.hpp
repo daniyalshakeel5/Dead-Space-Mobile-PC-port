@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 namespace xperia {
 // ARM32 guest-side JavaVM/JNIEnv ABI. This is NOT a general JVM: unsupported
@@ -37,12 +38,23 @@ public:
         auto out=pending_callback_;pending_callback_={};return out;
     }
     void set_content_ready(bool ready) noexcept {content_ready_=ready;}
+    // Called only for real AudioTrack.write(short[]) data in guest memory.
+    struct AudioSink {
+        void* context=nullptr;
+        bool (*enqueue)(void*,const std::uint8_t*,std::size_t,std::string&)=nullptr;
+    };
+    void set_audio_sink(AudioSink sink) noexcept {audio_=sink;}
+    static constexpr std::uint32_t audio_track_address=vm_address+0x3a00u;
     std::uint32_t vm() const noexcept {return vm_address;}
 private:
     std::vector<std::uint8_t> thunks_;
     NativeCallback pending_callback_{};
     std::uint32_t eaio_startup_=0;
     bool content_ready_=false;
+    AudioSink audio_{};
+    struct ShortArray {std::uint32_t data=0,length=0;};
+    std::unordered_map<std::uint32_t,ShortArray> short_arrays_;
+    std::uint32_t next_array_=0x74600000u;
     bool installed_=false;
 };
 } // namespace xperia
