@@ -29,13 +29,15 @@ foreach($control in @('GamePath','HdPath','BrowseZip','BrowseApk','InstallAssets
 }
 if($window.FindName('Launch').IsEnabled){throw 'Play must remain DISABLED until original ARM runtime can boot'}
 if($window.FindName('QemuBoot').IsEnabled){throw 'QEMU boot check must remain DISABLED until original Xperia game files are installed'}
-$bootBridge=Get-Content -LiteralPath (Join-Path $folder 'QemuBoot.ps1') -Raw
-if($bootBridge -notmatch 'wsl\.exe' -or $bootBridge -notmatch 'docker info' -or $bootBridge -notmatch 'allow-external-build'){
- throw 'QEMU WSL2 bridge is missing prerequisite checks or user-opt-in runtime command'
+# Standalone Windows package must never require WSL2 or Docker.
+$guiText=Get-Content -LiteralPath (Join-Path $folder 'Launcher.xaml') -Raw
+if($guiText -match 'Docker Desktop|WSL2 Linux|enable integration'){
+ throw 'Windows launcher is still advertising external development dependencies'
 }
-if($bootBridge -match 'Invoke-Expression|iex\s'){
- throw 'Untrusted shell invocation in QEMU WSL2 bridge'
+$source=Get-Content -LiteralPath (Join-Path $folder 'Launcher.ps1') -Raw
+if($source -match '\$ui\.QemuBoot\.IsEnabled=\s*-not \$busy'){
+ throw 'QEMU developer-only boot test must not be enabled in player launcher'
 }
 if($window.Title -notlike '*Dead Space*'){throw 'Wrong launcher identity'}
 $window.Close()
-Write-Output 'PASS: actual Diamond Rush WPF architecture, Dead Space controls/theme, QEMU boot prerequisites and consent, no interactive-play claim, safe zip paths, PowerShell parsing.'
+Write-Output 'PASS: actual Diamond Rush WPF architecture, Dead Space controls/theme, no WSL2 or Docker player requirements, no interactive-play claim, safe zip paths, PowerShell parsing.'

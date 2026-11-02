@@ -54,30 +54,15 @@ function Refresh-Setup {
  $hdInstalled=Test-Path -LiteralPath $hdRoot -PathType Container
  $ui.HdStatus.Text=if($hdInstalled){'REANIMATED  //  HD KTX sidecar installed (not mounted by engine)'}elseif($hasHd){'REANIMATED  //  APK selected; import required'}else{'REANIMATED  //  Optional HD APK not selected'}
  $ui.HdDetails.Text=if($hdInstalled){'HD files detected. Original game files remain separate.'}else{'HD files not installed. They will be kept separate from the original game.'}
- # Read verified local original-game telemetry (not synthetic JIT status).
- $reportPath=Join-Path $qemuLogs 'boot-status.json'
- $bootReport=$null
- if(Test-Path -LiteralPath $reportPath -PathType Leaf) {
-  try {$bootReport=Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json}
-  catch {Write-Activity ('Boot report cannot be read: '+$_.Exception.Message)}
- }
- $bootPassed=$bootReport -and [bool]$bootReport.real_game_started -and [int]$bootReport.milestone -ge 3
- if($bootPassed) {
-  $ui.EngineStatus.Text=('ENGINE  //  Last QEMU boot reached stage '+[int]$bootReport.milestone+'/7: original JNI startup verified.')
-  $ui.RuntimeStatus.Text='QEMU // Original Xperia JNI engine boot succeeded in the headless compatibility test.'
-  $ui.QemuStatus.Text=('Last recorded game result: stage '+[int]$bootReport.milestone+'/7; original frames: '+[int]$bootReport.frames+'. Play requires an interactive display backend.')
- }elseif($bootReport) {
-  $ui.EngineStatus.Text=('ENGINE  //  Last QEMU boot did NOT start the original engine (stage '+[int]$bootReport.milestone+'/7).')
-  $ui.RuntimeStatus.Text='QEMU // Original-engine startup blocked. Inspect the boot diagnostic log.'
-  $ui.QemuStatus.Text=('Last boot check: stage '+[int]$bootReport.milestone+'/7. See QEMU boot logs.')
- }else{
-  $ui.EngineStatus.Text='ENGINE  //  QEMU-ARM boot check available after asset setup; game startup not verified locally.'
-  $ui.RuntimeStatus.Text='QEMU PRIMARY // Original-game boot not yet checked on this PC.'
-  $ui.QemuStatus.Text='Boot check runs offscreen with Docker Linux/WSL2. The game Play button remains disabled.'
- }
+ # This public Windows launcher must NEVER demand WSL2, Docker,
+ # Git or Python merely to play. A self-contained Windows QEMU full-
+ # system runtime has not been validated and is not bundled yet.
+ $ui.EngineStatus.Text='ENGINE  //  Standalone QEMU Windows runtime not packaged yet.'
+ $ui.RuntimeStatus.Text='QEMU DEVELOPMENT BACKEND // Linux qemu-arm works without WSL. Windows packaging remains unverified.'
+ $ui.QemuStatus.Text='No WSL2 or Docker requirement for players. Play will unlock only with a verified self-contained PC runtime.'
  $busy=$null -ne $script:task
  $ui.InstallAssets.IsEnabled= -not $busy -and -not $isInstalled
- $ui.QemuBoot.IsEnabled= -not $busy -and $isInstalled
+ $ui.QemuBoot.IsEnabled=$false # no WSL/Docker requirement in the player build
  foreach($name in @('BrowseZip','BrowseApk','ClearApk','Recheck','BrowseApkGraphics')){$ui[$name].IsEnabled= -not $busy}
  $ui.OpenOriginal.IsEnabled=$isInstalled
  $ui.OpenHd.IsEnabled=$hdInstalled
@@ -171,29 +156,6 @@ $ui.InstallAssets.Add_Click({Safe-Action {
  Write-Activity 'Private install started. Your original files remain on this PC.'
  Refresh-Setup
 }})
-# A QEMU boot check is a genuine run of the user-owned ARM game,
-# but the first backend is headless; it is not interactive Play yet.
-$ui.QemuBoot.Add_Click({Safe-Action {
- if(-not (Test-Installed)){throw 'Install and verify the original Xperia Play game ZIP first.'}
- $answer=[Windows.MessageBox]::Show(
-  'The QEMU boot check will use WSL2 + Docker Linux containers, fetch and build a separate GPL-3.0 ARM/Linux game compatibility runtime from EapRules, then test your original Xperia game startup. Your installed game files are mounted read-only, and logs stay on your PC. This is a headless startup check, not an interactive game window. Continue?',
-  'Run original-game QEMU startup check','YesNo','Question')
- if($answer -ne 'Yes'){
-  Write-Activity 'QEMU external-runtime setup was declined.'
-  return
- }
- $scriptFile=Join-Path $PSScriptRoot 'QemuBoot.ps1'
- $backendFile=Join-Path (Split-Path $PSScriptRoot -Parent) 'tools\xperia_qemu_boot.py'
- if(-not (Test-Path -LiteralPath $backendFile -PathType Leaf)){
-  throw 'The QEMU boot adapter is missing from this launcher package.'
- }
- $argsList=@('-NoProfile','-ExecutionPolicy','Bypass','-File',$scriptFile,
-  '-GameDir',$install,'-BackendScript',$backendFile,'-LogsDir',$qemuLogs)
- $script:task=Start-Tracked (Join-Path $PSHOME 'powershell.exe') $argsList 'QEMU original-game boot'
- Write-Activity 'Original-game QEMU boot verification started through WSL2 and Docker.'
- Write-Activity 'Source adapter is GPL-based; original game data stays local and read-only.'
- Refresh-Setup
-}})
 # Match Diamond Rush v0.7.0's nonblocking log/status timer.
 $timer=New-Object Windows.Threading.DispatcherTimer
 $timer.Interval=[TimeSpan]::FromMilliseconds(500)
@@ -216,7 +178,7 @@ $timer.Add_Tick({
 })
 $window.Add_Closing({Save-Settings;$timer.Stop()})
 Write-Activity 'Dead Space launcher ready. Select your Xperia game ZIP and optional Reanimated APK.'
-Write-Activity 'QEMU is the primary boot backend. After installing, run the original-game QEMU boot check from Home.'
-Write-Activity 'The QEMU check runs the original game offscreen; interactive Windows gameplay is not yet connected.'
+Write-Activity 'QEMU is retained for development; the packaged Windows version will not require WSL2 or Docker.'
+Write-Activity 'Assets install without extra tools; standalone Windows game execution is still under development.'
 Show-Page 'Home';Refresh-Setup;$timer.Start()
 [void]$window.ShowDialog()
