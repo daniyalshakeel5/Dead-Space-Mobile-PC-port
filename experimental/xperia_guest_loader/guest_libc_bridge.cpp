@@ -48,7 +48,8 @@ GuestLibcBridge::GuestLibcBridge() {
         "pthread_mutex_init","pthread_mutex_destroy",
         "pthread_mutex_lock","pthread_mutex_trylock","pthread_mutex_unlock",
         "sem_init","sem_destroy","sem_post","sem_wait","sem_trywait",
-        "sem_getvalue","pthread_once"
+        "sem_getvalue","pthread_once",
+        "__atomic_cmpxchg","__atomic_swap","__atomic_inc","__atomic_dec"
     };
     for(unsigned i=0;i<last_svc;++i){
         const std::uint32_t id=i+1;
@@ -60,9 +61,15 @@ GuestLibcBridge::GuestLibcBridge() {
     }
 }
 std::unordered_map<std::string,std::uint32_t>
-GuestLibcBridge::plan_guest_imports(const GuestElf32& elf,std::string& error) {
+GuestLibcBridge::plan_guest_imports(
+    const GuestElf32& elf,std::string& error,
+    const std::unordered_map<std::string,std::uint32_t>& data_symbols) {
     std::unordered_map<std::string,std::uint32_t> combined=symbols_;
     try {
+        for(const auto& entry:data_symbols) {
+            if(!entry.second || !combined.emplace(entry).second)
+                throw std::runtime_error("Duplicate/invalid Bionic guest data symbol: "+entry.first);
+        }
         if(!unresolved_imports_.empty())
             throw std::runtime_error("Guest import plan already installed");
         std::map<std::string,unsigned> missing;
@@ -511,6 +518,30 @@ bool GuestLibcBridge::dispatch(
         }
         case 44:
             throw std::runtime_error("pthread_once requires translated ARM callback runner");
+        case 45: { // __atomic_cmpxchg(old, desired, volatile int*)
+            if((n&3u) || !image.writeable(n,4))
+                throw std::runtime_error("ARM atomic CAS pointer invalid");
+            const auto previous=image.read_u32(n);
+            if(previous==a){
+                auto* target=image.writeable(n,4);
+                for(unsigned i=0;i<4;++i)target[i]=std::uint8_t(b>>(i*8u));
+                result=0; // Bionic: zero means exchange succeeded
+            }else result=1;
+            break;
+        }
+        case 46: // __atomic_swap(new, volatile int*)
+        case 47: // __atomic_inc(volatile int*)
+        case 48: { // __atomic_dec(volatile int*)
+            const auto ptr=id==46?b:a;
+            if((ptr&3u) || !image.writeable(ptr,4))
+                throw std::runtime_error("ARM atomic pointer invalid");
+            const auto previous=image.read_u32(ptr);
+            const auto updated=id==46?a:id==47?previous+1u:previous-1u;
+            auto* target=image.writeable(ptr,4);
+            for(unsigned i=0;i<4;++i)target[i]=std::uint8_t(updated>>(i*8u));
+            result=previous; // Bionic inc/dec/swap return PREVIOUS value
+            break;
+        }
         }
         regs[0]=result;
         failure.clear();return true;
