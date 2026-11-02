@@ -28,3 +28,15 @@ target_compile_features(xperia_elf_jit_synthetic PRIVATE cxx_std_20)
 target_link_libraries(xperia_elf_jit_synthetic PRIVATE
     xperia_guest_elf32 dynarmic)
 add_test(NAME xperia_elf_mapped_a32_jit COMMAND xperia_elf_jit_synthetic)
+
+# ARM guest service integration: real A32 BLX -> SVC -> native memcpy
+# -> guest BX LR; service code is original-free and fail-closed.
+add_library(xperia_arm_guest_libc STATIC ../xperia_guest_loader/guest_libc_bridge.cpp)
+target_include_directories(xperia_arm_guest_libc PUBLIC ../xperia_guest_loader)
+target_link_libraries(xperia_arm_guest_libc PUBLIC xperia_guest_elf32)
+add_executable(xperia_guest_libc_jit_smoke guest_libc_jit_smoke.cpp)
+target_compile_features(xperia_guest_libc_jit_smoke PRIVATE cxx_std_20)
+target_link_libraries(xperia_guest_libc_jit_smoke PRIVATE
+    xperia_arm_guest_libc dynarmic)
+add_test(NAME xperia_jit_bionic_libc_a32_svc_roundtrip
+    COMMAND xperia_guest_libc_jit_smoke)
