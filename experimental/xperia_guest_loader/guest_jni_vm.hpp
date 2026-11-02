@@ -42,6 +42,7 @@ public:
     struct AudioSink {
         void* context=nullptr;
         bool (*enqueue)(void*,const std::uint8_t*,std::size_t,std::string&)=nullptr;
+        bool (*control)(void*,unsigned,std::string&)=nullptr;
     };
     void set_audio_sink(AudioSink sink) noexcept {audio_=sink;}
     static constexpr std::uint32_t audio_track_address=vm_address+0x3a00u;
