@@ -25,7 +25,8 @@ public:
     // guest-call runner's translated ARM callback path, in reverse order.
     struct Destructor { std::uint32_t function, argument, dso; };
     std::vector<Destructor> take_destructors(std::uint32_t dso);
-    static constexpr unsigned last_svc=32;
+    static constexpr unsigned last_svc=44;
+    static constexpr unsigned once_svc=44;
     static constexpr unsigned finalize_svc=32;
     // Called AFTER Dynarmic's SVC callback halts JIT execution.
     bool dispatch(std::uint32_t id,std::array<std::uint32_t,16>& registers,
@@ -37,5 +38,10 @@ private:
     std::vector<std::uint8_t> code_;
     mutable std::unordered_set<std::uint32_t> initializing_guards_;
     std::vector<Destructor> destructors_;
+    // Guest ARM address keyed synchronization objects. The guest runtime
+    // executes one translated guest thread until scheduling is implemented.
+    struct GuestMutex { bool locked=false; };
+    std::unordered_map<std::uint32_t,GuestMutex> mutexes_;
+    std::unordered_map<std::uint32_t,std::uint32_t> semaphores_;
 };
 }
