@@ -69,3 +69,21 @@ for typ in (9,5):
             if id_ and id_<=len(obj) and obj[id_-1][0] in (5,9,14):
                 counts[(off,obj[id_-1][0])]+=1
     print('unaligned_candidate_freq_type',typ,counts.most_common(25))
+
+# Explain *why* a group does not match the positive-child table shape:
+# a legitimate empty group may end in a zero child count. Record only
+# structural offsets/lengths, never the raw serialized asset bytes.
+unmatched=[item for item in trailing_tables(9) if not item[2]]
+for ident,length,_ in unmatched:
+    payload=obj[ident-1][1]
+    empty_tail=(length>=4 and struct.unpack_from('<I',payload,length-4)[0]==0)
+    matches=[]
+    for offset in range(0,len(payload)-3):
+        count=struct.unpack_from('<I',payload,offset)[0]
+        if count==0 or count>128 or offset+4+count*4>len(payload):
+            continue
+        targets=struct.unpack_from('<'+'I'*count,payload,offset+4)
+        if all(0<target<=len(obj) and obj[target-1][0] in (5,9,14) for target in targets):
+            matches.append((offset,count,len(payload)-(offset+4+count*4)))
+    print('UNMATCHED_GROUP',ident,'bytes',length,'zero_child_tail',empty_tail,
+          'alternative_valid_table_positions',matches[:12])
