@@ -23,6 +23,15 @@ enum class OriginalUiPointerAction {Move,Down,Up,Cancel};
 struct OriginalUiPointerResult {
     std::uint32_t hovered=0,activated=0;
 };
+// The recovered engine UI layout/state machine supplies screen-space
+// commands. Empty command sets leave the original 3D scene intact.
+struct OriginalUiRuntime {
+    const OriginalUiSbin* database=nullptr;
+    const std::vector<M3gRgbaImage>* atlases=nullptr;
+    const std::vector<OriginalUiDraw>* draw_commands=nullptr;
+    void* context=nullptr;
+    void (*on_activate)(void*,std::uint32_t)=nullptr;
+};
 bool validate_original_ui_draw_list(
     const OriginalUiSbin& database,
     const std::vector<M3gRgbaImage>& atlases,
