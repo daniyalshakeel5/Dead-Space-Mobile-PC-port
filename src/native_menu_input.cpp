@@ -35,7 +35,7 @@ void native_menu_focus_lost(NativeMenuInputState& state,
     if(state.mouse_held && cb.pointer) {
         state.mouse_held=false;
         cb.pointer(cb.context,1,kMenuModule,kPointer,
-                   state.last_x>=0?0.f:0.f,0.f);
+                   state.last_u,state.last_v);
     }
     if(state.enter_held && cb.key_up)
         cb.key_up(cb.context,kMenuModule,66,0);
