@@ -19,7 +19,8 @@ public:
     // Bind only observed ELF function symbols to named SVC fail traps.
     // Undefined objects/ambiguous symbols are rejected, never fabricated.
     std::unordered_map<std::string,std::uint32_t> plan_guest_imports(
-        const GuestElf32& elf,std::string& error);
+        const GuestElf32& elf,std::string& error,
+        const std::unordered_map<std::string,std::uint32_t>& data_symbols={});
     std::string unresolved_import(std::uint32_t svc_id) const;
     std::size_t unresolved_import_count() const noexcept {
         return unresolved_imports_.size();
@@ -33,7 +34,7 @@ public:
     // guest-call runner's translated ARM callback path, in reverse order.
     struct Destructor { std::uint32_t function, argument, dso; };
     std::vector<Destructor> take_destructors(std::uint32_t dso);
-    static constexpr unsigned last_svc=44;
+    static constexpr unsigned last_svc=48;
     static constexpr unsigned once_svc=44;
     static constexpr unsigned finalize_svc=32;
     // Called AFTER Dynarmic's SVC callback halts JIT execution.
