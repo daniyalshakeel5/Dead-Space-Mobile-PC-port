@@ -109,7 +109,7 @@ std::uint32_t GuestJniVm::return_pc(std::uint32_t id) const noexcept {
 }
 bool GuestJniVm::dispatch(std::uint32_t id,
                           std::array<std::uint32_t,16>& regs,
-                          GuestElf32& guest,std::string& error) const noexcept {
+                          GuestElf32& guest,std::string& error) noexcept {
     if(!handles(id)){error="Unrecognized original JNI call";return false;}
     const auto r0=regs[0],r1=regs[1],r2=regs[2];
     if(id>=vm_svc_base && id<vm_svc_base+vm_slots){
