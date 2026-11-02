@@ -48,7 +48,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native Windows ARM JIT configure failed' }
       - name: Build native Windows ARM32 translator and guest runtime integration
         run: |
-          cmake --build build-jit-windows --config Release --target xperia_arm32_jit_smoke xperia_elf_jit_synthetic xperia_guest_libc_jit_smoke xperia_arm_call_runner_tests --parallel 2
+          cmake --build build-jit-windows --config Release --target xperia_arm32_jit_smoke xperia_elf_jit_synthetic xperia_guest_libc_jit_smoke xperia_arm_call_runner_tests xperia_guest_import_report --parallel 2
           if ($LASTEXITCODE -ne 0) { throw 'Native Windows ARM JIT build failed' }
       - name: Execute actual A32 guest ABI synthetic tests on Windows x86-64
         run: |
