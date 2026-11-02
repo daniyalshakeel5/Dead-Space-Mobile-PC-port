@@ -166,9 +166,16 @@ OriginalMenuGpuStatus run_original_menu_gl(
     };
     const auto ui_pointer=[&](OriginalUiPointerAction action,int x,int y){
         if(!has_ui_layer)return;
+        int logical_x=-1,logical_y=-1;
+        if(action!=OriginalUiPointerAction::Cancel){
+            int window_width=0,window_height=0;
+            SDL_GetWindowSize(window.get(),&window_width,&window_height);
+            original_ui_window_to_canvas(window_width,window_height,x,y,
+                                         logical_x,logical_y);
+        }
         const auto previous=ui_input.hovered;
         const auto result=dispatch_original_ui_pointer(ui_input,
-            *ui_runtime->draw_commands,action,x,y);
+            *ui_runtime->draw_commands,action,logical_x,logical_y);
         if(result.hovered!=previous && ui_runtime->on_hover)
             ui_runtime->on_hover(ui_runtime->context,result.hovered);
         if(result.activated && ui_runtime->on_activate)
@@ -379,6 +386,15 @@ OriginalMenuGpuStatus run_original_menu_gl(
             }
         }
         if(has_ui_layer && !ui_runtime->draw_commands->empty()) {
+            const auto viewport=original_ui_viewport(w,h);
+            if(viewport.width<=0||viewport.height<=0){
+                diagnostic="Invalid native original 480x320 UI viewport";
+                release_all_textures();return OriginalMenuGpuStatus::InvalidScene;
+            }
+            // The original UI geometry is 480x320. Preserve the original
+            // aspect ratio instead of stretching it across 16:9 monitors.
+            glViewport(viewport.x,h-viewport.y-viewport.height,
+                       viewport.width,viewport.height);
             glPushAttrib(GL_ENABLE_BIT|GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|
                          GL_POLYGON_BIT|GL_TEXTURE_BIT);
             glDisable(GL_DEPTH_TEST);glDepthMask(GL_FALSE);
@@ -422,6 +438,7 @@ OriginalMenuGpuStatus run_original_menu_gl(
             glEnableClientState(GL_VERTEX_ARRAY);
             glEnableClientState(GL_TEXTURE_COORD_ARRAY);
             glPopAttrib();
+            glViewport(0,0,w,h);
         }
         // Optional one-frame production renderer smoke for GitHub's
         // software OpenGL runner. No framebuffer image is persisted.
