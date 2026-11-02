@@ -4,6 +4,7 @@
 #include "ds_port/original_splash_host.hpp"
 #include "ds_port/im_menu_scene.hpp"
 #include "ds_port/original_ui_sbin.hpp"
+#include "ds_port/original_ui_layout.hpp"
 #include "ds_port/original_menu_draw_stream.hpp"
 #ifdef DS_NATIVE_ORIGINAL_MENU_GL
 #include "ds_port/original_menu_gl.hpp"
@@ -147,10 +148,21 @@ bool load_original_external_textures(const std::string& root,
 }
 #endif // DS_NATIVE_ORIGINAL_MENU_GL
 bool load_original_menu_stage(const std::string& root) {
-    std::vector<std::uint8_t> scene_bytes,ui_bytes;
+    std::vector<std::uint8_t> scene_bytes,ui_bytes,layout_bytes;
     if(!read_original_bounded(root,"published/models/main_menu.m3g",scene_bytes) ||
-       !read_original_bounded(root,"published/texturepacks_ui/ui_frontend.m3g",ui_bytes))
+       !read_original_bounded(root,"published/texturepacks_ui/ui_frontend.m3g",ui_bytes) ||
+       !read_original_bounded(root,"published/layoutdata/layouts.xml.sb",layout_bytes))
         return false;
+    const auto layout=ds_port::decode_original_layout_sbin(
+        layout_bytes.data(),layout_bytes.size());
+    if(!layout.decoded) {
+        std::cerr<<"Original compiled main-menu layout decode failed: "
+                 <<layout.error<<"\\n";
+        return false;
+    }
+    std::cerr<<"Original UI layout data loaded: "<<layout.types.size()
+             <<" entity schemas, "<<layout.references.size()
+             <<" referenced records; original UI_MAIN and BTN_PLAY present.\\n";
     const auto scene=ds_port::decode_im_menu_geometry(
         scene_bytes.data(),scene_bytes.size());
     const auto ui=ds_port::decode_im_ui_rgba_images(
