@@ -307,6 +307,95 @@ M3gRgbaImage decode_m3g_rgba_image(const std::uint8_t* data, std::size_t size) {
 }
 
 
+M3gRgbaImage decode_m3g_scene_texture_image(
+    const std::uint8_t* data,std::size_t size) {
+    M3gRgbaImage out;
+    const auto fail=[&](const char* message) {
+        out.decoded=false;out.error=message;
+        out.pixels_rgba.clear();return out;
+    };
+    // Existing scanner checks every section's bounds, declared size,
+    // Adler-32 checksum, zlib expansion and object framing.
+    const auto report=scan_m3g_container(
+        data,size,64u*1024u*1024u,M3gScanMode::DiagnosticOpaqueVariant);
+    if(!report.valid || report.image2d_objects!=1 ||
+       report.image2d_standard_payloads!=1)
+        return fail("not a validated one-image JSR-184 texture resource");
+
+    std::size_t pos=kSignature.size();
+    std::size_t images=0;
+    while(pos<size) {
+        if(size-pos<13)return fail("truncated section");
+        const std::uint8_t* section=data+pos;
+        const std::uint8_t compression=section[0];
+        const std::size_t total=le32(section+1);
+        const std::size_t uncompressed=le32(section+5);
+        if(total<13 || total>size-pos ||
+           uncompressed>64u*1024u*1024u)
+            return fail("section length out of bounds");
+        const std::size_t stored=total-13;
+        std::vector<std::uint8_t> inflated;
+        const std::uint8_t* objects=section+9;
+        std::size_t objects_size=stored;
+        if(compression==1) {
+            inflated.resize(std::max<std::size_t>(1,uncompressed));
+            uLongf length=static_cast<uLongf>(inflated.size());
+            if(uncompress(inflated.data(),&length,
+                    reinterpret_cast<const Bytef*>(objects),
+                    static_cast<uLong>(stored))!=Z_OK ||
+               length!=uncompressed)
+                return fail("invalid compressed texture objects");
+            objects=inflated.data();
+            objects_size=static_cast<std::size_t>(length);
+        }else if(compression!=0 || stored!=uncompressed)
+            return fail("invalid uncompressed texture section");
+
+        std::size_t offset=0;
+        while(offset<objects_size) {
+            if(objects_size-offset<5)return fail("truncated texture object");
+            const auto type=objects[offset];
+            const auto length=static_cast<std::size_t>(le32(objects+offset+1));
+            offset+=5;
+            if(length>objects_size-offset)
+                return fail("invalid texture object size");
+            if(type==10) {
+                if(++images!=1)
+                    return fail("multiple Image2D objects in texture resource");
+                Image2dEvidence evidence{};
+                if(!parse_image2d_payload(objects+offset,length,evidence) ||
+                   evidence.is_mutable||evidence.palette_bytes!=0 ||
+                   (evidence.format!=99&&evidence.format!=100) ||
+                   evidence.width>4096||evidence.height>4096)
+                    return fail("unsupported original Image2D encoding");
+                const unsigned channels=evidence.format==100?4u:3u;
+                const std::size_t pixel_count=std::size_t(evidence.width)*evidence.height;
+                if(pixel_count>16u*1024u*1024u ||
+                   evidence.pixel_bytes!=pixel_count*channels ||
+                   evidence.pixel_offset>length ||
+                   evidence.pixel_bytes>length-evidence.pixel_offset)
+                    return fail("texture pixel span out of bounds");
+                out.width=evidence.width;
+                out.height=evidence.height;
+                out.pixels_rgba.resize(pixel_count*4u);
+                const auto* pixel=objects+offset+evidence.pixel_offset;
+                for(std::size_t i=0;i<pixel_count;++i) {
+                    const auto* src=pixel+i*channels;
+                    auto* dst=out.pixels_rgba.data()+i*4u;
+                    dst[0]=src[0];dst[1]=src[1];dst[2]=src[2];
+                    dst[3]=channels==4?src[3]:255;
+                }
+            }
+            offset+=length;
+        }
+        if(offset!=objects_size)
+            return fail("texture section object length mismatch");
+        pos+=total;
+    }
+    if(pos!=size||images!=1)
+        return fail("Image2D texture section missing");
+    out.decoded=true;return out;
+}
+
 M3gRgbaImage decode_m3g_etc1_image(const std::uint8_t* data, std::size_t size) {
     M3gRgbaImage image;
     const auto fail = [&](const char* reason) {
