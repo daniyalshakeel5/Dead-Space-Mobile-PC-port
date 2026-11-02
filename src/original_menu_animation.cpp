@@ -193,8 +193,10 @@ OriginalMenuMotion decode_original_menu_motion(const std::uint8_t* data,
     std::unordered_map<std::uint32_t,OriginalMotionTrack> tracks;
     for(std::size_t i=0;i<chunks.size();++i) {
         const auto& chunk=chunks[i];const auto id=std::uint32_t(i+1);
-        if(chunk.type!=1&&chunk.type!=2&&chunk.type!=19&&
-           chunk.type!=5&&chunk.type!=9&&chunk.type!=14)continue;
+        // Every standard JSR-184 scene class inherits Object3D, including
+        // Texture2D, Appearance and Material. The original menu attaches
+        // three tracks outside the Node hierarchy as well.
+        if(chunk.type==0 || chunk.type>22)continue;
         Reader r{chunk.data,chunk.size,0};
         std::vector<std::uint32_t> attached;
         if(!object3d(r,attached,id))return fail("Invalid animated Object3D header");
