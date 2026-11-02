@@ -48,7 +48,7 @@ jobs:
           $root='dist/DeadSpaceMobile-Xperia-Launcher'
           New-Item -ItemType Directory -Force "$root/launcher","$root/tools" | Out-Null
           Copy-Item 'dist/DeadSpaceLauncher.exe' "$root/DeadSpaceLauncher.exe"
-          Copy-Item 'launcher/Core.ps1','launcher/Installer.ps1','launcher/Launcher.ps1','launcher/Launcher.xaml' "$root/launcher/"
+          Copy-Item 'launcher/Core.ps1','launcher/Installer.ps1','launcher/Launcher.ps1','launcher/Launcher.xaml','launcher/GuestPreflight.ps1' "$root/launcher/"
           # QEMU Docker/WSL boot adapter remains developer-only, not a user requirement.
           Copy-Item 'docs/XPERIA_LAUNCHER.md' "$root/README.md"
           Copy-Item 'docs/XPERIA_PC_BOOT_BACKEND.md' "$root/QEMU-BOOT-NOTES.md"
