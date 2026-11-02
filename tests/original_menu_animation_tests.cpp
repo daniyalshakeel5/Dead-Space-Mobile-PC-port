@@ -41,5 +41,17 @@ int main(){
     motion.sequences[1].keys={{0,{1}},{1000,{0}}};
     assert(sample_original_menu_motion(motion,base,800,out,true));
     assert(!out[1].rendering_enabled);
+    motion.sequences.push_back(
+        {22,1000,176,192,{{0,{1,1,1}},{1000,{2,3,4}}}});
+    motion.tracks={{25,22,18,270}};
+    assert(sample_original_menu_motion(motion,base,500,out,true));
+    assert(std::fabs(out[0].local[0]-1.5f)<1e-5f);
+    assert(std::fabs(out[0].local[5]-2.f)<1e-5f);
+    assert(std::fabs(out[0].local[10]-2.5f)<1e-5f);
+    motion.sequences.push_back(
+        {23,1000,176,192,{{0,{1}},{1000,{0.2f}}}});
+    motion.tracks={{25,23,18,256}};
+    assert(sample_original_menu_motion(motion,base,500,out,true));
+    assert(std::fabs(out[0].alpha-0.6f)<1e-5f);
     return 0;
 }
