@@ -407,6 +407,78 @@ M3gRgbaImage decode_m3g_scene_texture_image(
     out.decoded=true;return out;
 }
 
+M3gRgbaImage decode_m3g_ironmonkey_uncompressed_image(
+    const std::uint8_t* data,std::size_t size) {
+    M3gRgbaImage out;
+    const auto fail=[&](const char* error) {
+        out.decoded=false;out.error=error;out.pixels_rgba.clear();return out;
+    };
+    // In the actual original texture_env_generic_uv_particle.m3g,
+    // the proprietary writer uses ONE JSR-184 section, with the section
+    // total repeated as the uncompressed-size word and a ZERO checksum.
+    // The ordinary JSR-184 path retains mandatory Adler32 verification.
+    if(!data || size<38 || size>64u*1024u*1024u ||
+       !std::equal(kSignature.begin(),kSignature.end(),data) ||
+       data[12]!=0 || le32(data+13)!=size-12 ||
+       le32(data+17)!=size-12 || le32(data+size-4)!=0)
+        return fail("not an original single-section zero-checksum texture");
+
+    const std::size_t end=size-4;
+    std::size_t at=21;
+    std::size_t objects=0,images=0;
+    while(at<end && objects<8192) {
+        if(end-at<5)return fail("truncated original image object header");
+        const auto type=data[at++];
+        const auto length=static_cast<std::size_t>(le32(data+at));
+        at+=4;
+        if(length>end-at)return fail("object exceeds original image section");
+        if(objects==0) {
+            if(type!=0 || length<12 || data[at]!=1 ||
+               data[at+1]!=0 || data[at+2]>1 ||
+               data[at+length-1]!=0)
+                return fail("invalid original texture Header object");
+        }
+        if(type==10) {
+            if(++images!=1)return fail("multiple Image2D objects");
+            Image2dEvidence evidence{};
+            if(!parse_image2d_payload(data+at,length,evidence) ||
+               evidence.is_mutable || evidence.palette_bytes ||
+               evidence.format<96 || evidence.format>100 ||
+               evidence.width>4096 || evidence.height>4096)
+                return fail("invalid original uncompressed Image2D");
+            const std::size_t count=std::size_t(evidence.width)*evidence.height;
+            const unsigned channels=evidence.format<=97?1u:
+                evidence.format==98?2u:evidence.format==99?3u:4u;
+            if(count>16u*1024u*1024u ||
+               evidence.pixel_bytes!=count*channels ||
+               evidence.pixel_offset>length ||
+               evidence.pixel_bytes>length-evidence.pixel_offset)
+                return fail("invalid original particle pixel span");
+            out.width=evidence.width;out.height=evidence.height;
+            out.pixels_rgba.resize(count*4u);
+            const auto* pixels=data+at+evidence.pixel_offset;
+            for(std::size_t i=0;i<count;++i) {
+                const auto* src=pixels+i*channels;
+                auto* dst=out.pixels_rgba.data()+i*4u;
+                if(evidence.format==96) {
+                    dst[0]=255;dst[1]=255;dst[2]=255;dst[3]=src[0];
+                }else if(evidence.format==97) {
+                    dst[0]=src[0];dst[1]=src[0];dst[2]=src[0];dst[3]=255;
+                }else if(evidence.format==98) {
+                    dst[0]=src[0];dst[1]=src[0];dst[2]=src[0];dst[3]=src[1];
+                }else {
+                    dst[0]=src[0];dst[1]=src[1];dst[2]=src[2];
+                    dst[3]=channels==4?src[3]:255;
+                }
+            }
+        }
+        at+=length;++objects;
+    }
+    if(at!=end || !images)
+        return fail("incomplete original uncompressed image objects");
+    out.decoded=true;return out;
+}
+
 M3gRgbaImage decode_m3g_etc1_image(const std::uint8_t* data, std::size_t size) {
     M3gRgbaImage image;
     const auto fail = [&](const char* reason) {
