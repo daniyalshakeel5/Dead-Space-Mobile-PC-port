@@ -58,3 +58,9 @@ add_test(NAME xperia_arm32_call_runner_and_constructor_order
 add_executable(xperia_guest_import_report xperia_guest_import_report.cpp)
 target_compile_features(xperia_guest_import_report PRIVATE cxx_std_20)
 target_link_libraries(xperia_guest_import_report PRIVATE xperia_arm_guest_libc)
+
+# Original user-supplied Xperia ELF startup: fail-closed if Android imports
+# are missing; only execute authentic game constructors when fully bound.
+add_executable(xperia_guest_startup xperia_guest_startup.cpp)
+target_compile_features(xperia_guest_startup PRIVATE cxx_std_20)
+target_link_libraries(xperia_guest_startup PRIVATE xperia_arm_call_runner)
