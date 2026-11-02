@@ -58,7 +58,9 @@ jobs:
             libc6:armhf libgcc-s1:armhf libstdc++6:armhf \
             zlib1g:armhf libzip4t64:armhf libbsd0:armhf \
             libsdl2-2.0-0:armhf libegl1:armhf libgles1:armhf \
-            libgl1-mesa-dri:armhf libgbm1:armhf libglapi-mesa:armhf
+            libgl1:armhf libglx0:armhf libglx-mesa0:armhf libglvnd0:armhf \
+            libgl1-mesa-dri:armhf libgbm1:armhf libglapi-mesa:armhf \
+            gcc-arm-linux-gnueabihf xvfb xauth
       - name: Package and execute real upstream ARM loader --version via bundled QEMU
         shell: bash
         run: |
@@ -97,6 +99,18 @@ jobs:
           chmod +x "$dest/bin/"* "$dest/Run Dead Space.sh" "$dest/Dead Space Mobile.desktop"
           echo "QEMU host binary:"
           "$dest/bin/qemu-arm-static" --version | head -1
+          # User field logs 2026-11-03 show SDL_CreateWindow failed:
+          # missing ARMHF libGL.so.1, followed by 182 unresolved GL imports.
+          # Verify the GL/GLX loader and the ACTUAL ARMHF SDL window path,
+          # not just game loader --version, before uploading any artifact.
+          test -s "$dest/sysroot/usr/lib/arm-linux-gnueabihf/libGL.so.1"
+          test -s "$dest/sysroot/usr/lib/arm-linux-gnueabihf/libGLX.so.0"
+          test -s "$dest/sysroot/usr/lib/arm-linux-gnueabihf/libGLX_mesa.so.0"
+          arm-linux-gnueabihf-gcc -O2 -Wall -Wextra -o "$RUNNER_TEMP/graphics-probe-armhf" \
+            linux-portable/graphics_probe_arm.c -ldl
+          echo "ARMHF SDL2 + libGL + GLES1 / GL2.1 compatibility under real QEMU:"
+          xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
+            "$dest/bin/qemu-arm-static" -L "$dest/sysroot" "$RUNNER_TEMP/graphics-probe-armhf"
           echo "Actual upstream GNU/Linux ARM32 Dead Space loader executed through QEMU:"
           "$dest/bin/qemu-arm-static" -L "$dest/sysroot" "$dest/bin/deadspace-armhf" --version
           test ! -e "$dest/game-data"
