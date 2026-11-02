@@ -73,7 +73,7 @@ def metadata(apk: Path) -> dict:
                         raise ValueError("Unexpected native library output size")
             if count != item.file_size:
                 raise ValueError("Truncated native library")
-            elf = len(header) >= 20 and header[:4] == b"\\x7fELF"
+            elf = len(header) >= 20 and header[:4] == b"\x7fELF"
             machine = int.from_bytes(header[18:20], "little") if elf and header[5] == 1 else None
             libraries.append({
                 "path": item.filename,

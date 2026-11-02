@@ -7,7 +7,7 @@ from tools.deadspace_apk_lineage_compare import metadata, comparison
 
 def fake_elf(machine=40):
     elf = bytearray(64)
-    elf[:4] = b"\\x7fELF"
+    elf[:4] = b"\x7fELF"
     elf[4] = 1
     elf[5] = 1
     elf[18:20] = machine.to_bytes(2, "little")
