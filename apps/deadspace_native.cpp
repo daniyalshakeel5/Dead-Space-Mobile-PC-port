@@ -5,6 +5,7 @@
 #include "ds_port/im_menu_scene.hpp"
 #include "ds_port/original_ui_sbin.hpp"
 #include "ds_port/original_ui_layout.hpp"
+#include "ds_port/original_ui_layout_compose.hpp"
 #include "ds_port/original_menu_draw_stream.hpp"
 #ifdef DS_NATIVE_ORIGINAL_MENU_GL
 #include "ds_port/original_menu_gl.hpp"
@@ -147,6 +148,63 @@ bool load_original_external_textures(const std::string& root,
     return replaced!=0;
 }
 #endif // DS_NATIVE_ORIGINAL_MENU_GL
+struct NativeOriginalMenuUi {
+    const ds_port::OriginalLayoutDatabase* layout=nullptr;
+    const ds_port::OriginalUiSbin* atlas=nullptr;
+    std::string active_screen="UI_MAIN";
+    std::uint32_t hovered=0;
+    std::vector<ds_port::OriginalUiDraw> commands;
+    std::unordered_map<std::uint32_t,std::string> actions;
+
+    bool rebuild(){
+        const auto ui=ds_port::compose_original_ui_screen(
+            *layout,*atlas,active_screen,hovered);
+        if(!ui.valid){
+            std::cerr<<"Original UI layout composition failed for "<<active_screen
+                     <<": "<<ui.error<<"\\n";
+            return false;
+        }
+        commands=ui.draws;actions=ui.actions;
+        return true;
+    }
+    static void hover(void* ptr,std::uint32_t id){
+        auto& state=*static_cast<NativeOriginalMenuUi*>(ptr);
+        if(state.hovered==id)return;
+        state.hovered=id;
+        state.rebuild();
+    }
+    static void activate(void* ptr,std::uint32_t id){
+        auto& state=*static_cast<NativeOriginalMenuUi*>(ptr);
+        const auto action=state.actions.find(id);
+        if(action==state.actions.end())return;
+        const auto& name=action->second;
+        std::string destination;
+        if(name=="BTN_PLAY"&&state.active_screen=="UI_MAIN")
+            destination="UI_PROFILE";
+        else if(name=="BTN_OPTIONS"&&state.active_screen=="UI_MAIN")
+            destination="UI_OPTIONS_MAIN";
+        else if(name=="BTN_EXTRAS"&&state.active_screen=="UI_MAIN")
+            destination="UI_EXTRAS";
+        else if(name=="BTN_BACK")
+            destination="UI_MAIN";
+        // A profile selection or actual game start requires original
+        // engine callbacks. Do not fabricate a mission or gameplay state.
+        if(destination.empty()) {
+            std::cerr<<"Original menu action "<<name
+                     <<" requires unrecovered game-state callback.\\n";
+            return;
+        }
+        const auto before=state.active_screen;
+        state.active_screen=destination;state.hovered=0;
+        if(!state.rebuild()){
+            state.active_screen=before;
+            state.rebuild();
+            return;
+        }
+        std::cerr<<"Native reconstructed menu transition: "
+                 <<before<<" -> "<<destination<<"\\n";
+    }
+};
 bool load_original_menu_stage(const std::string& root) {
     std::vector<std::uint8_t> scene_bytes,ui_bytes,layout_bytes;
     if(!read_original_bounded(root,"published/models/main_menu.m3g",scene_bytes) ||
@@ -174,6 +232,11 @@ bool load_original_menu_stage(const std::string& root) {
                  <<frontend.error<<"\\n";
         return false;
     }
+    NativeOriginalMenuUi menu_ui{&layout,&frontend};
+    if(!menu_ui.rebuild())return false;
+    std::cerr<<"Original UI_MAIN: "<<menu_ui.commands.size()
+             <<" source-layout draw/hit commands, "
+             <<menu_ui.actions.size()<<" named clickable controls.\\n";
     std::cerr<<"Original frontend UI database: "<<frontend.names.size()
              <<" named resources, "<<frontend.types.size()
              <<" record structures, "<<frontend.object_data.size()
@@ -238,9 +301,12 @@ bool load_original_menu_stage(const std::string& root) {
         const ds_port::OriginalMenuAnimationRuntime animation_runtime{
             &motion,&native_scene.nodes,&native_scene.camera,
             &native_scene.materials,true};
+        const ds_port::OriginalUiRuntime ui_runtime{
+            &frontend,&ui.images,&menu_ui.commands,&menu_ui,
+            &NativeOriginalMenuUi::activate,&NativeOriginalMenuUi::hover};
         const auto render_result=ds_port::run_original_menu_gl(
             scene,draw,native_scene.images,resolved.frame,renderer_error,
-            &animation_runtime);
+            &animation_runtime,&ui_runtime);
         if(render_result==ds_port::OriginalMenuGpuStatus::GraphicsUnavailable ||
            render_result==ds_port::OriginalMenuGpuStatus::InvalidScene ||
            render_result==ds_port::OriginalMenuGpuStatus::IncompleteOriginalScene) {
