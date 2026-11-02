@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 namespace fs=std::filesystem;
+using ds_port::read_original_asset_file;
 int main() {
     const auto stamp=std::chrono::steady_clock::now().time_since_epoch().count();
     const auto root=fs::temp_directory_path()/
