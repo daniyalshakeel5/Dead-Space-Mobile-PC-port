@@ -42,7 +42,7 @@ public:
     bool dispatch(std::uint32_t id,std::array<std::uint32_t,16>& registers,
                   GuestElf32& image,std::string& failure,
                   GuestHeap* heap=nullptr,
-                  GuestFileSystem* files=nullptr) const noexcept;
+                  GuestFileSystem* files=nullptr) noexcept;
 private:
     std::unordered_map<std::string,std::uint32_t> symbols_;
     std::vector<std::uint8_t> code_;
