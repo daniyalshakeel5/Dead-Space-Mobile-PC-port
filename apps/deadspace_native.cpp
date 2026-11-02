@@ -8,6 +8,9 @@
 #include "ds_port/original_menu_gl.hpp"
 #include "ds_port/original_menu_scene_graph.hpp"
 #include "ds_port/original_m3g_scene.hpp"
+#ifdef DS_NATIVE_EXTERNAL_M3G_TEXTURES
+#include "ds_port/m3g_container.hpp"
+#endif
 #endif
 #include "ds_port/im_ui_image.hpp"
 #include <filesystem>
@@ -84,14 +87,32 @@ bool load_original_external_textures(const std::string& root,
             std::cerr<<"Original menu texture pack missing: "<<path<<"\\n";
             return false;
         }
-        const auto pack=ds_port::decode_im_ui_rgba_images(
+        // The splash/UI packs use proprietary IM-M3G framing, whereas
+        // scene external images may use the standard JSR-184 container.
+        // Try both EXISTING validated native decoders; never generate
+        // placeholder textures or silently ignore a missing dependency.
+        ds_port::M3gRgbaImage decoded{};
+        const auto im=ds_port::decode_im_ui_rgba_images(
             payload.data(),payload.size());
-        if(!pack.decoded||pack.images.size()!=1||!pack.images.front().decoded) {
+        if(im.decoded && im.images.size()==1 &&
+           im.images.front().decoded)
+            decoded=std::move(im.images.front());
+#ifdef DS_NATIVE_EXTERNAL_M3G_TEXTURES
+        if(!decoded.decoded) {
+            decoded=ds_port::decode_m3g_rgba_image(
+                payload.data(),payload.size());
+            if(!decoded.decoded)
+                decoded=ds_port::decode_m3g_etc1_image(
+                    payload.data(),payload.size());
+        }
+#endif
+        if(!decoded.decoded) {
             std::cerr<<"Original texture pack decode unsupported: "<<path
-                     <<" ("<<pack.error<<")\\n";
+                     <<" (IM-M3G: "<<im.error<<", external: "
+                     <<decoded.error<<")\\n";
             return false;
         }
-        scene.images[i]=pack.images.front();
+        scene.images[i]=std::move(decoded);
         ++replaced;
     }
     std::cerr<<"Original scene external Image2D replacements: "<<replaced
