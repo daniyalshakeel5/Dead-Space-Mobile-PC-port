@@ -265,6 +265,25 @@ bool sample_original_menu_motion(const OriginalMenuMotion& animation,
             local[12]=value[0];local[13]=value[1];local[14]=value[2];
         }else if(track.property_id==268 && value.size()==4) {
             rotate_from_quaternion(local,value);
+        }else if(track.property_id==270 && value.size()==3) {
+            // SCALE: original track sets absolute component scale.
+            // Keep the recovered rotation directions and normalize its
+            // existing basis before applying each animated magnitude.
+            for(int axis=0;axis<3;++axis) {
+                float length=0.f;
+                for(int row=0;row<3;++row)
+                    length+=local[axis*4+row]*local[axis*4+row];
+                length=std::sqrt(length);
+                if(length<1e-8f) {
+                    if(value[axis]!=0.f)return false;
+                    continue;
+                }
+                for(int row=0;row<3;++row)
+                    local[axis*4+row]*=value[axis]/length;
+            }
+        }else if(track.property_id==256 && value.size()==1) {
+            result[node->second].alpha=
+                std::clamp(value[0],0.f,1.f);
         }else if(track.property_id==276 && value.size()==1) {
             result[node->second].rendering_enabled=value[0]>=0.5f;
         }
