@@ -83,10 +83,28 @@ def prepare_source(source):
         if not (source/file).is_file():raise BootError("Missing GPL loader build file: "+file)
 
 def run_logged(argv,timeout,path):
-    proc=subprocess.run(argv,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
-                        text=True,errors="replace",timeout=timeout,check=False)
-    path.write_text(proc.stdout[:8_000_000],encoding="utf-8")
-    return proc.returncode
+    """Stream Docker output to a bounded local logfile, not host memory.
+
+    A long GCC/Docker run can produce large output; the previous
+    subprocess.run(stdout=PIPE) buffered all output in RAM and showed
+    no progress while compiling the original-free ARM compatibility code.
+    """
+    print("QEMU backend: running "+(" ".join(argv[:3]))+"...",flush=True)
+    with path.open("w",encoding="utf-8",errors="replace") as output:
+        child=subprocess.Popen(argv,stdout=output,stderr=subprocess.STDOUT,
+                               text=True)
+        try:
+            rc=child.wait(timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            child.kill()
+            child.wait()
+            output.write("\nERROR: process exceeded stage timeout\n")
+            raise BootError("QEMU/Docker stage timed out; inspect "+str(path)) from exc
+    print("QEMU backend stage exit code: "+str(rc),flush=True)
+    if rc:
+        tail=path.read_text(encoding="utf-8",errors="replace")[-3000:]
+        print("QEMU backend recent error output:\n"+tail,flush=True)
+    return rc
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -111,6 +129,7 @@ def main():
         prepare_source(a.source_dir)
         a.logs.mkdir(parents=True,exist_ok=True)
         for i,label in enumerate(("image-build","arm-loader-build","real-game")):
+            print("QEMU backend: starting "+label+" (stage "+str(i+1)+"/3)",flush=True)
             rc=run_logged(stages[i],1200 if i<2 else a.seconds+60,a.logs/(label+".log"))
             if i<2 and rc:raise BootError(label+" failed; inspect local log")
         output=(a.logs/"real-game.log").read_text(encoding="utf-8",errors="replace")
