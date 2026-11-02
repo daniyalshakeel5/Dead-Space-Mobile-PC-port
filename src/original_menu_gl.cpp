@@ -221,19 +221,43 @@ OriginalMenuGpuStatus run_original_menu_gl(
                 native_menu_focus_lost(input,callbacks);
                 ui_pointer(OriginalUiPointerAction::Cancel,0,0);
             }else if(e.type==SDL_KEYDOWN && !e.key.repeat) {
-                if(e.key.keysym.sym==SDLK_ESCAPE) {
+                const auto key=e.key.keysym.sym;
+                if(key==SDLK_ESCAPE) {
                     native_menu_key(input,callbacks,4,true);
-                    // While original event-queue owners remain unavailable,
-                    // invoke only the real named BTN_BACK from the active
-                    // source-layout screen. No invented game-state change.
+                    // When the original JNI queue is unavailable, invoke
+                    // only an existing recovered BTN_BACK layout action.
                     if(ui_runtime && ui_runtime->on_back &&
                        original_runtime::original_last_input_status()!=
-                           original_runtime::OriginalInputStatus::Completed)
+                           original_runtime::OriginalInputStatus::Completed) {
                         ui_runtime->on_back(ui_runtime->context);
-                }else if(e.key.keysym.sym==SDLK_RETURN)
+                        ui_input.hovered=0;ui_input.pressed=0;
+                    }
+                }else if(key==SDLK_RETURN || key==SDLK_KP_ENTER) {
                     native_menu_key(input,callbacks,66,true);
+                    // Desktop keyboard support uses the same named UI
+                    // actions as mouse clicks, never fabricated screens.
+                    if(has_ui_layer && ui_runtime->on_activate &&
+                       ui_input.hovered &&
+                       original_runtime::original_last_input_status()!=
+                           original_runtime::OriginalInputStatus::Completed) {
+                        const auto selected=ui_input.hovered;
+                        ui_input.hovered=0;ui_input.pressed=0;
+                        ui_runtime->on_activate(ui_runtime->context,selected);
+                    }
+                }else if(has_ui_layer && ui_runtime->on_hover &&
+                         (key==SDLK_TAB || key==SDLK_UP ||
+                          key==SDLK_DOWN || key==SDLK_LEFT ||
+                          key==SDLK_RIGHT)) {
+                    const bool backwards=(key==SDLK_UP||key==SDLK_LEFT||
+                        (key==SDLK_TAB && (e.key.keysym.mod&KMOD_SHIFT)));
+                    const auto focused=cycle_original_ui_focus(
+                        *ui_runtime->draw_commands,ui_input.hovered,backwards);
+                    ui_input.hovered=focused;ui_input.pressed=0;
+                    ui_runtime->on_hover(ui_runtime->context,focused);
+                }
             }else if(e.type==SDL_KEYUP &&
                      (e.key.keysym.sym==SDLK_RETURN ||
+                      e.key.keysym.sym==SDLK_KP_ENTER ||
                       e.key.keysym.sym==SDLK_ESCAPE))
                 native_menu_key(input,callbacks,
                                 e.key.keysym.sym==SDLK_ESCAPE?4:66,false);
