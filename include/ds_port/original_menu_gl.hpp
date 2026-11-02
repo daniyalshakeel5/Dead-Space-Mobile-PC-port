@@ -13,10 +13,17 @@ struct OriginalMenuGpuSurface {
     std::uint32_t appearance_object_index=0;
     std::uint32_t image_index=0; // index into supplied original decoded images
     bool use_texture=false;
+    std::uint8_t blending=68;
+    std::uint8_t alpha_threshold=0;
+    bool depth_test=true,depth_write=true,color_write=true,alpha_write=true;
+    std::uint8_t culling=160,winding=168;
+    float depth_offset_factor=0.f,depth_offset_units=0.f;
 };
 struct OriginalMenuGpuMesh {
     std::uint32_t mesh_object_index=0;
     std::array<float,16> model_matrix{};
+    bool visible=true;
+    float alpha=1.f;
 };
 struct OriginalMenuGpuFrame {
     std::array<float,16> projection{};
