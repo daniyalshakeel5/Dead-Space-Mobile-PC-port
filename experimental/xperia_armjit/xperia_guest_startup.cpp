@@ -4,6 +4,10 @@
 #include "guest_filesystem.hpp"
 #include "guest_arm_call_runner.hpp"
 #include "guest_jni_vm.hpp"
+#include "guest_xperia_input.hpp"
+#ifdef _WIN32
+#include "guest_sdl_host.hpp"
+#endif
 #include "guest_bionic_data.hpp"
 #include <cstdint>
 #include <filesystem>
@@ -44,7 +48,15 @@ int main(int argc,char** argv){
             throw std::runtime_error("Bionic guest data allocation failed: "+error);
         // Function imports not needed by early constructors become distinct
         // error traps. Imported data and ambiguous symbols stay blocked.
+#ifdef _WIN32
+        xperia::GuestSdlHost platform;
+        if(!platform.start(error,960,544))
+            throw std::runtime_error("Windows SDL OpenGL host failed: "+error);
+        auto planned=services.plan_guest_imports(elf,error,bionic.symbols(),
+                                                  platform.symbols());
+#else
         auto planned=services.plan_guest_imports(elf,error,bionic.symbols());
+#endif
         if(planned.empty()) {
             std::cerr<<"XPERIA_STARTUP_BLOCKED: "<<error<<"\n";
             return 4;
@@ -61,7 +73,11 @@ int main(int argc,char** argv){
         java.set_content_ready(true); // verified installed assets/ mount
         if(!java.install(elf,error))
             throw std::runtime_error("ARM32 JNI guest environment failed: "+error);
+#ifdef _WIN32
+        xperia::GuestArmCallRunner guest(elf,services,heap,&files,&java,&platform);
+#else
         xperia::GuestArmCallRunner guest(elf,services,heap,&files,&java);
+#endif
         std::cerr<<"Executing "<<elf.initialization_order.size()
                  <<" ORIGINAL Xperia ARM ELF constructors via Dynarmic.\n";
         if(!guest.run_original_initializers(error))
