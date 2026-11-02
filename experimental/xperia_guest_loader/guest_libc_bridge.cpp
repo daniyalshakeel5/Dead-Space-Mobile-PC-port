@@ -43,7 +43,11 @@ GuestLibcBridge::GuestLibcBridge() {
         "__android_log_write","gettimeofday","clock_gettime","time",
         "__cxa_guard_acquire","__cxa_guard_release","__cxa_guard_abort",
         "__cxa_pure_virtual", "__aeabi_atexit", "__cxa_atexit",
-        "__errno", "__cxa_finalize"
+        "__errno", "__cxa_finalize",
+        "pthread_mutex_init","pthread_mutex_destroy",
+        "pthread_mutex_lock","pthread_mutex_trylock","pthread_mutex_unlock",
+        "sem_init","sem_destroy","sem_post","sem_wait","sem_trywait",
+        "sem_getvalue","pthread_once"
     };
     for(unsigned i=0;i<last_svc;++i){
         const std::uint32_t id=i+1;
@@ -357,6 +361,112 @@ bool GuestLibcBridge::dispatch(
         }
         case 32: // __cxa_finalize requires translated ARM destructors
             throw std::runtime_error("C++ finalizers require guest JIT callback runner");
+        case 33: { // pthread_mutex_init(mutex*, default attr)
+            auto* guest=image.writeable(a,4);
+            if(!guest)throw std::runtime_error("Guest pthread mutex unmapped");
+            if(b)throw std::runtime_error("Nondefault pthread mutex attributes unsupported");
+            if(mutexes_.count(a)){result=16;break;} // EBUSY
+            mutexes_.emplace(a,GuestMutex{});
+            std::fill_n(guest,4,0);
+            result=0;break;
+        }
+        case 34: { // pthread_mutex_destroy
+            auto* guest=image.writeable(a,4);
+            if(!guest)throw std::runtime_error("Guest pthread mutex unmapped");
+            auto it=mutexes_.find(a);
+            if(it!=mutexes_.end() && it->second.locked){result=16;break;}
+            if(it==mutexes_.end() && image.read_u32(a)!=0)
+                throw std::runtime_error("Unknown Bionic pthread mutex state");
+            if(it!=mutexes_.end())mutexes_.erase(it);
+            std::fill_n(guest,4,0xff); // reject use after destroy
+            result=0;break;
+        }
+        case 35: // pthread_mutex_lock
+        case 36: { // pthread_mutex_trylock
+            if(!image.read(a,4))
+                throw std::runtime_error("Guest pthread mutex unmapped");
+            auto it=mutexes_.find(a);
+            if(it==mutexes_.end()){
+                if(image.read_u32(a)!=0)
+                    throw std::runtime_error("Unsupported Bionic mutex initial state");
+                it=mutexes_.emplace(a,GuestMutex{}).first; // static initializer
+            }
+            if(it->second.locked) {
+                if(id==35)
+                    throw std::runtime_error("Blocking pthread mutex requires guest thread scheduler");
+                result=16; // EBUSY
+            }else{
+                it->second.locked=true;
+                result=0;
+            }
+            break;
+        }
+        case 37: { // pthread_mutex_unlock
+            if(!image.read(a,4))
+                throw std::runtime_error("Guest pthread mutex unmapped");
+            const auto it=mutexes_.find(a);
+            if(it==mutexes_.end() || !it->second.locked){result=1;break;} // EPERM
+            it->second.locked=false;
+            result=0;break;
+        }
+        case 38: { // sem_init(sem*, pshared, initial_count)
+            auto* guest=image.writeable(a,4);
+            if(!guest)throw std::runtime_error("Guest semaphore unmapped");
+            if(b || n>static_cast<std::uint32_t>(INT_MAX))
+                throw std::runtime_error("Unsupported shared/oversized guest semaphore");
+            if(semaphores_.count(a))
+                throw std::runtime_error("Guest semaphore initialized twice");
+            semaphores_.emplace(a,n);
+            for(int i=0;i<4;++i)guest[i]=std::uint8_t(n>>(8*i));
+            result=0;break;
+        }
+        case 39: { // sem_destroy
+            auto* guest=image.writeable(a,4);
+            if(!guest || !semaphores_.erase(a))
+                throw std::runtime_error("Unknown guest semaphore");
+            std::fill_n(guest,4,0xff);
+            result=0;break;
+        }
+        case 40: // sem_post
+        case 41: // sem_wait
+        case 42: { // sem_trywait
+            const auto it=semaphores_.find(a);
+            auto* guest=image.writeable(a,4);
+            if(it==semaphores_.end() || !guest)
+                throw std::runtime_error("Guest semaphore not initialized");
+            auto& count=it->second;
+            if(id==40){
+                if(count==static_cast<std::uint32_t>(INT_MAX))
+                    throw std::runtime_error("Guest semaphore overflow");
+                ++count;
+                result=0;
+            }else if(count){
+                --count;result=0;
+            }else if(id==41){
+                throw std::runtime_error("Blocking sem_wait requires guest thread scheduler");
+            }else{
+                // sem_trywait returns -1 with errno=EAGAIN (not EBUSY).
+                constexpr std::uint32_t kErrno=0x72000000u;
+                if(!image.read(kErrno,4))
+                    image.segments.push_back({kErrno,std::vector<std::uint8_t>(4,0)});
+                auto* ep=image.writeable(kErrno,4);
+                if(!ep)throw std::runtime_error("Guest errno storage unavailable");
+                ep[0]=11;ep[1]=ep[2]=ep[3]=0;
+                result=UINT32_MAX;
+            }
+            for(int i=0;i<4;++i)guest[i]=std::uint8_t(count>>(8*i));
+            break;
+        }
+        case 43: { // sem_getvalue(sem*, int*)
+            const auto it=semaphores_.find(a);
+            auto* out=image.writeable(b,4);
+            if(it==semaphores_.end() || !out)
+                throw std::runtime_error("Invalid guest sem_getvalue");
+            for(int i=0;i<4;++i)out[i]=std::uint8_t(it->second>>(8*i));
+            result=0;break;
+        }
+        case 44:
+            throw std::runtime_error("pthread_once requires translated ARM callback runner");
         }
         regs[0]=result;
         failure.clear();return true;
