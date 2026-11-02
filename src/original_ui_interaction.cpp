@@ -62,6 +62,30 @@ bool validate_original_ui_draw_list(
     }
     error.clear();return true;
 }
+std::uint32_t cycle_original_ui_focus(
+    const std::vector<OriginalUiDraw>& commands,
+    std::uint32_t current,bool backwards) noexcept {
+    // Helper rectangles from the original layout are logical buttons,
+    // unlike shared atlas sprites that may be purely decorative.
+    std::vector<std::uint32_t> actions;
+    for(const auto& command:commands) {
+        if(!command.interactive||command.width<=0||command.height<=0)
+            continue;
+        const std::uint32_t id=command.action_id?
+            command.action_id:command.sprite_object_id;
+        if(id && std::find(actions.begin(),actions.end(),id)==actions.end())
+            actions.push_back(id);
+    }
+    if(actions.empty())return 0;
+    const auto current_it=std::find(actions.begin(),actions.end(),current);
+    if(current_it==actions.end())
+        return backwards?actions.back():actions.front();
+    const std::size_t index=static_cast<std::size_t>(
+        std::distance(actions.begin(),current_it));
+    return actions[backwards?
+        (index+actions.size()-1)%actions.size():
+        (index+1)%actions.size()];
+}
 OriginalUiHit hit_test_original_ui(
     const std::vector<OriginalUiDraw>& list,int x,int y){
     // Reverse draw order makes the foremost visible widget receive input.
