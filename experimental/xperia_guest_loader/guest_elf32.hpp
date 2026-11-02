@@ -26,6 +26,11 @@ public:
     std::vector<GuestSegment> segments;
     std::size_t relative_relocations=0,remaining_relocations=0;
     std::vector<PendingImport> pending_imports;
+    // Resolved original ARM constructors, ordered DT_INIT then DT_INIT_ARRAY.
+    // These are guest addresses; invoking them still requires a live JIT.
+    std::vector<std::uint32_t> initialization_order;
+    // Exported original ARM JNI functions, not host-callable pointers.
+    std::unordered_map<std::string,std::uint32_t> jni_exports;
     // All-or-nothing guest import binding, using explicit ARM32 guest
     // addresses assigned to host-service trampolines elsewhere.
     // Binding does NOT implement these services or make game executable.
