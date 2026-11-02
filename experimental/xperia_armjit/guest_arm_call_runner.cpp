@@ -133,8 +133,15 @@ struct GuestArmCallRunner::Impl {
                     throw std::runtime_error("ARM guest exceeded bounded instruction budget");
                 const auto expected=GuestLibcBridge::veneer_base+
                     std::uint64_t(id-1u)*8u;
-                if(expected>UINT32_MAX || id>GuestLibcBridge::last_svc)
-                    throw std::runtime_error("Unsupported Android SVC/import");
+                if(expected>UINT32_MAX)
+                    throw std::runtime_error("Invalid original ARM import SVC address");
+                if(id>GuestLibcBridge::last_svc) {
+                    const auto missing=bridge.unresolved_import(id);
+                    if(!missing.empty())
+                        throw std::runtime_error(
+                            "Original Xperia ARM invoked unsupported host import: "+missing);
+                    throw std::runtime_error("Unknown Android SVC/import trap");
+                }
                 std::array<u32,16> copy=jit.Regs();
                 if(id==GuestLibcBridge::finalize_svc) {
                     // Save the suspended original caller; running an ARM
