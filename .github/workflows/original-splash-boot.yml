@@ -195,6 +195,7 @@ jobs:
             > "$RUNNER_TEMP/native-splash-exit.txt" 2>&1
           actual_exit=$?
           set -e
+          cat "$RUNNER_TEMP/native-splash-exit.txt"
           # Exit 20 is intentional: original menu code is NOT ready.
           test "$actual_exit" = 20
           grep -F "Original menu stage resource load:" \
@@ -215,6 +216,7 @@ jobs:
             > "$RUNNER_TEMP/native-boot-apk.txt" 2>&1
           actual_exit=$?
           set -e
+          cat "$RUNNER_TEMP/native-boot-apk.txt"
           # Original gameplay engine not yet recovered: no false success.
           test "$actual_exit" = 20
           grep -F "user-owned APK assets. Entering native boot." \
