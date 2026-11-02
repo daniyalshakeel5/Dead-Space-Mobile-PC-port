@@ -55,6 +55,18 @@ int main(){
     assert(out.sprites.size()==1);
     assert(out.sprites[0].name=="name");
     assert(out.sprites[0].atlas_rect.width==2);
+    ds_port::M3gRgbaImage atlas{};
+    atlas.decoded=true;atlas.width=4;atlas.height=4;
+    atlas.pixels_rgba.assign(4u*4u*4u,0);
+    for(int y=0;y<2;++y)for(int x=0;x<2;++x){
+        auto* pixel=atlas.pixels_rgba.data()+(y*4+x)*4;
+        pixel[0]=123;pixel[1]=45;pixel[2]=67;pixel[3]=255;
+    }
+    const auto rebuilt=ds_port::reconstruct_original_ui_sprite(
+        out.sprites.front(),{atlas});
+    assert(rebuilt.decoded && rebuilt.width==2 && rebuilt.height==2);
+    assert(rebuilt.pixels_rgba[0]==123 && rebuilt.pixels_rgba[3]==255);
+    assert(rebuilt.pixels_rgba.size()==16);
     file[3]=0;
     assert(!ds_port::decode_original_ui_sbin(file.data(),file.size()).decoded);
     return 0;
