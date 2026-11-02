@@ -63,6 +63,29 @@ Bytes texture(bool zip,std::uint8_t format) {
     file.insert(file.end(),second.begin(),second.end());
     return file;
 }
+// The original uncompressed particle resource uses a single section,
+// repeated total-size word, and a literal zero checksum.
+Bytes ironmonkey_single_section(std::uint8_t format) {
+    const auto standard=texture(false,format);
+    const auto read32=[](const Bytes& b,std::size_t at) {
+        return std::uint32_t(b[at])|(std::uint32_t(b[at+1])<<8)|
+            (std::uint32_t(b[at+2])<<16)|(std::uint32_t(b[at+3])<<24);
+    };
+    const std::size_t first=read32(standard,13);
+    const std::size_t second_start=12+first;
+    const std::size_t second=read32(standard,second_start+1);
+    Bytes objects;
+    objects.insert(objects.end(),standard.begin()+21,
+                   standard.begin()+12+first-4);
+    objects.insert(objects.end(),standard.begin()+second_start+9,
+                   standard.begin()+second_start+second-4);
+    Bytes file(standard.begin(),standard.begin()+12);
+    const auto total=static_cast<std::uint32_t>(objects.size()+13);
+    file.push_back(0);u32(file,total);u32(file,total);
+    file.insert(file.end(),objects.begin(),objects.end());
+    u32(file,0);
+    return file;
+}
 int main() {
     for(auto format:{96u,97u,98u,99u,100u})for(bool zip:{false,true}) {
         const auto bytes=texture(zip,static_cast<std::uint8_t>(format));
@@ -79,6 +102,17 @@ int main() {
         broken.back()^=0xff;
         assert(!ds_port::decode_m3g_scene_texture_image(
             broken.data(),broken.size()).decoded);
+    }
+    for(auto format:{96u,97u,98u,99u,100u}) {
+        auto file=ironmonkey_single_section(static_cast<std::uint8_t>(format));
+        const auto decoded=ds_port::decode_m3g_ironmonkey_uncompressed_image(
+            file.data(),file.size());
+        assert(decoded.decoded);
+        assert(decoded.width==2 && decoded.height==2);
+        assert(decoded.pixels_rgba.size()==16);
+        file.back()=1; // vendor zero-checksum rule must remain strict
+        assert(!ds_port::decode_m3g_ironmonkey_uncompressed_image(
+            file.data(),file.size()).decoded);
     }
     return 0;
 }
