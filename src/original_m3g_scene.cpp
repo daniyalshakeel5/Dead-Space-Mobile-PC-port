@@ -49,6 +49,16 @@ struct Cursor {
     }
     bool done() const{return at==n;}
 };
+// The original IronMonkey file format includes 6 zero-valued trailing
+// bytes after the standard CompositingMode payload (verified on real APK).
+// Accept only exact all-zero extension, never arbitrary ignored bytes.
+bool reserved_zero_tail(Cursor& c) {
+    if(c.done())return true;
+    if(c.at>c.n||c.n-c.at!=6)return false;
+    for(std::size_t at=c.at;at<c.n;++at)
+        if(c.p[at]!=0)return false;
+    return c.skip(6);
+}
 struct Obj {std::uint8_t type;const std::uint8_t* data;std::size_t size;};
 struct OriginalComposite {
     bool depth_test=true,depth_write=true,color_write=true,alpha_write=true;
@@ -266,7 +276,7 @@ OriginalM3gScene decode_original_m3g_scene(const std::uint8_t* data,std::size_t 
             parsed=parsed&&c.byte(state.threshold);
             parsed=parsed&&c.real(state.factor);
             parsed=parsed&&c.real(state.units);
-            if(!parsed||!c.done()||state.blending<64||state.blending>68) {
+            if(!parsed||!reserved_zero_tail(c)||state.blending<64||state.blending>68) {
                 std::string detail="Invalid M3G CompositingMode id="+std::to_string(id)+
                     " field_offset="+std::to_string(c.at)+
                     " total_bytes="+std::to_string(c.n)+
