@@ -26,3 +26,39 @@ stages extracted assets transactionally, and refuses to overwrite installs.
 Output: installed-xperia/assets and installed-xperia/lib/armeabi/libEAMGameDeadSpace.so.
 An installer is not a gameplay runtime. ARM JNI imports and GLES/ATC support
 are still required for a playable x86-64 build.
+
+## Reanimated HD enhancement archive selection
+
+The combined installer now **prompts for the Reanimated APK** as well as the
+required Xperia ZIP. On a desktop, use Python's native file-selection dialogs:
+
+```sh
+python -m tools.xperia_vita_donor_install --gui
+```
+
+Alternatively, provide both paths explicitly (suitable for PowerShell,
+Linux shells or a future compiled launcher):
+
+```sh
+python -m tools.xperia_vita_donor_install --zip deadspace.zip --reanimated-apk DeadSpaceReanimated-1.3.apk --destination installed-xperia
+```
+
+On a terminal, running with `--zip` and `--destination` but without
+`--reanimated-apk` asks the user for the optional APK path. Enter skips
+the HD enhancement, or pass `--no-hd` to explicitly install original-only.
+
+The importer accepts only the verified official Reanimated v1.2/v1.3
+releases (exact SHA256), and extracts **only** `assets/texture_hd/` into
+`installed-xperia/enhancements/reanimated/texture_hd/`.
+It never replaces Xperia Play's `assets/`, ARM library, audio or maps
+with a game build from another revision. The combined installation
+verifies both archives first and stages both layers as one atomic folder.
+
+**Important:** this is resource preparation, **not working HD graphics
+inside the Xperia game yet**. The source Reanimated APK contains a
+different ARM revision, and its texture names/shaders aren't yet mapped
+to Xperia's ATC material and M3G resources. The metadata explicitly
+marks `enabled_in_runtime=false` until that mapping is independently
+verified. Both source archives remain owned by the user and are not
+committed to GitHub.
+
