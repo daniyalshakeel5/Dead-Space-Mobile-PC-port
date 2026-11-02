@@ -32,6 +32,13 @@ try {
  if(-not (Test-Path -LiteralPath $BackendScript -PathType Leaf)) {
   throw 'The QEMU backend script was not packaged with this launcher.'
  }
+ # Never display a stale successful game-boot report after a newer
+ # attempt fails before it reaches Python (e.g., missing Docker).
+ [IO.Directory]::CreateDirectory($LogsDir) | Out-Null
+ $priorReport=Join-Path $LogsDir 'boot-status.json'
+ if(Test-Path -LiteralPath $priorReport -PathType Leaf) {
+  Remove-Item -LiteralPath $priorReport -Force
+ }
  $script:WslExe=Join-Path $env:SystemRoot 'System32\wsl.exe'
  if(-not (Test-Path -LiteralPath $script:WslExe -PathType Leaf)) {
   throw 'Windows Subsystem for Linux (WSL2) is not installed.'
