@@ -23,3 +23,46 @@ jobs:
         run: |
           cmake --build build-jit --target xperia_arm32_jit_smoke xperia_elf_jit_synthetic xperia_guest_libc_jit_smoke xperia_arm_call_runner_tests --parallel 2
           ctest --test-dir build-jit --output-on-failure -R 'xperia_arm32_jit_synthetic_a32|xperia_elf_mapped_a32_jit|xperia_jit_bionic_libc_a32_svc_roundtrip|xperia_arm32_call_runner_and_constructor_order'
+
+  windows-host:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare Windows-native ARM JIT dependencies
+        run: |
+          if (-not $env:VCPKG_INSTALLATION_ROOT) { throw 'Windows vcpkg is unavailable' }
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install boost-headers:x64-windows
+          if ($LASTEXITCODE -ne 0) { throw 'Boost headers installation failed' }
+      - name: Configure real Win64 ARM32 JIT without QEMU or WSL
+        run: |
+          $toolchain=Join-Path $env:VCPKG_INSTALLATION_ROOT 'scripts/buildsystems/vcpkg.cmake'
+          cmake -S experimental/xperia_armjit -B build-jit-windows -G 'Visual Studio 17 2022' -A x64 "-DCMAKE_TOOLCHAIN_FILE=$toolchain" -DDYNARMIC_WARNINGS_AS_ERRORS=OFF
+          if ($LASTEXITCODE -ne 0) { throw 'Native Windows ARM JIT configure failed' }
+      - name: Build native Windows ARM32 translator and guest runtime integration
+        run: |
+          cmake --build build-jit-windows --config Release --target xperia_arm32_jit_smoke xperia_elf_jit_synthetic xperia_guest_libc_jit_smoke xperia_arm_call_runner_tests --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw 'Native Windows ARM JIT build failed' }
+      - name: Execute actual A32 guest ABI synthetic tests on Windows x86-64
+        run: |
+          ctest --test-dir build-jit-windows -C Release --output-on-failure -R 'xperia_arm32_jit_synthetic_a32|xperia_elf_mapped_a32_jit|xperia_jit_bionic_libc_a32_svc_roundtrip|xperia_arm32_call_runner_and_constructor_order'
+          if ($LASTEXITCODE -ne 0) { throw 'Windows ARM32 translator tests failed' }
+      - name: Package Windows-native original-free runtime tests
+        run: |
+          New-Item -ItemType Directory -Force 'dist/Windows-Arm-Runtime-Tests' | Out-Null
+          $bins=@('xperia_arm32_jit_smoke','xperia_elf_jit_synthetic','xperia_guest_libc_jit_smoke','xperia_arm_call_runner_tests')
+          foreach ($name in $bins) {
+            Copy-Item "build-jit-windows/Release/$name.exe" 'dist/Windows-Arm-Runtime-Tests/' -ErrorAction Stop
+          }
+          if (Get-ChildItem 'dist/Windows-Arm-Runtime-Tests' -Recurse -File | Where-Object { $_.Extension -in @('.apk','.zip','.so','.ktx','.m3g','.sb') }) {
+            throw 'Copyrighted original game files would be packaged'
+          }
+          Compress-Archive -Path 'dist/Windows-Arm-Runtime-Tests/*' -DestinationPath 'dist/Windows-Arm-Runtime-Tests.zip'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xperia-win64-arm-guest-jit-tests
+          path: dist/Windows-Arm-Runtime-Tests.zip
+          retention-days: 15
