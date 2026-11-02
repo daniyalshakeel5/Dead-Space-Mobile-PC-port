@@ -71,6 +71,7 @@ int main(int argc,char** argv){
     std::size_t link_count=0;
     for(const auto& group:scene.validated_group_children)
         link_count+=group.children.size();
-    std::cout<<link_count<<"}\n";
+    std::cout<<link_count<<",\"possible_empty_groups\":"
+             <<scene.possible_empty_group_indices.size()<<"}\n";
     return 0;
 }
