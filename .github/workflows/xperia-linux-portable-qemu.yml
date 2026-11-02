@@ -60,7 +60,7 @@ jobs:
             libsdl2-2.0-0:armhf libegl1:armhf libgles1:armhf \
             libgl1:armhf libglx0:armhf libglx-mesa0:armhf libglvnd0:armhf \
             libgl1-mesa-dri:armhf libgbm1:armhf libglapi-mesa:armhf \
-            gcc-arm-linux-gnueabihf xvfb xauth
+            gcc-arm-linux-gnueabihf libc6-dev-armhf-cross xvfb xauth
       - name: Package and execute real upstream ARM loader --version via bundled QEMU
         shell: bash
         run: |
