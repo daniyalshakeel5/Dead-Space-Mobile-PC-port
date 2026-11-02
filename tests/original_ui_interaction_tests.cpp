@@ -58,6 +58,21 @@ int main() {
     assert(cx==240&&cy==160);
     assert(original_ui_viewport(0,720).width==0);
     assert(!original_ui_window_to_canvas(0,720,0,0,cx,cy));
+    // Keyboard navigation follows recovered clickable layout actions,
+    // skips decorative sprites and wraps in both directions.
+    const std::vector<OriginalUiDraw> navigation={
+        {0,0,0,20,20,true,true,11},
+        {2,0,0,20,20,false,false,0},
+        {0,20,0,20,20,true,true,22},
+        {0,40,0,20,20,true,true,33},
+        {0,41,0,20,20,true,true,33}
+    };
+    assert(cycle_original_ui_focus(navigation,0,false)==11);
+    assert(cycle_original_ui_focus(navigation,0,true)==33);
+    assert(cycle_original_ui_focus(navigation,11,false)==22);
+    assert(cycle_original_ui_focus(navigation,33,false)==11);
+    assert(cycle_original_ui_focus(navigation,11,true)==33);
+    assert(cycle_original_ui_focus({},0,false)==0);
     sprites[0].sprite_object_id=999;
     assert(!validate_original_ui_draw_list(db,{atlas},sprites,error));
     return 0;
