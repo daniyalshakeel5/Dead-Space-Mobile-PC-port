@@ -105,7 +105,8 @@ struct GuestArmCallRunner::Impl {
         host.jit=&jit;
     }
     bool invoke(u32 address,const std::array<u32,4>& args,
-                u32& result,std::string& error,unsigned depth=0) {
+                u32& result,std::string& error,unsigned depth=0,
+                const std::vector<u32>& stack_args={}) {
         try{
             if(depth>=kMaxNestedCalls)
                 throw std::runtime_error("ARM guest callback nesting limit");
@@ -117,7 +118,19 @@ struct GuestArmCallRunner::Impl {
             jit.Regs().fill(0);
             jit.SetCpsr(0x10u | ((address&1u)?0x20u:0u));
             for(int i=0;i<4;++i)jit.Regs()[i]=args[i];
-            jit.Regs()[13]=kStack+depth*kStackStride+kStackBytes;
+            if(stack_args.size()>12u)
+                throw std::runtime_error("ARM guest AAPCS stack argument cap");
+            const u32 bytes=static_cast<u32>((stack_args.size()*4u+7u)&~7u);
+            const u32 sp=kStack+depth*kStackStride+kStackBytes-bytes;
+            if(bytes) {
+                auto* dst=image.writeable(sp,bytes);
+                if(!dst)throw std::runtime_error("Unmapped ARM guest argument stack");
+                std::fill_n(dst,bytes,0);
+                for(std::size_t index=0;index<stack_args.size();++index)
+                    for(unsigned byte=0;byte<4;++byte)
+                        dst[index*4u+byte]=u8(stack_args[index]>>(8u*byte));
+            }
+            jit.Regs()[13]=sp;
             jit.Regs()[14]=kReturnTrap;
             jit.Regs()[15]=address&~1u;
             for(unsigned i=0;i<kMaxTraps;++i){
@@ -218,6 +231,21 @@ GuestArmCallRunner::~GuestArmCallRunner()=default;
 bool GuestArmCallRunner::invoke(u32 address,const std::array<u32,4>& args,
                                u32& result,std::string& error){
     return impl_->invoke(address,args,result,error);
+}
+bool GuestArmCallRunner::invoke_aapcs(u32 address,
+        const std::vector<u32>& arguments,
+        u32& result,std::string& error){
+    if(arguments.size()>16u){
+        error="ARM guest AAPCS argument count exceeds 16";
+        return false;
+    }
+    std::array<u32,4> first{};
+    for(std::size_t i=0;i<std::min<std::size_t>(arguments.size(),4u);++i)
+        first[i]=arguments[i];
+    std::vector<u32> stack;
+    if(arguments.size()>4)
+        stack.assign(arguments.begin()+4,arguments.end());
+    return impl_->invoke(address,first,result,error,0,stack);
 }
 bool GuestArmCallRunner::run_original_initializers(std::string& error){
     // Original ELF parser returned ordered DT_INIT and DT_INIT_ARRAY,
