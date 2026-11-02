@@ -42,6 +42,61 @@ bool read_original_bounded(const std::string& root,const char* name,
 // simulate a menu: it establishes whether the original scene AND the
 // original frontend resources can be instantiated together, bounded and
 // without importing any game bytes into the executable.
+// Original Image2D Object3D parameter 900 is relative to the scene's
+// directory, e.g. ../textures/texture_env_main_menu_01.m3g.
+// Resolve only the verified original asset namespaces, and never permit
+// traversal, separators or absolute destinations from game-file metadata.
+bool original_menu_texture_path(std::string_view reference,std::string& path) {
+    constexpr std::string_view textures="../textures/";
+    constexpr std::string_view uncompressed="../textures_uncompressed/";
+    const std::string_view prefix=reference.substr(0,textures.size())==textures
+        ?textures:(reference.substr(0,uncompressed.size())==uncompressed
+        ?uncompressed:std::string_view{});
+    if(prefix.empty())return false;
+    const auto file=reference.substr(prefix.size());
+    if(file.size()<5||file.size()>200||file.substr(file.size()-4)!=".m3g")
+        return false;
+    for(unsigned char byte:file)
+        if(!((byte>='a'&&byte<='z')||(byte>='A'&&byte<='Z')||
+             (byte>='0'&&byte<='9')||byte=='_'||byte=='-'||byte=='.'))
+            return false;
+    if(file=="."||file==".."||file.find("..")!=std::string_view::npos)
+        return false;
+    path="published/";
+    path+=reference.substr(3);
+    return true;
+}
+bool load_original_external_textures(const std::string& root,
+                                    ds_port::OriginalM3gScene& scene) {
+    if(scene.image_sources.size()!=scene.images.size())return false;
+    std::size_t replaced=0;
+    for(std::size_t i=0;i<scene.images.size();++i) {
+        const auto& source=scene.image_sources[i];
+        if(source.empty())continue;
+        std::string path;
+        if(!original_menu_texture_path(source,path)) {
+            std::cerr<<"Unsafe original texture resource reference rejected.\\n";
+            return false;
+        }
+        std::vector<std::uint8_t> payload;
+        if(!read_original_bounded(root,path.c_str(),payload)) {
+            std::cerr<<"Original menu texture pack missing: "<<path<<"\\n";
+            return false;
+        }
+        const auto pack=ds_port::decode_im_ui_rgba_images(
+            payload.data(),payload.size());
+        if(!pack.decoded||pack.images.size()!=1||!pack.images.front().decoded) {
+            std::cerr<<"Original texture pack decode unsupported: "<<path
+                     <<" ("<<pack.error<<")\\n";
+            return false;
+        }
+        scene.images[i]=pack.images.front();
+        ++replaced;
+    }
+    std::cerr<<"Original scene external Image2D replacements: "<<replaced
+             <<"/"<<scene.images.size()<<"\\n";
+    return replaced!=0;
+}
 bool load_original_menu_stage(const std::string& root) {
     std::vector<std::uint8_t> scene_bytes,ui_bytes;
     if(!read_original_bounded(root,"published/models/main_menu.m3g",scene_bytes) ||
@@ -68,11 +123,15 @@ bool load_original_menu_stage(const std::string& root) {
     std::cerr<<"Original menu topology: "<<topology.child_parent.size()
              <<" validated child-parent links, "<<topology.unresolved_groups
              <<" unresolved groups.\\n";
-    const auto native_scene=ds_port::decode_original_m3g_scene(
+    auto native_scene=ds_port::decode_original_m3g_scene(
         scene_bytes.data(),scene_bytes.size());
     if(!native_scene.decoded) {
         std::cerr<<"Original 3D menu scene decode failed: "
                  <<native_scene.error<<"\\n";
+        return false;
+    }
+    if(!load_original_external_textures(root,native_scene)) {
+        std::cerr<<"Original 3D menu external textures unavailable.\\n";
         return false;
     }
     const auto resolved=ds_port::resolve_original_menu_scene(
