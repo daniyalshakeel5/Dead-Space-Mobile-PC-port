@@ -50,6 +50,15 @@ struct Cursor {
     bool done() const{return at==n;}
 };
 struct Obj {std::uint8_t type;const std::uint8_t* data;std::size_t size;};
+struct OriginalComposite {
+    bool depth_test=true,depth_write=true,color_write=true,alpha_write=true;
+    std::uint8_t blending=68,threshold=0;
+    float factor=0,units=0;
+};
+struct OriginalPolygon {std::uint8_t culling=160,winding=168;};
+struct AppearanceRefs {
+    std::uint32_t id=0,texture=0,composite=0,polygon=0;
+};
 Matrix mul(const Matrix& a,const Matrix& b) {
     Matrix out{};
     for(int c=0;c<4;++c)for(int r=0;r<4;++r)
@@ -107,13 +116,14 @@ bool transformable(Cursor& c,Matrix& local) {
     local=composed;
     return true;
 }
-bool node(Cursor& c,Matrix& local) {
+bool node(Cursor& c,Matrix& local,bool& rendering,float& opacity) {
     if(!transformable(c,local))return false;
     bool render=false,pick=false,aligned=false;
     std::uint8_t alpha=0;std::uint32_t scope=0;
     if(!c.flag(render)||!c.flag(pick)||!c.byte(alpha)||
        !c.word(scope)||!c.flag(aligned))return false;
     if(aligned && !c.skip(2+4+4))return false;
+    rendering=render;opacity=float(alpha)/255.f;
     return true;
 }
 bool camera_projection(Cursor& c,Matrix& projection) {
@@ -184,20 +194,24 @@ OriginalM3gScene decode_original_m3g_scene(const std::uint8_t* data,std::size_t 
         return fail("Incomplete M3G objects");
     std::unordered_map<std::uint32_t,std::uint32_t> parents,texture_image;
     std::unordered_map<std::uint32_t,std::uint32_t> image_indices;
-    std::vector<std::pair<std::uint32_t,std::uint32_t>> appearance_texture;
+    std::vector<AppearanceRefs> appearance_texture;
+    std::unordered_map<std::uint32_t,OriginalComposite> compositors;
+    std::unordered_map<std::uint32_t,OriginalPolygon> polygons;
     std::size_t pixel_bytes=0;
     for(std::size_t index=0;index<objects.size();++index){
         const auto& o=objects[index];
         const auto id=static_cast<std::uint32_t>(index+1);
         if(o.type!=5&&o.type!=9&&o.type!=14&&o.type!=3&&
-           o.type!=10&&o.type!=17)continue;
+           o.type!=10&&o.type!=17&&o.type!=6&&o.type!=8)continue;
         Cursor c{o.data,o.size,0};
         if(!object3d(c,id,out.animation_references))
             return fail("Malformed M3G Object3D header");
         if(o.type==5||o.type==9||o.type==14) {
             Matrix local{};
-            if(!node(c,local))return fail("Malformed original M3G node transform");
-            out.nodes.push_back({id,0,local});
+            bool rendering=true;float opacity=1.f;
+            if(!node(c,local,rendering,opacity))
+                return fail("Malformed original M3G node transform");
+            out.nodes.push_back({id,0,local,rendering,opacity});
             if(o.type==5){
                 if(out.camera.node_id||!camera_projection(c,out.camera.projection)||!c.done())
                     return fail("Malformed original M3G camera");
@@ -220,10 +234,14 @@ OriginalM3gScene decode_original_m3g_scene(const std::uint8_t* data,std::size_t 
                 if(!c.done())return fail("Unexpected original group payload");
             }
         }else if(o.type==3){
-            std::uint8_t layer=0;std::uint32_t ignored=0,count=0;
-            if(!c.byte(layer))return fail("Invalid original Appearance layer");
-            for(int n=0;n<4;++n)
-                if(!c.word(ignored))return fail("Invalid original Appearance state");
+            std::uint8_t layer=0;std::uint32_t count=0;
+            std::uint32_t comp=0,fog=0,poly=0,material=0;
+            if(!c.byte(layer)||!c.word(comp)||!c.word(fog)||
+               !c.word(poly)||!c.word(material))
+                return fail("Invalid original Appearance state");
+            if((comp&&(comp>=id||objects[comp-1].type!=6))||
+               (poly&&(poly>=id||objects[poly-1].type!=8)))
+                return fail("Appearance references unexpected M3G state type");
             if(!c.word(count)||count>16||count>(c.n-c.at)/4)
                 return fail("Invalid Appearance texture array");
             std::uint32_t first=0;
@@ -235,7 +253,29 @@ OriginalM3gScene decode_original_m3g_scene(const std::uint8_t* data,std::size_t 
                 if(n==0)first=texture;
             }
             if(!c.done())return fail("Malformed original Appearance tail");
-            appearance_texture.push_back({id,first});
+            appearance_texture.push_back({id,first,comp,poly});
+
+        }else if(o.type==6){
+            OriginalComposite state{};
+            if(!c.flag(state.depth_test)||!c.flag(state.depth_write)||
+               !c.flag(state.color_write)||!c.flag(state.alpha_write)||
+               !c.byte(state.blending)||!c.byte(state.threshold)||
+               !c.real(state.factor)||!c.real(state.units)||!c.done()||
+               state.blending<64||state.blending>68)
+                return fail("Invalid original M3G CompositingMode");
+            compositors[id]=state;
+        }else if(o.type==8){
+            OriginalPolygon state{};
+            std::uint8_t shading=0;
+            bool lighting_two_sided=false,local_camera_lighting=false,perspective=false;
+            if(!c.byte(state.culling)||!c.byte(shading)||!c.byte(state.winding)||
+               !c.flag(lighting_two_sided)||!c.flag(local_camera_lighting)||
+               !c.flag(perspective)||!c.done()||
+               state.culling<160||state.culling>162||
+               (shading!=164&&shading!=165)||
+               (state.winding!=168&&state.winding!=169))
+                return fail("Invalid original M3G PolygonMode");
+            polygons[id]=state;
         }else if(o.type==17){
             Matrix tex_matrix{};
             std::uint32_t image_id=0;
@@ -257,9 +297,23 @@ OriginalM3gScene decode_original_m3g_scene(const std::uint8_t* data,std::size_t 
         n.parent_id=parents.at(n.object_id);
     for(const auto& a:appearance_texture){
         OriginalSceneBinding m{};
-        m.appearance_id=a.first;
-        if(a.second){
-            const auto tex=texture_image.find(a.second);
+        m.appearance_id=a.id;
+        if(a.composite) {
+            const auto state=compositors.find(a.composite);
+            if(state==compositors.end())return fail("CompositingMode unresolved");
+            const auto& x=state->second;
+            m.blending=x.blending;m.alpha_threshold=x.threshold;
+            m.depth_test=x.depth_test;m.depth_write=x.depth_write;
+            m.color_write=x.color_write;m.alpha_write=x.alpha_write;
+            m.depth_offset_factor=x.factor;m.depth_offset_units=x.units;
+        }
+        if(a.polygon){
+            const auto poly=polygons.find(a.polygon);
+            if(poly==polygons.end())return fail("PolygonMode unresolved");
+            m.culling=poly->second.culling;m.winding=poly->second.winding;
+        }
+        if(a.texture){
+            const auto tex=texture_image.find(a.texture);
             if(tex==texture_image.end()||!image_indices.count(tex->second))
                 return fail("Appearance texture image not resolved");
             m.textured=true;m.image_index=image_indices.at(tex->second);
