@@ -49,7 +49,7 @@ jobs:
           python tools/deadspace_original_code_window.py \
             --apk "$RUNNER_TEMP/deadspace.apk" \
             --output "$RUNNER_TEMP/full-instruction-windows.json"
-          python tools/deadspace_seek_table_probe.py \
+          python -m tools.deadspace_seek_table_probe \
             --apk "$RUNNER_TEMP/deadspace.apk"
           python - <<'PY'
           import json,os
