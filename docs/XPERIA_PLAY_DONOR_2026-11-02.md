@@ -48,7 +48,12 @@ On a terminal, running with `--zip` and `--destination` but without
 the HD enhancement, or pass `--no-hd` to explicitly install original-only.
 
 The importer accepts only the verified official Reanimated v1.2/v1.3
-releases (exact SHA256), and extracts **only** `assets/texture_hd/` into
+releases (exact SHA256). The **real Reanimated v1.3 APK** passed an
+isolated metadata-only GitHub Actions inspection:
+https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41470766140.
+The actual HD resource layer consists of **222 `.ktx` files** totaling
+**340,222,792 uncompressed bytes**. The install tool extracts **only**
+`assets/texture_hd/` into
 `installed-xperia/enhancements/reanimated/texture_hd/`.
 It never replaces Xperia Play's `assets/`, ARM library, audio or maps
 with a game build from another revision. The combined installation
@@ -62,3 +67,19 @@ marks `enabled_in_runtime=false` until that mapping is independently
 verified. Both source archives remain owned by the user and are not
 committed to GitHub.
 
+
+### Windows setup shortcut
+
+If you cloned this experimental branch, double-click
+`tools/Run-Xperia-Asset-Setup.cmd` to open both file selectors
+(uses Python 3 and its built-in tkinter file dialogs).
+Choose the original Xperia Play `deadspace.zip` first, and then the
+Reanimated APK. The extraction destination defaults to a new
+`DeadSpaceMobile-Xperia` folder in your chosen parent directory.
+No console commands are required.
+
+The 222 Reanimated files are **KTX containers**, not the ATC data directly
+stored in the Vita donor. The HD renderer will additionally need to
+identify KTX internal GPU formats, connect KTX names to game material
+references, and upload/transcode those assets safely. Installation
+does not make HD rendering functional yet.
