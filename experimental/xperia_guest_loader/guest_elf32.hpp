@@ -1,0 +1,25 @@
+#pragma once
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <vector>
+namespace xperia {
+// Directly maps actual ARM ELF32 PT_LOAD virtual addresses into owned
+// sparse guest memory and resolves only R_ARM_RELATIVE relocations.
+// No game code executes; ABS32/GLOB_DAT/JUMP_SLOT remain unbound.
+// No original EA binary is included in the module.
+struct GuestSegment {
+    std::uint32_t start=0;
+    std::vector<std::uint8_t> contents;
+};
+class GuestElf32 {
+public:
+    static constexpr std::uint32_t guest_base=0x10000000u;
+    std::vector<GuestSegment> segments;
+    std::size_t relative_relocations=0,remaining_relocations=0;
+    bool open(const std::vector<std::uint8_t>& raw,std::string& error) noexcept;
+    const std::uint8_t* read(std::uint32_t vaddr,std::size_t size) const noexcept;
+    std::uint8_t* writeable(std::uint32_t vaddr,std::size_t size) noexcept;
+    std::uint32_t read_u32(std::uint32_t vaddr) const;
+};
+} // namespace xperia

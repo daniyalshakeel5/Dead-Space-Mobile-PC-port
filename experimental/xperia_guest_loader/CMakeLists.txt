@@ -1,0 +1,10 @@
+cmake_minimum_required(VERSION 3.20)
+project(xperia_guest_elf32_loader LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+add_library(xperia_guest_elf32 STATIC guest_elf32.cpp)
+target_include_directories(xperia_guest_elf32 PUBLIC .)
+add_executable(xperia_guest_elf32_tests guest_elf32_tests.cpp)
+target_link_libraries(xperia_guest_elf32_tests PRIVATE xperia_guest_elf32)
+enable_testing()
+add_test(NAME xperia_elf32_relative_and_external_relocations
+         COMMAND xperia_guest_elf32_tests)

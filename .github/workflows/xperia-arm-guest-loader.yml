@@ -1,0 +1,25 @@
+name: Xperia ELF32 ARM guest mapping (asset-free)
+on:
+  push:
+    branches: [work/deadspace-xperia-arm-wrapper-2026-11-02]
+    paths:
+      - "experimental/xperia_guest_loader/**"
+      - ".github/workflows/xperia-arm-guest-loader.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S experimental/xperia_guest_loader -B build-guest -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build-guest --parallel 2
+      - run: ctest --test-dir build-guest --output-on-failure
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S experimental/xperia_guest_loader -B build-guest
+      - run: cmake --build build-guest --config Release
+      - run: ctest --test-dir build-guest -C Release --output-on-failure
