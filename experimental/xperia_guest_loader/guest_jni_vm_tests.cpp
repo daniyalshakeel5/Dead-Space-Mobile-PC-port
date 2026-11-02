@@ -146,6 +146,63 @@ int main(){
     r.fill(0);r[0]=vm.env_address;r[1]=vm.audio_track_address;r[2]=play_id;
     assert(vm.dispatch(vm.env_svc_base+61,r,elf,error));
     assert(probe.actions==1u);
+    // Device and storage Java delegate methods are original Xperia
+    // class/method signatures, not ad hoc host property guesses.
+    const auto find_class=[&](const char* name)->std::uint32_t {
+        write_string(base+0x500,name);
+        r.fill(0);r[0]=vm.env_address;r[1]=base+0x500;
+        assert(vm.dispatch(vm.env_svc_base+6,r,elf,error));
+        return r[0];
+    };
+    const auto get_instance_method=[&](std::uint32_t clazz,
+            const char* name,const char* sig)->std::uint32_t {
+        write_string(base+0x540,name);
+        write_string(base+0x600,sig);
+        r.fill(0);r[0]=vm.env_address;r[1]=clazz;
+        r[2]=base+0x540;r[3]=base+0x600;
+        assert(vm.dispatch(vm.env_svc_base+33,r,elf,error));
+        return r[0];
+    };
+    const auto new_instance=[&](std::uint32_t clazz)->std::uint32_t {
+        const auto init=get_instance_method(clazz,"<init>","()V");
+        r.fill(0);r[0]=vm.env_address;r[1]=clazz;r[2]=init;
+        assert(vm.dispatch(vm.env_svc_base+28,r,elf,error));
+        return r[0];
+    };
+    const auto read_java_string=[&](std::uint32_t ref)->std::string {
+        r.fill(0);r[0]=vm.env_address;r[1]=ref;
+        assert(vm.dispatch(vm.env_svc_base+169,r,elf,error));
+        const auto* data=elf.read(r[0],255);
+        assert(data);
+        return reinterpret_cast<const char*>(data);
+    };
+    const auto system=find_class("com/ea/blast/SystemAndroidDelegate");
+    const auto system_obj=new_instance(system);
+    const auto manufacturer=get_instance_method(system,"GetManufacturer",
+                                      "()Ljava/lang/String;");
+    r.fill(0);r[0]=vm.env_address;r[1]=system_obj;r[2]=manufacturer;
+    assert(vm.dispatch(vm.env_svc_base+34,r,elf,error));
+    assert(read_java_string(r[0])=="sony");
+    const auto device=get_instance_method(system,"GetDeviceName",
+                                      "()Ljava/lang/String;");
+    r.fill(0);r[0]=vm.env_address;r[1]=system_obj;r[2]=device;
+    assert(vm.dispatch(vm.env_svc_base+34,r,elf,error));
+    assert(read_java_string(r[0])=="R800");
+    const auto display=find_class("com/ea/blast/DisplayAndroidDelegate");
+    const auto display_obj=new_instance(display);
+    const auto width=get_instance_method(display,"GetDefaultWidth","()I");
+    r.fill(0);r[0]=vm.env_address;r[1]=display_obj;r[2]=width;
+    assert(vm.dispatch(vm.env_svc_base+49,r,elf,error)&&r[0]==544);
+    const auto height=get_instance_method(display,"GetDefaultHeight","()I");
+    r.fill(0);r[0]=vm.env_address;r[1]=display_obj;r[2]=height;
+    assert(vm.dispatch(vm.env_svc_base+49,r,elf,error)&&r[0]==960);
+    const auto storage=find_class("com/ea/blast/GetAppDataDirectoryDelegate");
+    const auto storage_obj=new_instance(storage);
+    const auto data_dir=get_instance_method(storage,"GetAppDataDirectory",
+                                          "()Ljava/lang/String;");
+    r.fill(0);r[0]=vm.env_address;r[1]=storage_obj;r[2]=data_dir;
+    assert(vm.dispatch(vm.env_svc_base+34,r,elf,error));
+    assert(read_java_string(r[0])=="deadspace");
     write_string(base+0x300,"com/ea/UNKNOWN");
     r.fill(0);r[0]=vm.env_address;r[1]=base+0x300;
     assert(!vm.dispatch(vm.env_svc_base+6,r,elf,error));
