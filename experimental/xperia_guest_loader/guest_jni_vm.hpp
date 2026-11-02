@@ -27,9 +27,22 @@ public:
     std::uint32_t return_pc(std::uint32_t id) const noexcept;
     bool dispatch(std::uint32_t id,std::array<std::uint32_t,16>& regs,
                   GuestElf32& guest,std::string& error) const noexcept;
+    // Called by the translated ARM runner after JNI dispatch. EAIO.Startup
+    // is an actual Java-declared native function in the installed game ELF.
+    struct NativeCallback {
+        std::uint32_t address=0;
+        std::array<std::uint32_t,4> arguments{};
+    };
+    NativeCallback take_callback() noexcept {
+        auto out=pending_callback_;pending_callback_={};return out;
+    }
+    void set_content_ready(bool ready) noexcept {content_ready_=ready;}
     std::uint32_t vm() const noexcept {return vm_address;}
 private:
     std::vector<std::uint8_t> thunks_;
+    NativeCallback pending_callback_{};
+    std::uint32_t eaio_startup_=0;
+    bool content_ready_=false;
     bool installed_=false;
 };
 } // namespace xperia
