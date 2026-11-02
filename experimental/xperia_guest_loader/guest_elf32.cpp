@@ -95,7 +95,7 @@ bool GuestElf32::open(const std::vector<std::uint8_t>& bytes,
         }
         // Resolve names directly from the mapped ELF dynamic table,
         // without a host symbol resolver or Android OS process.
-        struct Sym {std::string name;std::uint32_t value=0;bool defined=false;bool weak=false;bool absolute=false;};
+        struct Sym {std::string name;std::uint32_t value=0;bool defined=false;bool weak=false;bool absolute=false;std::uint8_t type=0;};
         bool symbols_ready=false;
         std::uint32_t symbols_count=0;
         std::uint32_t sym_addr=0,str_addr=0,str_size=0;
@@ -135,6 +135,7 @@ bool GuestElf32::open(const std::vector<std::uint8_t>& bytes,
             sym.defined=section!=0;
             sym.absolute=section==0xfff1;
             sym.weak=(p[12]>>4)==2;
+            sym.type=static_cast<std::uint8_t>(p[12]&15u);
             return sym;
         };
         std::unordered_set<std::uint32_t> used_targets;
@@ -185,7 +186,7 @@ bool GuestElf32::open(const std::vector<std::uint8_t>& bytes,
                         for(unsigned n=0;n<4;++n)slot[n]=std::uint8_t(result>>(8*n));
                     }else{
                         if(sym.name.empty())throw std::runtime_error("Unnamed mandatory import");
-                        pending_imports.push_back({at,kind,addend,sym.name});
+                        pending_imports.push_back({at,kind,addend,sym.name,sym.type});
                         ++remaining_relocations;
                     }
                 }else throw std::runtime_error("Unsupported ARM relocation type");
