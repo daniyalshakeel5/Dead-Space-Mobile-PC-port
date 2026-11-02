@@ -165,7 +165,8 @@ bool load_original_menu_stage(const std::string& root) {
     std::cerr<<"Original frontend UI database: "<<frontend.names.size()
              <<" named resources, "<<frontend.types.size()
              <<" record structures, "<<frontend.object_data.size()
-             <<" bytes of atlas geometry, "<<frontend.sprites.size()\n             <<" original UI sprites.\\n";
+             <<" bytes of atlas geometry, "<<frontend.sprites.size()
+             <<" original UI sprites.\\n";
     if(!scene.decoded || !ui.decoded || ui.images.size()!=2 ||
        scene.mesh_count==0 || scene.surfaces.empty() ||
        scene.camera_object_indices.empty() ||
