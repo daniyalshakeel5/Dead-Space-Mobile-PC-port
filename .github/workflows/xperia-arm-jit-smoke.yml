@@ -1,0 +1,24 @@
+name: Xperia ARM32 host JIT proof (no game code)
+on:
+  push:
+    branches: [work/deadspace-xperia-arm-wrapper-2026-11-02]
+    paths:
+      - "experimental/xperia_armjit/**"
+      - ".github/workflows/xperia-arm-jit-smoke.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Native JIT dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libboost-dev cmake ninja-build
+      - name: Configure verified ARM32 to x86-64 JIT
+        run: cmake -S experimental/xperia_armjit -B build-jit -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build JIT and run only user-owned synthetic A32 instructions
+        run: |
+          cmake --build build-jit --target xperia_arm32_jit_smoke --parallel 2
+          ctest --test-dir build-jit --output-on-failure -R xperia_arm32_jit_synthetic_a32
