@@ -2,6 +2,9 @@
 #undef NDEBUG
 #endif
 #include "guest_libc_bridge.hpp"
+#include "guest_filesystem.hpp"
+#include <filesystem>
+#include <fstream>
 #include <array>
 #include <cassert>
 #include <cstdint>
@@ -63,5 +66,41 @@ int main() {
     assert(!svc.code_byte(0x1000,byte));
     assert(!svc.symbols().count("glDrawArrays"));
     assert(svc.symbols().count("malloc")); // implemented by bounded GuestHeap
+    assert(svc.symbols().count("open") && svc.symbols().count("read"));
+    namespace fs=std::filesystem;
+    const auto install=fs::temp_directory_path()/"xperia_arm_svc_file_fixture";
+    fs::remove_all(install);
+    fs::create_directories(install/"assets/published/data");
+    {std::ofstream file(install/"assets/published/data/level.sb",
+                        std::ios::binary);file<<"STASIS!";}
+    GuestFileSystem assets(install);
+    const auto guest_path=0x10001500u, guest_output=0x10001600u;
+    const char* relative="assets/published/data/level.sb";
+    std::memcpy(image.writeable(guest_path,std::strlen(relative)+1),
+                relative,std::strlen(relative)+1);
+    regs.fill(0);
+    regs[0]=guest_path;regs[1]=0;
+    assert(svc.dispatch(12,regs,image,error,nullptr,&assets)); // open
+    const auto fd=regs[0];
+    assert(fd>=3u && assets.handle_count()==1);
+    regs[0]=fd;regs[1]=guest_output;regs[2]=7;
+    assert(svc.dispatch(13,regs,image,error,nullptr,&assets)); // read
+    assert(regs[0]==7u);
+    assert(std::memcmp(image.read(guest_output,7),"STASIS!",7)==0);
+    regs[0]=fd;regs[1]=0;regs[2]=0;
+    assert(svc.dispatch(14,regs,image,error,nullptr,&assets)); // lseek
+    assert(regs[0]==0);
+    regs[0]=fd;
+    assert(svc.dispatch(15,regs,image,error,nullptr,&assets)); // close
+    assert(regs[0]==0 && assets.handle_count()==0);
+    regs[0]=guest_path;regs[1]=0;
+    assert(!svc.dispatch(12,regs,image,error)); // no mount = no fabricated file
+    const char* escaped="assets/../outside.txt";
+    std::memcpy(image.writeable(guest_path,std::strlen(escaped)+1),
+                escaped,std::strlen(escaped)+1);
+    regs[0]=guest_path;regs[1]=0;
+    assert(svc.dispatch(12,regs,image,error,nullptr,&assets));
+    assert(static_cast<std::int32_t>(regs[0])==-1);
+    fs::remove_all(install);
     return 0;
 }
