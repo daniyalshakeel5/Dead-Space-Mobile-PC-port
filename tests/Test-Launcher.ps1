@@ -3,7 +3,7 @@ $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
 $folder=Join-Path $repo 'launcher'
 . (Join-Path $folder 'Core.ps1')
-foreach($path in @('Core.ps1','Installer.ps1','Launcher.ps1')) {
+foreach($path in @('Core.ps1','Installer.ps1','Launcher.ps1','QemuBoot.ps1')) {
  $tokens=$null;$errors=$null
  [void][Management.Automation.Language.Parser]::ParseFile((Join-Path $folder $path),[ref]$tokens,[ref]$errors)
  if($errors.Count){throw ('PowerShell parse failure '+$path+': '+($errors|Out-String))}
@@ -24,10 +24,18 @@ $window=[Windows.Markup.XamlReader]::Load((New-Object Xml.XmlNodeReader $xaml))
 foreach($node in $xaml.SelectNodes('//*[@Name]')) {
  if(-not $window.FindName($node.Name)){throw ('Unbound WPF control: '+$node.Name)}
 }
-foreach($control in @('GamePath','HdPath','BrowseZip','BrowseApk','InstallAssets','Launch','HomeNav','GraphicsNav','ControlsNav','DepsNav','Log','EnableHd','CopyLog')){
+foreach($control in @('GamePath','HdPath','BrowseZip','BrowseApk','InstallAssets','QemuBoot','QemuStatus','OpenBootLogs','Launch','HomeNav','GraphicsNav','ControlsNav','DepsNav','Log','EnableHd','CopyLog')){
  if(-not $window.FindName($control)){throw ('Required adapted Diamond Rush launcher control absent: '+$control)}
 }
 if($window.FindName('Launch').IsEnabled){throw 'Play must remain DISABLED until original ARM runtime can boot'}
+if($window.FindName('QemuBoot').IsEnabled){throw 'QEMU boot check must remain DISABLED until original Xperia game files are installed'}
+$bootBridge=Get-Content -LiteralPath (Join-Path $folder 'QemuBoot.ps1') -Raw
+if($bootBridge -notmatch 'wsl\.exe' -or $bootBridge -notmatch 'docker info' -or $bootBridge -notmatch 'allow-external-build'){
+ throw 'QEMU WSL2 bridge is missing prerequisite checks or user-opt-in runtime command'
+}
+if($bootBridge -match 'Invoke-Expression|iex\s'){
+ throw 'Untrusted shell invocation in QEMU WSL2 bridge'
+}
 if($window.Title -notlike '*Dead Space*'){throw 'Wrong launcher identity'}
 $window.Close()
-Write-Output 'PASS: actual Diamond Rush WPF architecture, Dead Space controls/theme, no playable-engine claim, verified zip path safety, PowerShell parsing.'
+Write-Output 'PASS: actual Diamond Rush WPF architecture, Dead Space controls/theme, QEMU boot prerequisites and consent, no interactive-play claim, safe zip paths, PowerShell parsing.'
