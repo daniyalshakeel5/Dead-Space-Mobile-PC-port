@@ -63,6 +63,12 @@ else()
     target_compile_options(ds_port_apk_probe PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+# The actual game splash/3D renderer must discover SDL2 independently
+# of the optional diagnostic input tool.
+if(DS_BUILD_BOOT_SPLASH AND NOT DS_BUILD_INPUT_PROBE)
+    find_package(SDL2 CONFIG QUIET)
+endif()
+
 if(DS_BUILD_INPUT_PROBE)
     find_package(SDL2 CONFIG QUIET)
     if(NOT TARGET SDL2::SDL2 AND DS_FETCH_SDL2)
