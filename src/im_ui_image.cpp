@@ -27,7 +27,8 @@ struct Cursor {
     }
 };
 bool decode_image(const std::uint8_t* payload,std::size_t length,
-                  M3gRgbaImage& image) {
+                  M3gRgbaImage& image,
+                  std::vector<std::uint8_t>& frontend_sbin) {
     Cursor at{payload,length,0};
     std::uint32_t ignored=0,tracks=0,params=0;
     if(!at.take(ignored)||!at.take(tracks)||
@@ -40,8 +41,13 @@ bool decode_image(const std::uint8_t* payload,std::size_t length,
     // has one 29728-byte parameter. None of this is pixel data.
     for(std::uint32_t i=0;i<params;++i){
         std::uint32_t paramid=0,bytes=0;
-        if(!at.take(paramid)||!at.take(bytes)||!at.skip(bytes))
-            return false;
+        if(!at.take(paramid)||!at.take(bytes)||
+           bytes>length-at.at)return false;
+        if(paramid==500 && bytes>=8 && bytes<=256u*1024u &&
+           std::memcmp(payload+at.at,"SBIN",4)==0 &&
+           frontend_sbin.empty())
+            frontend_sbin.assign(payload+at.at,payload+at.at+bytes);
+        if(!at.skip(bytes))return false;
     }
     if(at.at>length||length-at.at<18u)return false;
     const auto fmt=payload[at.at++];
@@ -85,7 +91,7 @@ ImUiPack decode_im_ui_rgba_images(
         if(objects==0 && type!=0)return fail("missing first header object");
         if(type==10){
             M3gRgbaImage image{};
-            if(!decode_image(data+at,len,image))
+            if(!decode_image(data+at,len,image,result.frontend_sbin))
                 return fail("unsupported or malformed UI Image2D");
             result.images.push_back(std::move(image));
             if(result.images.size()>8)
