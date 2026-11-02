@@ -56,6 +56,13 @@ private:
     struct ShortArray {std::uint32_t data=0,length=0;};
     std::unordered_map<std::uint32_t,ShortArray> short_arrays_;
     std::uint32_t next_array_=0x74600000u;
+    std::unordered_map<std::uint32_t,std::uint32_t> strings_;
+    std::unordered_map<unsigned,std::uint32_t> cached_method_strings_;
+    std::unordered_map<std::uint32_t,unsigned> instances_;
+    unsigned next_instance_=0;
+    unsigned next_string_=0;
+    std::uint32_t store_string(GuestElf32& guest,const std::string& text,
+                                std::string& error);
     bool installed_=false;
 };
 } // namespace xperia
