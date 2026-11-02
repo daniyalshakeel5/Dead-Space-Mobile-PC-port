@@ -45,7 +45,9 @@ bool validate_original_menu_gpu_frame(
     std::unordered_map<std::uint32_t,const OriginalMenuGpuMesh*> transforms;
     for(const auto& m:frame.mesh_transforms){
         if(!m.mesh_object_index||!finite_matrix(m.model_matrix)||
-           all_zero(m.model_matrix)||!transforms.emplace(m.mesh_object_index,&m).second){
+           all_zero(m.model_matrix)||!std::isfinite(m.alpha)||
+           m.alpha<0.f||m.alpha>1.f||
+           !transforms.emplace(m.mesh_object_index,&m).second){
             reason="Duplicate or invalid original mesh transform";return false;
         }
     }
@@ -54,6 +56,11 @@ bool validate_original_menu_gpu_frame(
         if(!m.appearance_object_index||
            (m.use_texture && (m.image_index>=images.size() ||
              !images[m.image_index].decoded)) ||
+           m.blending<64||m.blending>68||
+           m.culling<160||m.culling>162||
+           (m.winding!=168&&m.winding!=169)||
+           !std::isfinite(m.depth_offset_factor)||
+           !std::isfinite(m.depth_offset_units)||
            !materials.emplace(m.appearance_object_index,&m).second){
             reason="Duplicate or invalid original material binding";return false;
         }
@@ -193,12 +200,48 @@ OriginalMenuGpuStatus run_original_menu_gl(
         int w=0,h=0;SDL_GL_GetDrawableSize(window.get(),&w,&h);
         if(w<=0||h<=0)continue;
         glViewport(0,0,w,h);
+        glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
+        glDepthMask(GL_TRUE);
         glClearColor(0,0,0,1);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         glMatrixMode(GL_PROJECTION);glLoadMatrixf(frame.projection.data());
         for(const auto& batch:stream.batches){
             const auto& object=*transforms.at(batch.mesh_object_index);
             const auto& mat=*materials.at(batch.appearance_object_index);
+            if(!object.visible||object.alpha<=0.f)continue;
+            glColor4f(1.f,1.f,1.f,object.alpha);
+            if(mat.depth_test)glEnable(GL_DEPTH_TEST);
+            else glDisable(GL_DEPTH_TEST);
+            glDepthFunc(GL_LEQUAL);
+            glDepthMask(mat.depth_write?GL_TRUE:GL_FALSE);
+            glColorMask(mat.color_write?GL_TRUE:GL_FALSE,
+                        mat.color_write?GL_TRUE:GL_FALSE,
+                        mat.color_write?GL_TRUE:GL_FALSE,
+                        mat.alpha_write?GL_TRUE:GL_FALSE);
+            if(mat.alpha_threshold){
+                glEnable(GL_ALPHA_TEST);
+                glAlphaFunc(GL_GEQUAL,float(mat.alpha_threshold)/255.f);
+            }else glDisable(GL_ALPHA_TEST);
+            if(mat.blending==68)glDisable(GL_BLEND);
+            else{
+                glEnable(GL_BLEND);
+                switch(mat.blending){
+                  case 64:glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);break;
+                  case 65:glBlendFunc(GL_SRC_ALPHA,GL_ONE);break;
+                  case 66:glBlendFunc(GL_DST_COLOR,GL_ZERO);break;
+                  case 67:glBlendFunc(GL_DST_COLOR,GL_SRC_COLOR);break;
+                }
+            }
+            if(mat.culling==162)glDisable(GL_CULL_FACE);
+            else{
+                glEnable(GL_CULL_FACE);
+                glCullFace(mat.culling==161?GL_FRONT:GL_BACK);
+            }
+            glFrontFace(mat.winding==169?GL_CW:GL_CCW);
+            if(mat.depth_offset_factor!=0.f||mat.depth_offset_units!=0.f){
+                glEnable(GL_POLYGON_OFFSET_FILL);
+                glPolygonOffset(mat.depth_offset_factor,mat.depth_offset_units);
+            }else glDisable(GL_POLYGON_OFFSET_FILL);
             glMatrixMode(GL_MODELVIEW);
             glLoadMatrixf(frame.view.data());
             glMultMatrixf(object.model_matrix.data());
