@@ -2,6 +2,7 @@
 #include "ds_port/original_menu_gl.hpp"
 #include "ds_port/original_menu_animation.hpp"
 #include "ds_port/original_ui_interaction.hpp"
+#include "ds_port/dualshock4_input.hpp"
 #include "ds_port/native_menu_input.hpp"
 #include "ds_port/original_input_jni_bridge.hpp"
 #include <SDL.h>
@@ -103,6 +104,34 @@ OriginalMenuGpuStatus run_original_menu_gl(
         diagnostic=SDL_GetError();return OriginalMenuGpuStatus::GraphicsUnavailable;
     }
     SDLQuit quit{};
+    // SDL2's game controller layer provides stable DS4 mappings and
+    // touchpad events on supported Windows/Linux backends. Failure
+    // to find a controller must not block keyboard/mouse play.
+    struct ControllerOwner {
+        SDL_GameController* controller=nullptr;
+        bool subsystem_ready=false;
+        ~ControllerOwner(){
+            if(controller)SDL_GameControllerClose(controller);
+            if(subsystem_ready)SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+        }
+    } ds4;
+    ds4.subsystem_ready=SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER)==0;
+    SDL_JoystickID controller_id=-1;
+    const auto open_controller=[&](int device_index){
+        if(!ds4.subsystem_ready||ds4.controller ||
+           !SDL_IsGameController(device_index))return;
+        ds4.controller=SDL_GameControllerOpen(device_index);
+        if(ds4.controller){
+            controller_id=SDL_JoystickInstanceID(
+                SDL_GameControllerGetJoystick(ds4.controller));
+            std::cerr<<"Native gamepad input: "
+                     <<SDL_GameControllerName(ds4.controller)
+                     <<" (instance "<<controller_id<<")\\n";
+        }
+    };
+    if(ds4.subsystem_ready)
+        for(int i=0;i<SDL_NumJoysticks()&&!ds4.controller;++i)
+            open_controller(i);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION,2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,1);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
@@ -204,6 +233,43 @@ OriginalMenuGpuStatus run_original_menu_gl(
         Java_com_ea_blast_KeyboardAndroid_NativeOnKeyUp(
             nullptr,nullptr,module,key,alt);
     };
+    // Host-only pointer used for the exact on-screen native UI. A
+    // touchpad finger positions the cursor; pushing the DS4 touchpad
+    // or Cross confirms. These events do not fake a running ARM queue.
+    Ds4WindowPointer pad_cursor{};
+    int initial_width=0,initial_height=0;
+    SDL_GetWindowSize(window.get(),&initial_width,&initial_height);
+    ds4_touchpad_to_window(initial_width,initial_height,0.5f,0.5f,pad_cursor);
+    bool pad_click_down=false;
+    bool pad_finger_active=false;
+    std::uint32_t pad_last_frame=SDL_GetTicks();
+    const auto pad_pointer=[&](OriginalUiPointerAction action){
+        ui_pointer(action,pad_cursor.x,pad_cursor.y);
+        int width=0,height=0;
+        SDL_GetWindowSize(window.get(),&width,&height);
+        if(action==OriginalUiPointerAction::Down)
+            native_menu_pointer(input,callbacks,0,pad_cursor.x,pad_cursor.y,width,height);
+        else if(action==OriginalUiPointerAction::Up)
+            native_menu_pointer(input,callbacks,1,pad_cursor.x,pad_cursor.y,width,height);
+        else if(action==OriginalUiPointerAction::Move && input.mouse_held)
+            native_menu_pointer(input,callbacks,2,pad_cursor.x,pad_cursor.y,width,height);
+    };
+    const auto pad_focus=[&](bool backwards){
+        if(!has_ui_layer||!ui_runtime||!ui_runtime->on_hover)return;
+        const auto id=cycle_original_ui_focus(
+            *ui_runtime->draw_commands,ui_input.hovered,backwards);
+        ui_input.hovered=id;ui_input.pressed=0;
+        ui_runtime->on_hover(ui_runtime->context,id);
+    };
+    const auto pad_select=[&](){
+        if(!has_ui_layer||!ui_runtime||!ui_runtime->on_activate)return;
+        if(!ui_input.hovered)pad_focus(false);
+        if(ui_input.hovered){
+            const auto selected=ui_input.hovered;
+            ui_input.pressed=0;
+            ui_runtime->on_activate(ui_runtime->context,selected);
+        }
+    };
     bool quit_requested=false;
     const std::uint32_t animation_start=SDL_GetTicks();
     bool reported_unbound_input=false;
@@ -211,10 +277,77 @@ OriginalMenuGpuStatus run_original_menu_gl(
         SDL_Event e{};
         while(SDL_PollEvent(&e)) {
             if(e.type==SDL_QUIT)quit_requested=true;
-            else if(e.type==SDL_WINDOWEVENT &&
+            else if(e.type==SDL_CONTROLLERDEVICEADDED){
+                open_controller(e.cdevice.which);
+            }else if(e.type==SDL_CONTROLLERDEVICEREMOVED &&
+                     e.cdevice.which==controller_id) {
+                if(pad_click_down)pad_pointer(OriginalUiPointerAction::Cancel);
+                pad_click_down=false;pad_finger_active=false;
+                SDL_GameControllerClose(ds4.controller);
+                ds4.controller=nullptr;controller_id=-1;
+            }else if(e.type==SDL_CONTROLLERBUTTONDOWN ||
+                     e.type==SDL_CONTROLLERBUTTONUP) {
+                if(e.cbutton.which!=controller_id)continue;
+                const bool pressed=e.type==SDL_CONTROLLERBUTTONDOWN;
+                const auto btn=e.cbutton.button;
+#if SDL_VERSION_ATLEAST(2,0,14)
+                if(btn==SDL_CONTROLLER_BUTTON_TOUCHPAD){
+                    if(pressed&&!pad_click_down){
+                        pad_click_down=true;
+                        pad_pointer(OriginalUiPointerAction::Down);
+                    }else if(!pressed&&pad_click_down){
+                        pad_pointer(OriginalUiPointerAction::Up);
+                        pad_click_down=false;
+                    }
+                    continue;
+                }
+#endif
+                if(btn==SDL_CONTROLLER_BUTTON_A){
+                    // Vita: Cross sends Android DPAD_CENTER (23).
+                    // The active original JNI queue will consume this
+                    // when the translated runtime owns it; until then
+                    // only existing source-layout UI actions are used.
+                    if(pressed)callbacks.key_down(nullptr,600,23,0);
+                    else callbacks.key_up(nullptr,600,23,0);
+                    if(pressed)pad_select();
+                }else if(btn==SDL_CONTROLLER_BUTTON_B){
+                    native_menu_key(input,callbacks,4,pressed);
+                    if(pressed && ui_runtime && ui_runtime->on_back &&
+                       original_runtime::original_last_input_status()!=
+                           original_runtime::OriginalInputStatus::Completed){
+                        ui_runtime->on_back(ui_runtime->context);
+                        ui_input.hovered=0;ui_input.pressed=0;
+                    }
+                }else if(pressed &&
+                        (btn==SDL_CONTROLLER_BUTTON_DPAD_UP ||
+                         btn==SDL_CONTROLLER_BUTTON_DPAD_LEFT ||
+                         btn==SDL_CONTROLLER_BUTTON_DPAD_DOWN ||
+                         btn==SDL_CONTROLLER_BUTTON_DPAD_RIGHT)) {
+                    pad_focus(btn==SDL_CONTROLLER_BUTTON_DPAD_UP ||
+                              btn==SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+                }
+#if SDL_VERSION_ATLEAST(2,0,14)
+            }else if(e.type==SDL_CONTROLLERTOUCHPADDOWN ||
+                     e.type==SDL_CONTROLLERTOUCHPADMOTION ||
+                     e.type==SDL_CONTROLLERTOUCHPADUP) {
+                if(e.ctouchpad.which!=controller_id||
+                   e.ctouchpad.finger!=0)continue;
+                int width=0,height=0;
+                SDL_GetWindowSize(window.get(),&width,&height);
+                Ds4WindowPointer mapped{};
+                if(ds4_touchpad_to_window(
+                        width,height,e.ctouchpad.x,e.ctouchpad.y,mapped)){
+                    pad_cursor=mapped;
+                    pad_pointer(OriginalUiPointerAction::Move);
+                    SDL_WarpMouseInWindow(window.get(),pad_cursor.x,pad_cursor.y);
+                }
+                pad_finger_active=e.type!=SDL_CONTROLLERTOUCHPADUP;
+#endif
+            }else if(e.type==SDL_WINDOWEVENT &&
                     e.window.event==SDL_WINDOWEVENT_FOCUS_LOST) {
                 native_menu_focus_lost(input,callbacks);
                 ui_pointer(OriginalUiPointerAction::Cancel,0,0);
+                pad_click_down=false;pad_finger_active=false;
             }else if(e.type==SDL_WINDOWEVENT &&
                     e.window.event==SDL_WINDOWEVENT_LEAVE) {
                 // Losing the mouse should not preserve a pressed or hovered
@@ -289,6 +422,33 @@ OriginalMenuGpuStatus run_original_menu_gl(
                 else if(e.type==SDL_MOUSEBUTTONUP &&
                         e.button.button==SDL_BUTTON_LEFT)
                     native_menu_pointer(input,callbacks,1,e.button.x,e.button.y,width,height);
+            }
+        }
+        // The same controller may use its right stick to position the
+        // cursor when no finger is on the DS4 pad. Movement is capped
+        // to a per-frame delta to prevent large jumps on resume.
+        const std::uint32_t pad_now=SDL_GetTicks();
+        const float dt=std::min<std::uint32_t>(pad_now-pad_last_frame,50u)/1000.f;
+        pad_last_frame=pad_now;
+        if(ds4.controller && !pad_finger_active) {
+            const float rx=ds4_normalize_axis(
+                SDL_GameControllerGetAxis(ds4.controller,
+                    SDL_CONTROLLER_AXIS_RIGHTX),0.17f);
+            const float ry=ds4_normalize_axis(
+                SDL_GameControllerGetAxis(ds4.controller,
+                    SDL_CONTROLLER_AXIS_RIGHTY),0.17f);
+            if(rx!=0.f||ry!=0.f){
+                int width=0,height=0;
+                SDL_GetWindowSize(window.get(),&width,&height);
+                const auto vp=original_ui_viewport(width,height);
+                if(vp.width>0&&vp.height>0){
+                    pad_cursor.x=std::clamp(pad_cursor.x+
+                        int(rx*700.f*dt),vp.x,vp.x+vp.width-1);
+                    pad_cursor.y=std::clamp(pad_cursor.y+
+                        int(ry*700.f*dt),vp.y,vp.y+vp.height-1);
+                    pad_pointer(OriginalUiPointerAction::Move);
+                    SDL_WarpMouseInWindow(window.get(),pad_cursor.x,pad_cursor.y);
+                }
             }
         }
         // JNI wrappers fail closed until original mapped queue owners and
