@@ -27,6 +27,7 @@ These are two user-confirmed Windows native port bugs, tracked in git and PR #1.
   legitimate ambient/auto-active controller continues to run.
 - **Regression:** `ds_original_menu_native_keyframe_timeline` now verifies
   active ambient and inactive action controllers side by side.
+- **Verified original-APK result:** [CI 41433880581](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41433880581) recovered 32 controllers, all inactive at 0/1,000 ms. The old forced-preview moved five scene nodes, whereas original interval gating moved none.
 - **Boundary:** UI 2D action-to-3D controller mapping is **not yet known**;
   do not invent mappings. Full activation requires original evidence.
 - **State:** code fix; require green CI and user's Windows visual retest.

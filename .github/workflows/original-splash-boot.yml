@@ -210,6 +210,11 @@ jobs:
           grep -F "Original menu motion: 32 sequences, 32 controllers, 32 scene node tracks" "$RUNNER_TEMP/original-animation-probe.txt"
           grep -F "Original serialized M3G controller windows: active at 0 ms=" "$RUNNER_TEMP/original-animation-probe.txt"
           grep -F "Original runtime-gated menu scene nodes changed after 1000 ms:" "$RUNNER_TEMP/original-animation-probe.txt"
+          # Real-APK proof 41433880581: 32 original controllers
+          # inactive at boot. Forced-preview moved five scene nodes,
+          # production interval-gating moves zero.
+          grep -F "Original serialized M3G controller windows: active at 0 ms=0, at 1000 ms=0, total=32" "$RUNNER_TEMP/original-animation-probe.txt"
+          grep -F "Original runtime-gated menu scene nodes changed after 1000 ms: 0" "$RUNNER_TEMP/original-animation-probe.txt"
       - name: Execute both ORIGINAL splash screens through SDL2 software renderer
         shell: bash
         run: |
