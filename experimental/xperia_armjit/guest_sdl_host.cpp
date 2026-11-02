@@ -197,6 +197,14 @@ bool GuestSdlHost::queue_pcm16(const std::uint8_t* data,std::size_t bytes,
     }
     error.clear();return true;
 }
+bool GuestSdlHost::audio_control(unsigned action,std::string& error) noexcept{
+    if(!audio_device_){error="SDL audio device not initialized";return false;}
+    if(action==0)SDL_PauseAudioDevice(audio_device_,0); // play
+    else if(action==1)SDL_PauseAudioDevice(audio_device_,1); // stop
+    else if(action==2)SDL_ClearQueuedAudio(audio_device_); // release
+    else {error="Unknown AudioTrack lifecycle command";return false;}
+    error.clear();return true;
+}
 bool GuestSdlHost::code_byte(std::uint32_t addr,std::uint8_t& value) const noexcept{
     if(addr<veneer_base||std::uint64_t(addr)-veneer_base>=veneers_.size())return false;
     value=veneers_[addr-veneer_base];return true;
