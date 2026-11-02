@@ -62,6 +62,6 @@ int main() {
     assert(svc.code_byte(veneer+4,byte)&&byte==0x1e); // BX LR
     assert(!svc.code_byte(0x1000,byte));
     assert(!svc.symbols().count("glDrawArrays"));
-    assert(!svc.symbols().count("malloc")); // not yet implemented
+    assert(svc.symbols().count("malloc")); // implemented by bounded GuestHeap
     return 0;
 }
