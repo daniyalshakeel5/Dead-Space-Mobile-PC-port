@@ -241,6 +241,7 @@ int main(int argc, char** argv) {
             std::cout<<"Dead Space Mobile native x86-64 desktop port (incomplete)\n"
                      <<"Usage: deadspace_native [--apk PATH --assets-dir NEW_EMPTY_DIR]\n"
                      <<"       deadspace_native --boot-splash --assets-dir INSTALLED_DIR\n"
+                     <<"       deadspace_native --boot-apk --apk PATH --assets-dir NEW_EMPTY_DIR\n"
                      <<"       deadspace_native --inspect-assets EXISTING_DIR\n"
                      <<"       deadspace_native --status\n"
                      <<"Original game files are required; no APK or assets are bundled.\n"
