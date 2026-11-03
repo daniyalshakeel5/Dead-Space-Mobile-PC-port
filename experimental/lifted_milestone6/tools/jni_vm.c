@@ -120,6 +120,13 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
             u32 names[1024]; u32 cnt = 0; struct dirent* e;
             while ((e = readdir(d)) && cnt < 1024) if (strcmp(e->d_name, ".") && strcmp(e->d_name, "..")) names[cnt++] = new_obj(K_STRING, e->d_name, 0, 0);
             closedir(d);
+            if (getenv("DS_ASSET_TRACE")) {
+                fprintf(stderr, "[JAVA_ASSET_LIST] path=%s files=%u\n", path, cnt);
+                for (u32 i = 0; i < cnt && i < 32; i++) {
+                    JObj* item = OBJ(names[i]);
+                    if (item && item->s) fprintf(stderr, "[JAVA_ASSET_ENTRY] %s\n", item->s);
+                }
+            }
             u32* arr = malloc(4 * (cnt + 1)); memcpy(arr, names, 4 * cnt);
             u32 h = new_obj(K_OBJARR, "[Ljava/lang/String;", arr, cnt); return h;
         }
@@ -183,6 +190,7 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
     if (!strcmp(c, "com/ea/blast/GetAppDataDirectoryDelegate") && !strcmp(m->sig, "()Ljava/lang/String;")) {
         const char* d = getenv("DS_DATA") ? getenv("DS_DATA") : "userdata"; mkdir(d, 0755);
         char full[4096]; if (!realpath(d, full)) snprintf(full, sizeof full, "%s", d);
+        if (getenv("DS_ASSET_TRACE")) fprintf(stderr, "[JAVA_APP_STORAGE] %s -> %s\n", nm, full);
         return new_obj(K_STRING, full, 0, 0);
     }
     *handled = 0;

@@ -447,6 +447,8 @@ static void* run(void* p) {
     printf("registered natives (RegisterNatives): %d\n", g_natives);
     const char* steps = getenv("DS_STEPS") ? getenv("DS_STEPS") : "";
     if (getenv("DS_ASSETS")) g_assets_root = getenv("DS_ASSETS");
+    fprintf(stderr, "[RESOURCE_ROOTS] apk_assets=%s save_directory=%s\n",
+            g_assets_root, getenv("DS_DATA") ? getenv("DS_DATA") : "userdata");
     g_activity = new_obj(K_OBJECT, "com/ea/blast/MainActivity", 0, 0);
     g_assetmgr = new_obj(K_ASSETMGR, "android/content/res/AssetManager", 0, 0);
     u32 renderer = new_obj(K_OBJECT, "com/ea/blast/AndroidRenderer", 0, 0);

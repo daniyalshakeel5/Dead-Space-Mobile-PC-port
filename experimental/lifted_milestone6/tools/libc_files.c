@@ -3,6 +3,24 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <errno.h>
+/* Runtime-only resource audit. Missing files are reported automatically,
+ * successes only with DS_ASSET_TRACE=1. Avoid flooding normal play logs. */
+static int ds_asset_io_verbose(void) {
+    static int cached = -1;
+    if (cached < 0) {
+        const char* val = getenv("DS_ASSET_TRACE");
+        cached = val && *val && strcmp(val, "0") != 0;
+    }
+    return cached;
+}
+static void ds_asset_io_note(const char* op, const char* path, int ok, int err) {
+    static unsigned missing_count;
+    if (ok && !ds_asset_io_verbose()) return;
+    if (!ok && missing_count++ >= 96 && !ds_asset_io_verbose()) return;
+    fprintf(stderr, "[GUEST_RESOURCE_%s] op=%s path=%s errno=%d\n",
+            ok ? "OK" : "MISS", op, path ? path : "(null)", ok ? 0 : err);
+}
 
 static FILE* hostfile(u32 f) {
     u32 sf = data_object("__sF");
@@ -16,9 +34,11 @@ static void fill_stat(u32 buf, const struct stat* s) {
     *(u64*)(b + 64) = (u64)s->st_blocks; *(u32*)(b + 72) = (u32)s->st_atime; *(u32*)(b + 80) = (u32)s->st_mtime; *(u32*)(b + 88) = (u32)s->st_ctime;
     *(u64*)(b + 96) = (u64)s->st_ino;
 }
-IMP(stat)  { T(stat);  struct stat s; int rc = stat(P(r0), &s); if (!rc) fill_stat(r1, &s); RET(rc); }
+IMP(stat)  { T(stat); const char* path = P(r0); struct stat s; int rc = stat(path, &s); int saved = errno;
+    if (!rc) fill_stat(r1, &s); ds_asset_io_note("stat", path, rc == 0, saved); errno = saved; RET(rc); }
 IMP(fstat) { T(fstat); struct stat s; int rc = fstat((int)r0, &s); if (!rc) fill_stat(r1, &s); RET(rc); }
-IMP(open)  { T(open);  RET(open(P(r0), (int)r1, (mode_t)r2)); }
+IMP(open)  { T(open); const char* path = P(r0); int fd = open(path, (int)r1, (mode_t)r2); int saved = errno;
+    ds_asset_io_note("open", path, fd >= 0, saved); errno = saved; RET(fd); }
 IMP(close) { T(close); RET(close((int)r0)); }
 IMP(read)  { T(read);  RET(read((int)r0, P(r1), r2)); }
 IMP(write) { T(write); RET(write((int)r0, P(r1), r2)); }
@@ -34,7 +54,8 @@ IMP(chdir)  { T(chdir);  RET(chdir(P(r0))); }
 IMP(chmod)  { T(chmod);  RET(chmod(P(r0), (mode_t)r1)); }
 IMP(getcwd) { T(getcwd); RET(U(getcwd(P(r0), r1))); }
 
-IMP(fopen)   { T(fopen);   RET(U(fopen(P(r0), P(r1)))); }
+IMP(fopen)   { T(fopen); const char* path = P(r0); FILE* fp = fopen(path, P(r1)); int saved = errno;
+    ds_asset_io_note("fopen", path, fp != NULL, saved); errno = saved; RET(U(fp)); }
 IMP(fclose)  { T(fclose);  RET(fclose(hostfile(r0))); }
 IMP(fread)   { T(fread);   RET(fread(P(r0), r1, r2, hostfile(r3))); }
 IMP(fwrite)  { T(fwrite);  RET(fwrite(P(r0), r1, r2, hostfile(r3))); }
@@ -50,7 +71,8 @@ IMP(fprintf) {
     T(fprintf); char buf[4096]; u32 regs[4] = {0, 0, r2, r3}; AR a = {regs, 4, 2, (const u32*)P(sp)};
     int n = gformat(buf, sizeof buf, P(r1), &a); fwrite(buf, 1, n < (int)sizeof buf ? n : (int)sizeof buf - 1, hostfile(r0)); RET(n);
 }
-IMP(opendir)  { T(opendir); RET(U(opendir(P(r0)))); }
+IMP(opendir)  { T(opendir); const char* path = P(r0); DIR* d = opendir(path); int saved = errno;
+    ds_asset_io_note("opendir", path, d != NULL, saved); errno = saved; RET(U(d)); }
 IMP(closedir) { T(closedir); RET(closedir(P(r0))); }
 static u8 g_dirent[280];
 IMP(readdir) {                                               // bionic struct dirent: ino(8) off(8) reclen(2) type(1) name[256]
