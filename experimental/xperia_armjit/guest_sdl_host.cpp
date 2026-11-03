@@ -60,7 +60,71 @@ const char* const names[]={
 "glRenderbufferStorageOES","glFramebufferRenderbufferOES",
 "glGetRenderbufferParameterivOES",
 "glBlendEquationOES","glBlendFuncSeparateOES",
-"glBlendEquationSeparateOES"
+"glBlendEquationSeparateOES",
+"glPushMatrix",
+"glPopMatrix",
+"glIsEnabled",
+"glIsTexture",
+"glIsBuffer",
+"glStencilMask",
+"glStencilFunc",
+"glStencilOp",
+"glClearStencil",
+"glDepthRangef",
+"glLineWidthx",
+"glNormal3x",
+"glAlphaFuncx",
+"glMaterialf",
+"glMaterialx",
+"glLightf",
+"glLightx",
+"glLightModelf",
+"glFogf",
+"glFogx",
+"glPointSizex",
+"glSampleCoverage",
+"glSampleCoveragex",
+"glGetTexParameteriv",
+"glGetTexParameterfv",
+"glGetTexEnviv",
+"glGetTexEnvfv",
+"glGetBufferParameteriv",
+"glGetFixedv",
+"glGetPointerv",
+"glGetTexParameterxv",
+"glGetTexEnvxv",
+"glGetMaterialfv",
+"glGetLightfv",
+"glLightModelxv",
+"glLightModelfv",
+"glMaterialxv",
+"glFogxv",
+"glTexParameterxv",
+"glTexEnvxv",
+"glTexParameterfv",
+"glMultiTexCoord4f",
+"glMultiTexCoord4x",
+"glCopyTexImage2D",
+"glClipPlanef",
+"glGetClipPlanef",
+"glPointParameterf",
+"glPointParameterx",
+"glPointParameterfv",
+"glPointParameterxv",
+"glGetLightxv",
+"glGetMaterialxv",
+"glPolygonOffsetx",
+"glTexGenfOES",
+"glTexGeniOES",
+"glTexGenfvOES",
+"glTexGenivOES",
+"glTexGenxOES",
+"glTexGenxvOES",
+"glGetTexGenfvOES",
+"glGetTexGenivOES",
+"glGetTexGenxvOES",
+"glGetClipPlanex",
+"glClipPlanex"
 };
 constexpr std::size_t count=sizeof(names)/sizeof(names[0]);
 unsigned element_bytes(unsigned type){
@@ -856,7 +920,9 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
             resolve_fbo<void(*)(GLenum,GLenum)>(
                 "glBlendEquationSeparate","glBlendEquationSeparateEXT")(a(0),a(1));
             break;
-        default:throw std::runtime_error("Unknown GLES1 dispatch index");
+        default:
+            if(which>=105u)return dispatch_legacy(which,r,guest,error);
+            throw std::runtime_error("Unknown GLES1 dispatch index");
         }
         r[0]=result;
         error.clear();return true;
