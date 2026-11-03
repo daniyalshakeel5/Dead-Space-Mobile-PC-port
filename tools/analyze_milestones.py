@@ -180,6 +180,10 @@ def compare(old: dict[str, Path], new: dict[str, Path]) -> str:
             out += [f"- examples counted: before {len(a[1])}, after {len(b[1])}", ""]
     if not focus:
         out += ["No matching short text files changed.", ""]
+    out += ["## All 29 milestone-6 entries", ""]
+    for name in sorted(now):
+        out.append("- " + name)
+    out += [""]
     out += ["## Potential archive/package risks", ""]
     for name in added+changed:
         if Path(name).suffix.lower() in BAD_SUFFIX or name.lower().endswith("data.zip"):
@@ -190,6 +194,26 @@ def compare(old: dict[str, Path], new: dict[str, Path]) -> str:
             "To verify, reproduce with matching libDeadSpace.so and resource files,",
             "then inspect actual menu rendering, audio and interactions.", ""]
     return "\n".join(out)
+
+
+def print_targeted_source_diffs(old: dict[str, Path], new: dict[str, Path]) -> None:
+    """Bounded context of user-supplied port glue (never proprietary game assets)."""
+    names = ("README.md", "tools/front_sdl.c", "tools/host.c", "tools/jni_vm.c")
+    for name in names:
+        if name not in old or name not in new:
+            continue
+        a = old[name].read_text(encoding="utf-8", errors="replace").splitlines()
+        b = new[name].read_text(encoding="utf-8", errors="replace").splitlines()
+        if a == b:
+            continue
+        diff = list(difflib.unified_diff(a, b, fromfile="m5/"+name,
+                                         tofile="m6/"+name, n=3))
+        print("\n====== DIFF " + name + f" ({len(diff)} lines) ======")
+        for line in diff[:340]:
+            print(line[:250])
+        if len(diff)>340:
+            print(f"... {len(diff)-340} additional diff lines omitted")
+    print("\n====== END OF LIMITED DIFFS ======")
 
 
 def self_test() -> None:
@@ -213,6 +237,7 @@ def main() -> int:
     ap.add_argument("--new", type=Path)
     ap.add_argument("--report", type=Path, default=Path("milestone6-analysis.md"))
     ap.add_argument("--self-test", action="store_true")
+    ap.add_argument("--details", action="store_true")
     args=ap.parse_args()
     if args.self_test:
         self_test(); return 0
@@ -227,6 +252,8 @@ def main() -> int:
         if warnings:
             report = ("## RAR integrity and extraction warnings\n\n" +
                 "\n".join("- " + w for w in warnings) + "\n\n" + report)
+        if args.details:
+            print_targeted_source_diffs(snapshot(a), snapshot(b))
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(report, encoding="utf-8")
     print(report)
