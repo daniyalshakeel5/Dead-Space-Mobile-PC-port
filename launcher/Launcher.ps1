@@ -57,9 +57,11 @@ function Refresh-Setup {
  # This public Windows launcher must NEVER demand WSL2, Docker,
  # Git or Python merely to play. A self-contained Windows QEMU full-
  # system runtime has not been validated and is not bundled yet.
- $ui.EngineStatus.Text='ENGINE  //  Standalone QEMU Windows runtime not packaged yet.'
- $ui.RuntimeStatus.Text='QEMU DEVELOPMENT BACKEND // Linux qemu-arm works without WSL. Windows packaging remains unverified.'
- $ui.QemuStatus.Text='No WSL2 or Docker requirement for players. Play will unlock only with a verified self-contained PC runtime.'
+ $runtime=Join-Path $PSScriptRoot 'xperia_guest_startup.exe'
+ $hasRuntime=Test-Path -LiteralPath $runtime -PathType Leaf
+ $ui.EngineStatus.Text=if($hasRuntime){'ENGINE  //  Win64 Dynarmic ARM + GLES1/ATC/PVRTC host present (experimental)'}else{'ENGINE  //  Experimental Windows ARM runtime not found in launcher folder'}
+ $ui.RuntimeStatus.Text='WINDOWS DYNARMIC  //  ARM JNI, SDL OpenGL ES1 compatibility, PCM and controller forwarding are under verification.'
+ $ui.QemuStatus.Text='Linux/QEMU remains development research. No WSL2, Docker or Android emulator required by the Windows executable.'
  $busy=$null -ne $script:task
  $ui.InstallAssets.IsEnabled= -not $busy -and -not $isInstalled
  $ui.QemuBoot.IsEnabled=$false # no WSL/Docker requirement in the player build
@@ -71,9 +73,10 @@ function Refresh-Setup {
  $ui.OpenOriginal.IsEnabled=$isInstalled
  $ui.OpenHd.IsEnabled=$hdInstalled
  $ui.OpenInstall.IsEnabled=$isInstalled
- $ui.Launch.IsEnabled=$false # Fail closed until real Xperia runtime is wired.
+ $ui.Launch.IsEnabled=$isInstalled -and $hasRuntime -and (-not $busy)
+ $ui.Launch.Content=if($ui.Launch.IsEnabled){'TRY ORIGINAL ARM GAME (EXPERIMENTAL)'}else{'ORIGINAL ARM BOOT NOT READY'}
  $ui.EnableHd.IsEnabled=$hdInstalled
- if(-not $busy){$ui.RunStatus.Text=if($isInstalled){'Assets installed. Play is disabled until the ARM runtime boots.'}else{'Select game files and click Install / Verify Game Files.'}}
+ if(-not $busy){$ui.RunStatus.Text=if($isInstalled -and $hasRuntime){'Installed original files and native ARM runtime detected. Experimental game boot available; not verified playable.'}elseif($isInstalled){'Original files installed; Windows ARM runtime missing. Install the matching build.'}else{'Select game files and click Install / Verify Game Files.'}}
 }
 function Show-Page([string]$Name) {
  foreach($part in @('Home','Graphics','Controls','Deps','About')){
@@ -132,21 +135,24 @@ $ui.OpenOriginal.Add_Click({Safe-Action {Start-Process explorer.exe -ArgumentLis
 $ui.OpenHd.Add_Click({Safe-Action {Start-Process explorer.exe -ArgumentList (Quote-Argument (Join-Path $install 'enhancements\reanimated\texture_hd'))}})
 $ui.OpenInstall.Add_Click({Safe-Action {Start-Process explorer.exe -ArgumentList (Quote-Argument $install)}})
 $ui.OpenLogs.Add_Click({Start-Process explorer.exe -ArgumentList (Quote-Argument $logs)})
-$ui.GuestStartup.Add_Click({Safe-Action {
- if(-not (Test-Installed)){throw 'Install verified Xperia Play files first.'}
+function Start-OriginalArmGame {
+ if(-not (Test-Installed)){throw 'Install verified original Xperia Play files first.'}
+ if($script:task){throw 'Another launcher operation is already running.'}
  $binary=Join-Path $PSScriptRoot 'xperia_guest_startup.exe'
- if(-not (Test-Path -LiteralPath $binary -PathType Leaf)){throw 'Windows ARM32 startup runtime missing.'}
- $response=[Windows.MessageBox]::Show(
-  'This runs original Xperia ARM initialization code through the experimental native Windows translator. Unimplemented Android services will stop execution and appear in the log; it cannot yet run a playable game. Proceed?',
-  'Experimental ARM32 guest execution','YesNo','Warning')
- if($response -ne 'Yes'){return}
+ if(-not (Test-Path -LiteralPath $binary -PathType Leaf)){throw 'Bundled Windows ARM32 runtime missing.'}
  $original=Join-Path $install 'lib\armeabi\libEAMGameDeadSpace.so'
  if(-not (Test-Path -LiteralPath $original -PathType Leaf)){throw 'Original Xperia game library missing.'}
- $script:task=Start-Tracked $binary @($original,$install) 'Original Xperia ARM constructor startup'
- Write-Activity 'Running original Xperia ARM guest constructors using Windows Dynarmic.'
- Write-Activity 'Execution will stop at the first unsupported guest service or JNI bootstrap boundary.'
+ $response=[Windows.MessageBox]::Show(
+  'This will execute the ORIGINAL Xperia ARM game code through Dynarmic and try to create a real Windows game window. JNI, multi-thread scheduling and rendering are still experimental; this attempt may stop or display nothing. Logs will be saved. Continue?',
+  'Attempt original Xperia Play ARM game boot','YesNo','Warning')
+ if($response -ne 'Yes'){return}
+ $script:task=Start-Tracked $binary @($original,$install) 'Original Xperia ARM game boot'
+ Write-Activity 'Executing original Xperia ARM JNI, audio, game creation, surface and frames in native Windows compatibility host.'
+ Write-Activity 'Any unsupported call or guest fault remains a hard failure; check launcher logs.'
  Refresh-Setup
-}})
+}
+$ui.GuestStartup.Add_Click({Safe-Action {Start-OriginalArmGame}})
+$ui.Launch.Add_Click({Safe-Action {Start-OriginalArmGame}})
 $ui.GuestPreflight.Add_Click({Safe-Action {
  if(-not (Test-Installed)){throw 'Install the verified Xperia Play files first.'}
  $helper=Join-Path $PSScriptRoot 'GuestPreflight.ps1'
