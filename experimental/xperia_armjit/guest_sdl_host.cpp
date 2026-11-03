@@ -13,6 +13,13 @@ template<typename Fn> Fn resolve_gl(const char* name) {
     if(!p)throw std::runtime_error(std::string("Required desktop GL extension missing: ")+name);
     return reinterpret_cast<Fn>(p);
 }
+template<typename Fn> Fn resolve_fbo(const char* core,const char* extension) {
+    auto* p=SDL_GL_GetProcAddress(core);
+    if(!p)p=SDL_GL_GetProcAddress(extension);
+    if(!p)throw std::runtime_error(
+        std::string("Framebuffer GL function missing: ")+core+"/"+extension);
+    return reinterpret_cast<Fn>(p);
+}
 constexpr GLenum kArrayBuffer=0x8892u,kElementBuffer=0x8893u;
 constexpr GLenum kTextureEnvColor=0x2201u;
 constexpr std::uint64_t kMaxBuffer=64u*1024u*1024u;
@@ -43,7 +50,17 @@ const char* const names[]={
 "glGenerateMipmapOES","glTexParameteriv","glTexEnviv",
 "glLoadMatrixx","glMultMatrixx","glTranslatex","glRotatex","glScalex",
 "glClearColorx","glColor4x","glOrthox","glFrustumx","glClearDepthx",
-"glDepthRangex","glTexEnvx","glTexParameterx","glTexCoord4f"
+"glDepthRangex","glTexEnvx","glTexParameterx","glTexCoord4f",
+"glGenFramebuffersOES","glBindFramebufferOES",
+"glDeleteFramebuffersOES","glIsFramebufferOES",
+"glCheckFramebufferStatusOES","glFramebufferTexture2DOES",
+"glGetFramebufferAttachmentParameterivOES",
+"glGenRenderbuffersOES","glBindRenderbufferOES",
+"glDeleteRenderbuffersOES","glIsRenderbufferOES",
+"glRenderbufferStorageOES","glFramebufferRenderbufferOES",
+"glGetRenderbufferParameterivOES",
+"glBlendEquationOES","glBlendFuncSeparateOES",
+"glBlendEquationSeparateOES"
 };
 constexpr std::size_t count=sizeof(names)/sizeof(names[0]);
 unsigned element_bytes(unsigned type){
@@ -729,6 +746,116 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
         case 85:glTexEnvi(a(0),a(1),static_cast<GLint>(a(2)));break;
         case 86:glTexParameteri(a(0),a(1),static_cast<GLint>(a(2)));break;
         case 87:glTexCoord4f(f(0),f(1),f(2),f(3));break;
+        // Android GLES1 OES framebuffer extensions; desktop Win64
+        // OpenGL implements the same operations under core/EXT names.
+        case 88:case 90:case 95:case 97:{ // Gen/Delete FBO/RBO objects
+            const auto n=a(0);
+            if(n>4096u)throw std::runtime_error("GLES FBO object count cap");
+            std::vector<GLuint> values(n,0u);
+            if(which==88 || which==95){
+                auto* guest_output=guest.writeable(a(1),n*4u);
+                if(n&&!guest_output)
+                    throw std::runtime_error("GLES FBO IDs guest output unmapped");
+                if(which==88)
+                    resolve_fbo<void(*)(GLsizei,GLuint*)>(
+                        "glGenFramebuffers","glGenFramebuffersEXT")(n,values.data());
+                else
+                    resolve_fbo<void(*)(GLsizei,GLuint*)>(
+                        "glGenRenderbuffers","glGenRenderbuffersEXT")(n,values.data());
+                for(unsigned i=0;i<n;++i)
+                    for(unsigned k=0;k<4;++k)
+                        guest_output[i*4u+k]=std::uint8_t(values[i]>>(k*8u));
+            }else{
+                const auto* guest_ids=guest.read(a(1),n*4u);
+                if(n&&!guest_ids)
+                    throw std::runtime_error("GLES FBO ID deletion source unmapped");
+                for(unsigned i=0;i<n;++i)
+                    for(unsigned k=0;k<4;++k)
+                        values[i]|=GLuint(guest_ids[i*4u+k])<<(k*8u);
+                if(which==90)
+                    resolve_fbo<void(*)(GLsizei,const GLuint*)>(
+                        "glDeleteFramebuffers","glDeleteFramebuffersEXT")(n,values.data());
+                else
+                    resolve_fbo<void(*)(GLsizei,const GLuint*)>(
+                        "glDeleteRenderbuffers","glDeleteRenderbuffersEXT")(n,values.data());
+            }
+            break;
+        }
+        case 89: // glBindFramebufferOES
+            resolve_fbo<void(*)(GLenum,GLuint)>(
+                "glBindFramebuffer","glBindFramebufferEXT")(a(0),a(1));
+            break;
+        case 91: // glIsFramebufferOES
+            result=resolve_fbo<GLboolean(*)(GLuint)>(
+                "glIsFramebuffer","glIsFramebufferEXT")(a(0))?1u:0u;
+            break;
+        case 92: // glCheckFramebufferStatusOES
+            result=resolve_fbo<GLenum(*)(GLenum)>(
+                "glCheckFramebufferStatus","glCheckFramebufferStatusEXT")(a(0));
+            break;
+        case 93: // glFramebufferTexture2DOES
+            resolve_fbo<void(*)(GLenum,GLenum,GLenum,GLuint,GLint)>(
+                "glFramebufferTexture2D","glFramebufferTexture2DEXT")(
+                   a(0),a(1),a(2),a(3),static_cast<GLint>(a(4)));
+            break;
+        case 94: { // glGetFramebufferAttachmentParameterivOES
+            auto* dst=guest.writeable(a(3),4u);
+            if(!dst||(a(3)&3u))
+                throw std::runtime_error("ARM FBO attachment query outptr invalid");
+            GLint value=0;
+            resolve_fbo<void(*)(GLenum,GLenum,GLenum,GLint*)>(
+                "glGetFramebufferAttachmentParameteriv",
+                "glGetFramebufferAttachmentParameterivEXT")(a(0),a(1),a(2),&value);
+            for(unsigned i=0;i<4u;++i)
+                dst[i]=std::uint8_t(std::uint32_t(value)>>(i*8u));
+            break;
+        }
+        case 96: // glBindRenderbufferOES
+            resolve_fbo<void(*)(GLenum,GLuint)>(
+                "glBindRenderbuffer","glBindRenderbufferEXT")(a(0),a(1));
+            break;
+        case 98: // glIsRenderbufferOES
+            result=resolve_fbo<GLboolean(*)(GLuint)>(
+                "glIsRenderbuffer","glIsRenderbufferEXT")(a(0))?1u:0u;
+            break;
+        case 99: { // glRenderbufferStorageOES
+            if(a(2)>8192u || a(3)>8192u)
+                throw std::runtime_error("ARM renderbuffer size cap");
+            resolve_fbo<void(*)(GLenum,GLenum,GLsizei,GLsizei)>(
+                "glRenderbufferStorage","glRenderbufferStorageEXT")(
+                  a(0),a(1),a(2),a(3));
+            break;
+        }
+        case 100: // glFramebufferRenderbufferOES
+            resolve_fbo<void(*)(GLenum,GLenum,GLenum,GLuint)>(
+                "glFramebufferRenderbuffer","glFramebufferRenderbufferEXT")(
+                  a(0),a(1),a(2),a(3));
+            break;
+        case 101: { // glGetRenderbufferParameterivOES
+            auto* dst=guest.writeable(a(2),4u);
+            if(!dst||(a(2)&3u))
+                throw std::runtime_error("ARM renderbuffer query outptr invalid");
+            GLint value=0;
+            resolve_fbo<void(*)(GLenum,GLenum,GLint*)>(
+                "glGetRenderbufferParameteriv",
+                "glGetRenderbufferParameterivEXT")(a(0),a(1),&value);
+            for(unsigned i=0;i<4u;++i)
+                dst[i]=std::uint8_t(std::uint32_t(value)>>(i*8u));
+            break;
+        }
+        case 102: // glBlendEquationOES
+            resolve_fbo<void(*)(GLenum)>(
+                "glBlendEquation","glBlendEquationEXT")(a(0));
+            break;
+        case 103: // glBlendFuncSeparateOES
+            resolve_fbo<void(*)(GLenum,GLenum,GLenum,GLenum)>(
+                "glBlendFuncSeparate","glBlendFuncSeparateEXT")(
+                  a(0),a(1),a(2),a(3));
+            break;
+        case 104: // glBlendEquationSeparateOES
+            resolve_fbo<void(*)(GLenum,GLenum)>(
+                "glBlendEquationSeparate","glBlendEquationSeparateEXT")(a(0),a(1));
+            break;
         default:throw std::runtime_error("Unknown GLES1 dispatch index");
         }
         r[0]=result;
