@@ -536,6 +536,158 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
                 throw std::runtime_error("Host OpenGL rejected decompressed RGBA texture, error "+std::to_string(status));
             break;
         }
+        // These are directly evidenced by the Xperia v1.1.33 ELF import
+        // inventory, not just a generic GLES compatibility wish list.
+        case 60:
+            resolve_gl<void(*)(GLenum)>("glActiveTexture")(a(0));break;
+        case 61:
+            resolve_gl<void(*)(GLenum)>("glClientActiveTexture")(a(0));break;
+        case 62:glColorMask(a(0)!=0,a(1)!=0,a(2)!=0,a(3)!=0);break;
+        case 63:glPolygonOffset(f(0),f(1));break;
+        case 64: { // glBindBuffer: VBO object identity belongs to host GL
+            const auto target=a(0),name=a(1);
+            if(target!=kArrayBuffer && target!=kElementBuffer)
+                throw std::runtime_error("Unknown ARM GLES buffer binding target");
+            resolve_gl<void(*)(GLenum,GLuint)>("glBindBuffer")(target,name);
+            if(name)buffer_sizes_.try_emplace(name,0u);
+            if(target==kArrayBuffer)array_buffer_=name;
+            else element_buffer_=name;
+            break;
+        }
+        case 65:case 66: { // glGenBuffers / glDeleteBuffers
+            const auto n=a(0);
+            if(n>4096)throw std::runtime_error("GLES buffer count cap");
+            std::vector<GLuint> ids(n,0);
+            if(which==65){
+                auto* out=guest.writeable(a(1),n*4u);
+                if(n&&!out)throw std::runtime_error("Unmapped GLES buffer output");
+                resolve_gl<void(*)(GLsizei,GLuint*)>("glGenBuffers")(n,ids.data());
+                for(unsigned i=0;i<n;++i){
+                    buffer_sizes_[ids[i]]=0u;
+                    for(unsigned k=0;k<4;++k)
+                        out[i*4u+k]=std::uint8_t(ids[i]>>(k*8u));
+                }
+            }else{
+                const auto* src=guest.read(a(1),n*4u);
+                if(n&&!src)throw std::runtime_error("Unmapped GLES buffer deletion IDs");
+                for(unsigned i=0;i<n;++i){
+                    for(unsigned k=0;k<4;++k)
+                        ids[i]|=GLuint(src[i*4u+k])<<(k*8u);
+                    buffer_sizes_.erase(ids[i]);
+                    if(ids[i]==array_buffer_)array_buffer_=0;
+                    if(ids[i]==element_buffer_)element_buffer_=0;
+                }
+                resolve_gl<void(*)(GLsizei,const GLuint*)>("glDeleteBuffers")(n,ids.data());
+            }
+            break;
+        }
+        case 67:case 68: { // glBufferData / glBufferSubData
+            const auto target=a(0);
+            if(target!=kArrayBuffer && target!=kElementBuffer)
+                throw std::runtime_error("GLES upload target not VBO/EBO");
+            const auto bound=target==kArrayBuffer?array_buffer_:element_buffer_;
+            if(!bound)throw std::runtime_error("GLES buffer transfer without bound object");
+            std::uint64_t offset=0,bytes=0;
+            std::uint32_t address=0;
+            if(which==67){
+                bytes=a(1);address=a(2);
+            }else{
+                offset=a(1);bytes=a(2);address=a(3);
+            }
+            if(bytes>kMaxBuffer || offset+bytes>kMaxBuffer)
+                throw std::runtime_error("GLES buffer transfer exceeds 64MiB");
+            if(which==68){
+                const auto it=buffer_sizes_.find(bound);
+                if(it==buffer_sizes_.end()||offset+bytes>it->second)
+                    throw std::runtime_error("GLES sub-buffer write exceeds allocated buffer");
+            }
+            const void* source=nullptr;
+            if(address && bytes) {
+                source=guest.read(address,static_cast<std::size_t>(bytes));
+                if(!source)throw std::runtime_error("GLES source ARM buffer unmapped");
+            }else if(bytes && which==68)
+                throw std::runtime_error("Null GLES sub-buffer source");
+            if(which==67){
+                resolve_gl<void(*)(GLenum,std::ptrdiff_t,const void*,GLenum)>("glBufferData")(
+                    target,static_cast<std::ptrdiff_t>(bytes),source,a(3));
+                buffer_sizes_[bound]=static_cast<std::size_t>(bytes);
+            }else{
+                resolve_gl<void(*)(GLenum,std::ptrdiff_t,std::ptrdiff_t,const void*)>("glBufferSubData")(
+                    target,static_cast<std::ptrdiff_t>(offset),
+                    static_cast<std::ptrdiff_t>(bytes),source);
+            }
+            break;
+        }
+        case 69: { // glReadPixels(x,y,width,height,format,type,pixels)
+            const auto width=a(2),height=a(3),format=a(4),type=a(5);
+            if(width>8192||height>8192||type!=GL_UNSIGNED_BYTE ||
+               (format!=GL_RGBA && format!=GL_RGB))
+                throw std::runtime_error("Unsupported GLES glReadPixels pixel layout");
+            const unsigned components=format==GL_RGBA?4u:3u;
+            GLint alignment=4;glGetIntegerv(GL_PACK_ALIGNMENT,&alignment);
+            if(alignment!=1&&alignment!=2&&alignment!=4&&alignment!=8)
+                throw std::runtime_error("GL pixel pack alignment invalid");
+            const std::uint64_t row=std::uint64_t(width)*components;
+            const std::uint64_t pitch=(row+unsigned(alignment)-1u)&~(unsigned(alignment)-1u);
+            const std::uint64_t bytes=height?pitch*(height-1u)+row:0u;
+            if(bytes>kMaxBuffer)throw std::runtime_error("Guest framebuffer read >64MiB");
+            auto* dest=guest.writeable(a(6),static_cast<std::size_t>(bytes));
+            if(!dest && bytes)throw std::runtime_error("GLES framebuffer destination unmapped");
+            glReadPixels(static_cast<GLint>(a(0)),static_cast<GLint>(a(1)),
+                         width,height,format,type,dest);
+            break;
+        }
+        case 70:
+            glCopyTexSubImage2D(a(0),static_cast<GLint>(a(1)),
+                               static_cast<GLint>(a(2)),static_cast<GLint>(a(3)),
+                               static_cast<GLint>(a(4)),static_cast<GLint>(a(5)),
+                               a(6),a(7));
+            break;
+        case 71:
+            resolve_gl<void(*)(GLenum)>("glGenerateMipmap")(a(0));break;
+        case 72:case 73:{ // glTexParameteriv / glTexEnviv
+            const auto token=a(1);
+            const auto n=(which==73 && token==kTextureEnvColor)?4u:1u;
+            const auto* bytes=guest.read(a(2),n*4u);
+            if(!bytes)throw std::runtime_error("GLES integer parameter array unmapped");
+            GLint values[4]={};
+            for(unsigned i=0;i<n;++i)
+                for(unsigned k=0;k<4;++k)
+                    values[i]|=GLint(std::uint32_t(bytes[i*4u+k])<<(k*8u));
+            if(which==72)glTexParameteriv(a(0),token,values);
+            else glTexEnviv(a(0),token,values);
+            break;
+        }
+        case 74:case 75: { // glLoadMatrixx / glMultMatrixx
+            const auto* src=guest.read(a(0),16u*4u);
+            if(!src)throw std::runtime_error("ARM fixed-point matrix unmapped");
+            GLfloat matrix[16]{};
+            for(unsigned i=0;i<16;++i){
+                const auto* p=src+i*4u;
+                const auto fixedword=std::uint32_t(p[0]) |
+                    std::uint32_t(p[1])<<8u |
+                    std::uint32_t(p[2])<<16u |
+                    std::uint32_t(p[3])<<24u;
+                matrix[i]=fixed(fixedword);
+            }
+            if(which==74)glLoadMatrixf(matrix);
+            else glMultMatrixf(matrix);
+            break;
+        }
+        case 76:glTranslatef(fixed(a(0)),fixed(a(1)),fixed(a(2)));break;
+        case 77:glRotatef(fixed(a(0)),fixed(a(1)),fixed(a(2)),fixed(a(3)));break;
+        case 78:glScalef(fixed(a(0)),fixed(a(1)),fixed(a(2)));break;
+        case 79:glClearColor(fixed(a(0)),fixed(a(1)),fixed(a(2)),fixed(a(3)));break;
+        case 80:glColor4f(fixed(a(0)),fixed(a(1)),fixed(a(2)),fixed(a(3)));break;
+        case 81:glOrtho(fixed(a(0)),fixed(a(1)),fixed(a(2)),fixed(a(3)),
+                        fixed(a(4)),fixed(a(5)));break;
+        case 82:glFrustum(fixed(a(0)),fixed(a(1)),fixed(a(2)),fixed(a(3)),
+                          fixed(a(4)),fixed(a(5)));break;
+        case 83:glClearDepth(static_cast<GLdouble>(fixed(a(0))));break;
+        case 84:glDepthRange(fixed(a(0)),fixed(a(1)));break;
+        case 85:glTexEnvi(a(0),a(1),static_cast<GLint>(a(2)));break;
+        case 86:glTexParameteri(a(0),a(1),static_cast<GLint>(a(2)));break;
+        case 87:glTexCoord4f(f(0),f(1),f(2),f(3));break;
         default:throw std::runtime_error("Unknown GLES1 dispatch index");
         }
         r[0]=result;
