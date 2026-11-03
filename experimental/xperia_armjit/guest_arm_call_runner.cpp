@@ -133,13 +133,13 @@ struct GuestArmCallRunner::Impl {
     // stack and preserves the calling ARM context including NEON/VFP.
     // One worker runs per scheduling decision; no host x64 pthread runs ARM.
     bool run_one_worker(std::string& error,unsigned depth) {
+        if(depth+1u>=kMaxNestedCalls) {
+            error="ARM guest pthread nesting limit reached";
+            return false;
+        }
         GuestThreads::Task task;
         if(!bridge.guest_threads().take_next(task)) {
             error="No runnable ARM guest pthread";
-            return false;
-        }
-        if(depth+1u>=kMaxNestedCalls) {
-            error="ARM guest pthread nesting limit reached";
             return false;
         }
         const auto parent=bridge.guest_threads().self();
