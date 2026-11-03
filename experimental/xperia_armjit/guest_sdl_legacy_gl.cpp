@@ -20,6 +20,7 @@ constexpr GLenum kProjectionMatrix=0x0ba7u;
 constexpr GLenum kTextureMatrix=0x0ba8u;
 constexpr GLenum kTextureEnvColor=0x2201u;
 constexpr GLenum kTextureBorderColor=0x1004u;
+constexpr GLenum kTextureCropOES=0x8b9du;
 constexpr GLenum kFogColor=0x0b66u;
 constexpr GLenum kSpotDirection=0x1204u;
 constexpr GLenum kLightModelAmbient=0x0b53u;
@@ -161,6 +162,20 @@ bool GuestSdlHost::dispatch_legacy(
             ext<void(*)(GLclampf,GLboolean)>("glSampleCoverage")(x(0),a(1)!=0);
             break;
         case 128:case 129:case 130:case 131:{
+            if((which==128||which==129) && a(1)==kTextureCropOES) {
+                const auto it=crop_rects_.find(bound_textures_[active_texture_unit_]);
+                const auto crop=it==crop_rects_.end()?
+                    std::array<std::int32_t,4>{0,0,0,0}:it->second;
+                if(which==128){
+                    const GLint val[4]={crop[0],crop[1],crop[2],crop[3]};
+                    write_int_vector(guest,a(2),val,4u);
+                }else{
+                    const GLfloat val[4]={float(crop[0]),float(crop[1]),
+                                          float(crop[2]),float(crop[3])};
+                    write_float_vector(guest,a(2),val,4u,false);
+                }
+                break;
+            }
             const unsigned n=components(a(1));
             if(which==128||which==130){
                 GLint out[16]={};
@@ -206,6 +221,15 @@ bool GuestSdlHost::dispatch_legacy(
             write32(dest,guest_ptr);break;
         }
         case 135:case 136:{ // GL fixed texture state queries
+            if(which==135 && a(1)==kTextureCropOES){
+                const auto it=crop_rects_.find(bound_textures_[active_texture_unit_]);
+                const auto crop=it==crop_rects_.end()?
+                    std::array<std::int32_t,4>{0,0,0,0}:it->second;
+                const GLfloat fv[4]={float(crop[0]),float(crop[1]),
+                                     float(crop[2]),float(crop[3])};
+                write_float_vector(guest,a(2),fv,4u,true);
+                break;
+            }
             GLfloat out[16]={};
             const auto n=components(a(1));
             if(which==135)glGetTexParameterfv(a(0),a(1),out);
@@ -238,6 +262,15 @@ bool GuestSdlHost::dispatch_legacy(
             glFogfv(a(0),out.data());break;
         }
         case 143:{
+            if(a(1)==kTextureCropOES){
+                if(a(0)!=GL_TEXTURE_2D||!bound_textures_[active_texture_unit_])
+                    throw std::runtime_error("OES crop requires bound 2D texture");
+                const auto out=read_fixed_vector(guest,a(2),4u);
+                std::array<std::int32_t,4> values{};
+                for(unsigned i=0;i<4u;++i)values[i]=std::int32_t(std::lround(out[i]));
+                crop_rects_[bound_textures_[active_texture_unit_]]=values;
+                break;
+            }
             const auto out=read_fixed_vector(guest,a(2),components(a(1)));
             glTexParameterfv(a(0),a(1),out.data());break;
         }
@@ -246,6 +279,15 @@ bool GuestSdlHost::dispatch_legacy(
             glTexEnvfv(a(0),a(1),out.data());break;
         }
         case 145:{
+            if(a(1)==kTextureCropOES){
+                if(a(0)!=GL_TEXTURE_2D||!bound_textures_[active_texture_unit_])
+                    throw std::runtime_error("OES crop requires bound 2D texture");
+                const auto out=read_float_vector(guest,a(2),4u);
+                std::array<std::int32_t,4> values{};
+                for(unsigned i=0;i<4u;++i)values[i]=std::int32_t(std::lround(out[i]));
+                crop_rects_[bound_textures_[active_texture_unit_]]=values;
+                break;
+            }
             const auto out=read_float_vector(guest,a(2),components(a(1)));
             glTexParameterfv(a(0),a(1),out.data());break;
         }
