@@ -22,6 +22,27 @@ import sys
 MARKER = "DS_TEXTUREPACK_VECTOR_GUARD_0035B2E0"
 FUNCTION = "f_0035b2e0"
 EXPECTED_LABEL = "L_35b564:;"
+CALLER_MARKER = "DS_TEXTUREPACK_POST_DECODE_VECTOR_0035C844"
+CALLER_NAME = "f_0035c844"
+CALLER_CALL = (
+    "{ u64 rv = f_00365a2c(r0, r1, r2, r3, sp); "
+    "r0 = (u32)rv; r1 = (u32)(rv>>32); }"
+)
+CALLER_TRACE = r'''
+  /* DS_TEXTUREPACK_POST_DECODE_VECTOR_0035C844
+   * This vector was produced from the resource path BEFORE
+   * im::TexturePack::load(vector) mutates it.
+   */
+  fprintf(stderr,
+     "[TEXPACK_SOURCE_VECTOR] after f_00365a2c "
+     "vector=0x%08x begin=0x%08x end=0x%08x cap=0x%08x\n",
+     (unsigned)sp,
+     (unsigned)LD32(sp),
+     (unsigned)LD32(sp+4u),
+     (unsigned)LD32(sp+8u));
+  fflush(stderr);
+'''
+
 # Pin to the two lifted ARM loads visible in the original user's debug build.
 LOAD = re.compile(
     r"(L_35b564:;\s*\{\s*u32 ea = r10 \+ 0u;\s*"
@@ -87,14 +108,26 @@ def patch(source: str) -> str:
         raise ValueError("Crash-site load is not adjacent to L_35b564; "
                          "refusing to instrument an unknown source layout")
     replacement = body[:m.end()] + "\n" + GUARD + body[m.end():]
-    if '#include <stdio.h>\n' not in source[:begin]:
+    source=source[:begin]+replacement+source[end:]
+    # The source string loader first calls f_00365a2c to construct the
+    # intrusive_ptr<Object3D> vector. Record the vector BEFORE forwarding
+    # to the crashing loader. This distinguishes an empty source from
+    # corruption/mutation inside TexturePack::load(vector).
+    funcs=list(FUNC_RE.finditer(source))
+    cstart=next((x.start() for x in funcs if source[x.start():].startswith(
+        "u64 f_0035c844(")),-1)
+    if cstart < 0:
+        raise ValueError("Missing string-to-vector TexturePack caller")
+    cend=next((x.start() for x in funcs if x.start()>cstart),len(source))
+    caller=source[cstart:cend]
+    if CALLER_MARKER not in caller:
+        if caller.count(CALLER_CALL)!=1:
+            raise ValueError("Unknown TexturePack string-to-vector source layout")
+        caller=caller.replace(CALLER_CALL,CALLER_CALL+"\n"+CALLER_TRACE,1)
+        source=source[:cstart]+caller+source[cend:]
+    if '#include <stdio.h>\n' not in source:
         source = '#include <stdio.h>\n' + source
-    # Recompute function bounds after potential header insertion.
-    matches = list(FUNC_RE.finditer(source))
-    begin = next(x.start() for x in matches if source[x.start():].startswith(
-        "u64 f_0035b2e0("))
-    end = next((x.start() for x in matches if x.start() > begin),len(source))
-    return source[:begin] + replacement + source[end:]
+    return source
 
 
 def main() -> int:
