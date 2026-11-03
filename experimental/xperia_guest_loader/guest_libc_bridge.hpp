@@ -1,5 +1,6 @@
 #pragma once
 #include "guest_elf32.hpp"
+#include "guest_threads.hpp"
 #include <array>
 #include <cstdint>
 #include <string>
@@ -35,7 +36,13 @@ public:
     // guest-call runner's translated ARM callback path, in reverse order.
     struct Destructor { std::uint32_t function, argument, dso; };
     std::vector<Destructor> take_destructors(std::uint32_t dso);
-    static constexpr unsigned last_svc=48;
+    static constexpr unsigned last_svc=63;
+    static constexpr unsigned create_thread_svc=49;
+    static constexpr unsigned join_thread_svc=50;
+    static constexpr unsigned yield_thread_svc=62;
+    static constexpr unsigned exit_thread_svc=63;
+    GuestThreads& guest_threads() noexcept {return guest_threads_;}
+    const GuestThreads& guest_threads() const noexcept {return guest_threads_;}
     static constexpr unsigned once_svc=44;
     static constexpr unsigned finalize_svc=32;
     // Called AFTER Dynarmic's SVC callback halts JIT execution.
@@ -54,5 +61,6 @@ private:
     struct GuestMutex { bool locked=false; };
     std::unordered_map<std::uint32_t,GuestMutex> mutexes_;
     std::unordered_map<std::uint32_t,std::uint32_t> semaphores_;
+    GuestThreads guest_threads_;
 };
 }
