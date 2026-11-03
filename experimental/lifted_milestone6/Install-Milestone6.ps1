@@ -92,7 +92,7 @@ try {
     }
     exit 0
 } catch {
-    Write-Error ("Milestone 6 update failed safely: " + $_.Exception.Message)
+    Write-Host ("Milestone 6 update failed safely: " + $_.Exception.Message) -ForegroundColor Red
     if (-not $Quiet) {
         Add-Type -AssemblyName System.Windows.Forms
         [void][System.Windows.Forms.MessageBox]::Show(
