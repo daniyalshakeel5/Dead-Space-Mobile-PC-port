@@ -39,3 +39,13 @@ add_executable(xperia_guest_bionic_data_tests guest_bionic_data_tests.cpp)
 target_link_libraries(xperia_guest_bionic_data_tests PRIVATE xperia_guest_libc_bridge)
 add_test(NAME xperia_guest_bionic_elf_global_objects
     COMMAND xperia_guest_bionic_data_tests)
+
+# Independent compressed-texture correctness tests run on Windows without JIT.
+add_executable(xperia_guest_texture_decoder_tests
+    ../xperia_armjit/guest_texture_decoder_tests.cpp
+    ../xperia_armjit/guest_texture_decoder.cpp
+    ../xperia_armjit/third_party/powervr/PVRTDecompress.cpp)
+target_include_directories(xperia_guest_texture_decoder_tests
+    PRIVATE ../xperia_armjit)
+add_test(NAME xperia_guest_ATC_PVRTC_decoding
+    COMMAND xperia_guest_texture_decoder_tests)
