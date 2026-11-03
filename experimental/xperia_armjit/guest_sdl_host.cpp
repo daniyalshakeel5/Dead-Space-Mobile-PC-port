@@ -389,8 +389,23 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
             if(n>1000000u||(type!=GL_UNSIGNED_BYTE&&type!=GL_UNSIGNED_SHORT))
                 throw std::runtime_error("Unsupported indexed draw size/type");
             if(!n)break;
-            const auto* indices=guest.read(ptr,n*(type==GL_UNSIGNED_SHORT?2u:1u));
-            if(!indices)throw std::runtime_error("Guest draw indices unmapped");
+            const auto length=std::size_t(n)*(type==GL_UNSIGNED_SHORT?2u:1u);
+            std::vector<std::uint8_t> readback;
+            const std::uint8_t* indices=nullptr;
+            if(element_buffer_){
+                const auto it=buffer_sizes_.find(element_buffer_);
+                if(it==buffer_sizes_.end() || std::uint64_t(ptr)+length>it->second)
+                    throw std::runtime_error("Original GLES EBO draw exceeds allocated index buffer");
+                readback.resize(length);
+                resolve_gl<void(*)(GLenum,std::ptrdiff_t,std::ptrdiff_t,void*)>(
+                    "glGetBufferSubData")(kElementBuffer,
+                    static_cast<std::ptrdiff_t>(ptr),
+                    static_cast<std::ptrdiff_t>(length),readback.data());
+                indices=readback.data();
+            }else{
+                indices=guest.read(ptr,length);
+                if(!indices)throw std::runtime_error("Guest draw indices unmapped");
+            }
             unsigned highest=0;
             for(unsigned i=0;i<n;++i){
                 unsigned index=type==GL_UNSIGNED_BYTE?indices[i]:
@@ -398,7 +413,10 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
                 highest=std::max(highest,index);
             }
             if(!apply_arrays(guest,highest,error))return false;
-            glDrawElements(a(0),n,type,indices);break;
+            const void* draw_pointer=element_buffer_
+                ?reinterpret_cast<const void*>(std::uintptr_t(ptr))
+                :static_cast<const void*>(indices);
+            glDrawElements(a(0),n,type,draw_pointer);break;
         }
         case 25:result=glGetError();break;
         case 26:glColor4f(f(0),f(1),f(2),f(3));break;
