@@ -447,6 +447,35 @@ bool GuestJniVm::dispatch(std::uint32_t id,
                 return false;
             }
         }
+        if(owner==4u) {
+            if(slot==27u){
+                error="Android AudioTrack requires six-integer constructor";return false;
+            }
+            if(!audio_.enqueue||!audio_.control){
+                error="AudioTrack object requires active real Windows PCM device";
+                return false;
+            }
+            // AAPCS: env, class, method ID, streamType are r0-r3;
+            // sampleRate, channelConfig, format, bufferBytes and mode are
+            // five consecutive 32-bit words at the caller's guest SP.
+            std::uint32_t sample_rate=0,channels=0,format=0,capacity=0,mode=0;
+            try{
+                sample_rate=guest.read_u32(regs[13]);
+                channels=guest.read_u32(regs[13]+4u);
+                format=guest.read_u32(regs[13]+8u);
+                capacity=guest.read_u32(regs[13]+12u);
+                mode=guest.read_u32(regs[13]+16u);
+            }catch(...){
+                error="AudioTrack six-int constructor AAPCS stack unmapped";return false;
+            }
+            if(sample_rate!=44100u ||
+               (channels!=12u&&channels!=2u) ||
+               format!=2u || capacity<1024u ||
+               capacity>2u*1024u*1024u || mode!=1u){
+                error="AudioTrack constructor requested unsupported rate/channel/PCM/mode";
+                return false;
+            }
+        }
         if(next_instance_>=32u){error="JNI Xperia delegate object cap";return false;}
         const auto object=vm_address+0x3b00u+next_instance_*16u;
         ++next_instance_;
