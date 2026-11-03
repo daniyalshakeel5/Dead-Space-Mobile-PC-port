@@ -291,6 +291,41 @@ struct GuestArmCallRunner::Impl {
                     }else if(state!=2)
                         throw std::runtime_error("Reentrant pthread_once requires guest scheduler");
                     copy[0]=0;
+                } else if(id==GuestLibcBridge::cond_wait_svc ||
+                          id==GuestLibcBridge::cond_timedwait_svc){
+                    // pthread_cond_wait releases its mutex atomically with
+                    // parking and only reacquires after a guest ARM worker
+                    // changes this condition's generation.
+                    std::uint32_t sequence=0;
+                    if(id==GuestLibcBridge::cond_timedwait_svc){
+                        const auto* timeout=image.read(copy[2],8u);
+                        if(!timeout || (copy[2]&3u)){
+                            error="Timed ARM condition requires valid guest timespec";
+                            return false;
+                        }
+                        const std::uint32_t nanoseconds=image.read_u32(copy[2]+4u);
+                        if(nanoseconds>=1000000000u){
+                            error="Invalid ARM condition absolute timeout";return false;
+                        }
+                    }
+                    if(!bridge.begin_cond_wait(copy[0],copy[1],sequence,error))
+                        return false;
+                    bool signalled=false;
+                    for(unsigned turns=0;turns<GuestThreads::max_live;++turns){
+                        signalled=bridge.cond_signalled(copy[0],sequence);
+                        if(signalled || !bridge.guest_threads().pending())break;
+                        if(!run_one_worker(error,depth)){
+                            (void)bridge.cancel_cond_wait(copy[1],error);
+                            return false;
+                        }
+                    }
+                    signalled=bridge.cond_signalled(copy[0],sequence);
+                    if(!bridge.end_cond_wait(copy[1],error))return false;
+                    if(!signalled && id==GuestLibcBridge::cond_wait_svc){
+                        error="ARM pthread_cond_wait blocked without runnable signalling worker";
+                        return false;
+                    }
+                    copy[0]=signalled?0u:110u; // ETIMEDOUT
                 } else if(id==GuestLibcBridge::exit_thread_svc){
                     if(bridge.guest_threads().self()==GuestThreads::main_thread)
                         throw std::runtime_error("Main ARM thread cannot pthread_exit");
