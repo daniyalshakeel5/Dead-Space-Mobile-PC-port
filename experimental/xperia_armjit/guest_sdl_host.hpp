@@ -55,7 +55,10 @@ private:
         int size=0,type=0,stride=0;
         std::uint32_t ptr=0;
         bool enabled=false;
+        std::uint32_t buffer=0;
     } vertex_,color_,texcoord_,normal_;
+    std::uint32_t array_buffer_=0,element_buffer_=0;
+    std::unordered_map<std::uint32_t,std::size_t> buffer_sizes_;
     bool apply_arrays(GuestElf32& guest,std::uint32_t highest,
                       std::string& error) noexcept;
     void button(GuestXperiaInput& input,int button,bool pressed) noexcept;
