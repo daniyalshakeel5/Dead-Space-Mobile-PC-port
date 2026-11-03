@@ -56,7 +56,10 @@ private:
         std::uint32_t ptr=0;
         bool enabled=false;
         std::uint32_t buffer=0;
-    } vertex_,color_,texcoord_,normal_;
+    } vertex_,color_,normal_;
+    static constexpr std::size_t kMaxTextureUnits=8;
+    std::array<ArrayDesc,kMaxTextureUnits> texcoord_units_{};
+    unsigned client_texunit_=0;
     std::uint32_t array_buffer_=0,element_buffer_=0;
     std::unordered_map<std::uint32_t,std::size_t> buffer_sizes_;
     bool apply_arrays(GuestElf32& guest,std::uint32_t highest,
