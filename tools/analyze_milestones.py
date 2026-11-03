@@ -59,14 +59,35 @@ def extract_zip(path: Path, output: Path) -> None:
                     shutil.copyfileobj(src, dst)
 
 
-def extract_rar(path: Path, output: Path) -> None:
+def extract_rar(path: Path, output: Path) -> list[str]:
     if not shutil.which("unar"):
         raise RuntimeError("unar command is required for the RAR milestone")
     proc = subprocess.run(
         ["unar", "-quiet", "-o", str(output), str(path.resolve())],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=180)
-    if proc.returncode:
-        raise RuntimeError("RAR extraction failed: " + proc.stdout[-2500:])
+    if proc.returncode == 0:
+        return []
+    fail_lines = [x.strip() for x in proc.stdout.splitlines()
+                  if "Failed" in x or "read more data" in x]
+    # RAR archives may trip one decoder but not another; do not assume
+    # truncation until a second independent decoder has also failed.
+    if shutil.which("7z"):
+        retry = output.parent / "sevenzip-retry"
+        retry.mkdir(exist_ok=True)
+        alt = subprocess.run(
+            ["7z", "x", "-y", "-o" + str(retry), str(path.resolve())],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=180)
+        if alt.returncode == 0:
+            shutil.rmtree(output)
+            retry.rename(output)
+            return ["unar failed; 7z independently extracted all entries"]
+        fail_lines += ["7z also failed: " + alt.stdout[-450:].replace("\n", " ")]
+    if not any(p.is_file() for p in output.rglob("*")):
+        raise RuntimeError("Both RAR readers failed and no files extracted: "
+                           + "\n".join(fail_lines[-15:]))
+    return (["INCOMPLETE RAR: some entries could not be extracted, so "
+             "missing/changed counts are preliminary."] + fail_lines[-12:])
 
 
 def snapshot(root: Path) -> dict[str, Path]:
@@ -76,9 +97,17 @@ def snapshot(root: Path) -> dict[str, Path]:
     if any(p.is_symlink() for p in root.rglob("*")):
         raise RuntimeError("Symlink present in archive; refusing to compare")
     relative = [p.relative_to(root).as_posix() for p in files]
-    tops = {s.split("/", 1)[0] for s in relative}
-    strip = (next(iter(tops)) + "/") if len(tops) == 1 and all("/" in x for x in relative) else ""
-    return {r[len(strip):]: p for r, p in zip(relative, files)}
+    # ZIP and RAR often differ by two wrapping folders:
+    # 'dspc/' vs 'dspc_milestone6/dspc/'. Normalize both.
+    while relative:
+        tops = {s.split("/", 1)[0] for s in relative}
+        if len(tops) != 1 or not all("/" in x for x in relative):
+            break
+        prefix = next(iter(tops)) + "/"
+        relative = [s[len(prefix):] for s in relative]
+    if len(relative) != len(set(relative)):
+        raise RuntimeError("Normalized archive has duplicate file paths")
+    return dict(zip(relative, files))
 
 
 def digest(path: Path) -> tuple[str, int]:
@@ -193,8 +222,11 @@ def main() -> int:
         root=Path(t); a=root/"old"; b=root/"new"
         a.mkdir(); b.mkdir()
         extract_zip(args.old, a)
-        extract_rar(args.new, b)
+        warnings=extract_rar(args.new, b)
         report=compare(snapshot(a),snapshot(b))
+        if warnings:
+            report = ("## RAR integrity and extraction warnings\n\n" +
+                "\n".join("- " + w for w in warnings) + "\n\n" + report)
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(report, encoding="utf-8")
     print(report)
