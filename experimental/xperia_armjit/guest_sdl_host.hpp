@@ -62,6 +62,8 @@ private:
     unsigned client_texunit_=0;
     std::uint32_t array_buffer_=0,element_buffer_=0;
     std::unordered_map<std::uint32_t,std::size_t> buffer_sizes_;
+    bool dispatch_legacy(std::uint32_t which,std::array<std::uint32_t,16>& regs,
+                         GuestElf32& guest,std::string& error) noexcept;
     bool apply_arrays(GuestElf32& guest,std::uint32_t highest,
                       std::string& error) noexcept;
     void button(GuestXperiaInput& input,int button,bool pressed) noexcept;
