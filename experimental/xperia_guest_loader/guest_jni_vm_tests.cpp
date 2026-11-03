@@ -203,6 +203,52 @@ int main(){
     r.fill(0);r[0]=vm.env_address;r[1]=storage_obj;r[2]=data_dir;
     assert(vm.dispatch(vm.env_svc_base+34,r,elf,error));
     assert(read_java_string(r[0])=="deadspace");
+    const auto get_static=[&](std::uint32_t clazz,
+            const char* name,const char* sig)->std::uint32_t {
+        write_string(base+0x540,name);
+        write_string(base+0x600,sig);
+        r.fill(0);r[0]=vm.env_address;r[1]=clazz;
+        r[2]=base+0x540;r[3]=base+0x600;
+        assert(vm.dispatch(vm.env_svc_base+113,r,elf,error));
+        return r[0];
+    };
+    const auto xt_system=find_class("xtSystem");
+    const auto info=get_static(xt_system,"getDeviceInfo",
+                        "()Ljava/lang/String;");
+    r.fill(0);r[0]=vm.env_address;r[1]=xt_system;r[2]=info;
+    assert(vm.dispatch(vm.env_svc_base+114,r,elf,error));
+    const auto device_info=read_java_string(r[0]);
+    assert(device_info.find("Manufacturer:sony")!=std::string::npos);
+    assert(device_info.find("Model:R800")!=std::string::npos);
+    const auto network=get_static(xt_system,"getNetworkAvailability","()Z");
+    r.fill(0);r[0]=vm.env_address;r[1]=xt_system;r[2]=network;
+    assert(vm.dispatch(vm.env_svc_base+117,r,elf,error) && r[0]==0);
+    const auto ads=find_class("com/ea/blast/xtPlay");
+    const auto available=get_static(ads,"isRewardedVideoAdAvailable","()Z");
+    r.fill(0);r[0]=vm.env_address;r[1]=ads;r[2]=available;
+    assert(vm.dispatch(vm.env_svc_base+117,r,elf,error)&&r[0]==0);
+    const auto build=find_class("android/os/Build");
+    write_string(base+0x540,"MANUFACTURER");
+    write_string(base+0x600,"Ljava/lang/String;");
+    r.fill(0);r[0]=vm.env_address;r[1]=build;
+    r[2]=base+0x540;r[3]=base+0x600;
+    assert(vm.dispatch(vm.env_svc_base+144,r,elf,error));
+    const auto field=r[0];
+    r.fill(0);r[0]=vm.env_address;r[1]=build;r[2]=field;
+    assert(vm.dispatch(vm.env_svc_base+145,r,elf,error));
+    assert(read_java_string(r[0])=="sony");
+    r.fill(0);r[0]=vm.env_address;r[1]=base+0xa20;
+    assert(vm.dispatch(vm.env_svc_base+219,r,elf,error));
+    assert(elf.read_u32(base+0xa20)==vm.vm());
+    write_string(base+0x650,"hello-world");
+    r.fill(0);r[0]=vm.env_address;r[1]=base+0x650;
+    assert(vm.dispatch(vm.env_svc_base+167,r,elf,error));
+    assert(read_java_string(r[0])=="hello-world");
+    // RegisterNatives must reject non-executable function pointers, never
+    // report valid registered original game methods that cannot be called.
+    r.fill(0);r[0]=vm.env_address;r[1]=xt_system;
+    r[2]=base+0xb00;r[3]=1;
+    assert(!vm.dispatch(vm.env_svc_base+215,r,elf,error));
     write_string(base+0x300,"com/ea/UNKNOWN");
     r.fill(0);r[0]=vm.env_address;r[1]=base+0x300;
     assert(!vm.dispatch(vm.env_svc_base+6,r,elf,error));
