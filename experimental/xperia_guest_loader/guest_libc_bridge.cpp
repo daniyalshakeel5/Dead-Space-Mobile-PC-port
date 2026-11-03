@@ -55,7 +55,18 @@ GuestLibcBridge::GuestLibcBridge() {
         "pthread_attr_setdetachstate","pthread_attr_getdetachstate",
         "pthread_attr_setstacksize","pthread_attr_getstacksize",
         "pthread_attr_setguardsize","pthread_attr_getguardsize",
-        "sched_yield","pthread_exit"
+        "sched_yield","pthread_exit",
+        "pthread_cond_init","pthread_cond_destroy",
+        "pthread_cond_signal","pthread_cond_broadcast",
+        "pthread_cond_wait","pthread_cond_timedwait",
+        "pthread_key_create","pthread_key_delete",
+        "pthread_setspecific","pthread_getspecific",
+        "pthread_mutexattr_init","pthread_mutexattr_destroy",
+        "pthread_mutexattr_settype","pthread_mutexattr_setpshared",
+        "pthread_attr_setstack","pthread_attr_getstack",
+        "pthread_getattr_np","pthread_attr_setschedparam",
+        "pthread_getschedparam","pthread_setschedparam",
+        "sem_timedwait"
     };
     for(unsigned i=0;i<last_svc;++i){
         const std::uint32_t id=i+1;
@@ -426,9 +437,17 @@ bool GuestLibcBridge::dispatch(
         case 33: { // pthread_mutex_init(mutex*, default attr)
             auto* guest=image.writeable(a,4);
             if(!guest)throw std::runtime_error("Guest pthread mutex unmapped");
-            if(b)throw std::runtime_error("Nondefault pthread mutex attributes unsupported");
+            std::uint32_t type=0;
+            if(b){
+                const auto attr=mutex_attrs_.find(b);
+                if(attr==mutex_attrs_.end()){
+                    result=22;break;
+                }
+                type=attr->second;
+            }
             if(mutexes_.count(a)){result=16;break;} // EBUSY
-            mutexes_.emplace(a,GuestMutex{});
+            GuestMutex m{};m.type=type;
+            mutexes_.emplace(a,m);
             std::fill_n(guest,4,0);
             result=0;break;
         }
@@ -454,11 +473,18 @@ bool GuestLibcBridge::dispatch(
                 it=mutexes_.emplace(a,GuestMutex{}).first; // static initializer
             }
             if(it->second.locked) {
-                if(id==35)
-                    throw std::runtime_error("Blocking pthread mutex requires guest thread scheduler");
-                result=16; // EBUSY
+                if(it->second.owner==guest_threads_.self()&&
+                   it->second.type==1u){
+                    ++it->second.recursion;
+                    result=0;
+                }else if(id==35){
+                    throw std::runtime_error(
+                        "Blocking ARM mutex requires another runnable original ARM thread");
+                }else result=16; // EBUSY
             }else{
                 it->second.locked=true;
+                it->second.owner=guest_threads_.self();
+                it->second.recursion=1;
                 result=0;
             }
             break;
@@ -467,8 +493,13 @@ bool GuestLibcBridge::dispatch(
             if(!image.read(a,4))
                 throw std::runtime_error("Guest pthread mutex unmapped");
             const auto it=mutexes_.find(a);
-            if(it==mutexes_.end() || !it->second.locked){result=1;break;} // EPERM
-            it->second.locked=false;
+            if(it==mutexes_.end() || !it->second.locked ||
+               it->second.owner!=guest_threads_.self()){
+                result=1;break; // EPERM
+            }
+            if(--it->second.recursion==0){
+                it->second.locked=false;it->second.owner=0;
+            }
             result=0;break;
         }
         case 38: { // sem_init(sem*, pshared, initial_count)
@@ -599,6 +630,155 @@ bool GuestLibcBridge::dispatch(
         case 63:
             failure="pthread_exit needs original ARM call-runner scheduling";
             return false;
+        case 64: { // pthread_cond_init(cond*, default attr)
+            if(!a || (a&3u)|| !image.writeable(a,4u))
+                throw std::runtime_error("ARM pthread_cond_t address invalid");
+            if(b){result=22;break;}
+            if(conditions_.count(a)){result=16;break;}
+            conditions_.emplace(a,GuestCondition{});
+            auto* dst=image.writeable(a,4);
+            std::memset(dst,0,4);
+            result=0;break;
+        }
+        case 65: { // pthread_cond_destroy
+            if(!image.writeable(a,4u)){result=22;break;}
+            if(!conditions_.erase(a) && image.read_u32(a)!=0){
+                result=22;break;
+            }
+            auto* dst=image.writeable(a,4);
+            std::memset(dst,0xff,4);
+            result=0;break;
+        }
+        case 66:case 67: { // pthread_cond_signal / broadcast
+            if(!image.read(a,4u)){result=22;break;}
+            auto it=conditions_.find(a);
+            if(it==conditions_.end()){
+                if(image.read_u32(a)!=0){result=22;break;}
+                it=conditions_.emplace(a,GuestCondition{}).first;
+            }
+            ++it->second.generation;
+            result=0;break;
+        }
+        case 68:case 69:
+            failure="pthread_cond_wait requires translated ARM scheduler to release mutex";
+            return false;
+        case 70: { // pthread_key_create(pthread_key_t*, destructor)
+            if(!a || (a&3u)||!image.writeable(a,4u) ||
+               (b && !image.read(b&~1u,2u)))
+                throw std::runtime_error("pthread_key_create invalid guest argument");
+            if(tls_keys_.size()>=256u){result=11;break;}
+            const auto key=next_tls_key_++;
+            auto* out=image.writeable(a,4u);
+            for(unsigned i=0;i<4;++i)out[i]=std::uint8_t(key>>(8u*i));
+            tls_keys_.emplace(key,GuestTlsKey{b,{}});
+            result=0;break;
+        }
+        case 71:result=tls_keys_.erase(a)?0u:22u;break;
+        case 72: { // pthread_setspecific(key, const void*)
+            const auto it=tls_keys_.find(a);
+            if(it==tls_keys_.end()){result=22;break;}
+            it->second.values[guest_threads_.self()]=b;
+            result=0;break;
+        }
+        case 73: { // pthread_getspecific(key)
+            result=0;
+            const auto it=tls_keys_.find(a);
+            if(it!=tls_keys_.end()){
+                const auto v=it->second.values.find(guest_threads_.self());
+                if(v!=it->second.values.end())result=v->second;
+            }
+            break;
+        }
+        case 74: { // pthread_mutexattr_init
+            if(!a||(a&3u)||!image.writeable(a,4u)){result=22;break;}
+            mutex_attrs_[a]=0;
+            auto* out=image.writeable(a,4u);std::memset(out,0,4);
+            result=0;break;
+        }
+        case 75: { // pthread_mutexattr_destroy
+            if(!mutex_attrs_.erase(a)){result=22;break;}
+            auto* out=image.writeable(a,4u);
+            if(!out)throw std::runtime_error("pthread_mutexattr_destroy invalid address");
+            std::memset(out,0xff,4);result=0;break;
+        }
+        case 76: { // pthread_mutexattr_settype
+            const auto it=mutex_attrs_.find(a);
+            if(it==mutex_attrs_.end()||b>2u){result=22;break;}
+            it->second=b;
+            auto* out=image.writeable(a,4u);
+            if(!out)throw std::runtime_error("pthread_mutexattr_settype unmapped");
+            for(unsigned i=0;i<4;++i)out[i]=std::uint8_t(b>>(8u*i));
+            result=0;break;
+        }
+        case 77: { // pthread_mutexattr_setpshared
+            // 0=PTHREAD_PROCESS_PRIVATE; cross-process pthreads can't use
+            // a guest-owned mutex inside this standalone Windows process.
+            if(!mutex_attrs_.count(a)||b!=0u){result=22;break;}
+            result=0;break;
+        }
+        case 78: { // pthread_attr_setstack(attr, stack, size) 3 AAPCS args
+            if(n<16384u||n>GuestThreads::default_stack||
+               !image.read(b,n)){result=22;break;}
+            if(!GuestThreads::set_attr_field(image,a,4u,b,failure) ||
+               !GuestThreads::set_attr_field(image,a,8u,n,failure))
+                return false;
+            result=0;break;
+        }
+        case 79: { // pthread_attr_getstack(attr, void**, size_t*)
+            std::uint32_t stack=0,bytes=0;
+            if(!GuestThreads::attr_field(image,a,4u,stack,failure)||
+               !GuestThreads::attr_field(image,a,8u,bytes,failure))
+                return false;
+            auto* out=image.writeable(b,4u);
+            auto* length=image.writeable(n,4u);
+            if(!out||!length||(b&3u)||(n&3u)){result=22;break;}
+            for(unsigned i=0;i<4u;++i){
+                out[i]=std::uint8_t(stack>>(8u*i));
+                length[i]=std::uint8_t(bytes>>(8u*i));
+            }
+            result=0;break;
+        }
+        case 80: { // pthread_getattr_np(pthread_t, pthread_attr_t*)
+            // Thread descriptors are guest-local IDs; only main and live
+            // guest workers can be queried. Thread stacks are private.
+            if(a!=GuestThreads::main_thread&&!guest_threads_.exists(a)){
+                result=3;break;
+            }
+            if(!GuestThreads::init_attr(image,b,failure))return false;
+            result=0;break;
+        }
+        case 81: { // pthread_attr_setschedparam
+            const auto* priority=image.read(b,4u);
+            if(!priority){result=22;break;}
+            // Original Xperia guest scheduling uses deterministic cooperative
+            // priorities; Linux POSIX priority data cannot be passed as-is.
+            std::uint32_t value=0;
+            for(unsigned i=0;i<4u;++i)value|=std::uint32_t(priority[i])<<(i*8u);
+            if(!GuestThreads::set_attr_field(image,a,20u,value,failure))
+                return false;
+            result=0;break;
+        }
+        case 82: { // pthread_getschedparam
+            if(a!=GuestThreads::main_thread&&!guest_threads_.exists(a)){
+                result=3;break;
+            }
+            auto* policy=image.writeable(b,4u);
+            auto* param=image.writeable(n,4u);
+            if(!policy||!param){result=22;break;}
+            std::memset(policy,0,4);std::memset(param,0,4);
+            result=0;break;
+        }
+        case 83: { // pthread_setschedparam
+            if(a!=GuestThreads::main_thread&&!guest_threads_.exists(a)){
+                result=3;break;
+            }
+            if(b!=0u || !image.read(n,4u)){result=22;break;}
+            result=0;break;
+        }
+        case 84: {
+            failure="sem_timedwait needs translated scheduler and ARM timespec";
+            return false;
+        }
         }
         regs[0]=result;
         failure.clear();return true;
