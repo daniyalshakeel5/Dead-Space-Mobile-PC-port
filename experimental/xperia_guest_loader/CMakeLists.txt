@@ -15,7 +15,8 @@ target_link_libraries(xperia_guest_heap PUBLIC xperia_guest_elf32)
 target_include_directories(xperia_guest_heap PUBLIC .)
 add_library(xperia_guest_filesystem STATIC guest_filesystem.cpp)
 target_include_directories(xperia_guest_filesystem PUBLIC .)
-add_library(xperia_guest_libc_bridge STATIC guest_libc_bridge.cpp guest_jni_vm.cpp guest_bionic_data.cpp)
+add_library(xperia_guest_libc_bridge STATIC guest_libc_bridge.cpp guest_jni_vm.cpp guest_bionic_data.cpp
+    guest_threads.cpp)
 target_link_libraries(xperia_guest_libc_bridge PUBLIC xperia_guest_elf32 xperia_guest_heap xperia_guest_filesystem)
 target_include_directories(xperia_guest_libc_bridge PUBLIC .)
 add_executable(xperia_guest_libc_bridge_tests guest_libc_bridge_tests.cpp)
@@ -49,3 +50,7 @@ target_include_directories(xperia_guest_texture_decoder_tests
     PRIVATE ../xperia_armjit)
 add_test(NAME xperia_guest_ATC_PVRTC_decoding
     COMMAND xperia_guest_texture_decoder_tests)
+
+add_executable(xperia_guest_threads_tests guest_threads_tests.cpp)
+target_link_libraries(xperia_guest_threads_tests PRIVATE xperia_guest_libc_bridge)
+add_test(NAME xperia_guest_pthread_abi_lifecycle COMMAND xperia_guest_threads_tests)
