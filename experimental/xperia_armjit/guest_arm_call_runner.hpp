@@ -35,6 +35,11 @@ public:
     // External patches of guest ARM instructions require Dynarmic's
     // translation cache to be explicitly invalidated before next execute.
     void invalidate_code(std::uint32_t start,std::size_t length);
+    // Execute pending original ARM pthread start routines on dedicated
+    // guest stacks at a cooperative scheduling point. No host pthread
+    // ever receives a raw ARM address.
+    bool run_pending_guest_threads(std::string& error,
+                                   unsigned max_workers=16);
     bool run_original_initializers(std::string& error);
 private:
     struct Impl;
