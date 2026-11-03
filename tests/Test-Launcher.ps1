@@ -38,6 +38,12 @@ $source=Get-Content -LiteralPath (Join-Path $folder 'Launcher.ps1') -Raw
 if($source -match '\$ui\.QemuBoot\.IsEnabled=\s*-not \$busy'){
  throw 'QEMU developer-only boot test must not be enabled in player launcher'
 }
+if($source -notmatch [regex]::Escape('$ui.Launch.Add_Click')){
+ throw 'Experimentally launchable original ARM executable is not wired to the Play button'
+}
+if($source -match [regex]::Escape('$ui.Launch.IsEnabled=$false')){
+ throw 'Original game remains hard-disabled despite matching bundled runtime and installed assets'
+}
 if($window.Title -notlike '*Dead Space*'){throw 'Wrong launcher identity'}
 $window.Close()
 Write-Output 'PASS: actual Diamond Rush WPF architecture, Dead Space controls/theme, no WSL2 or Docker player requirements, no interactive-play claim, safe zip paths, PowerShell parsing.'
