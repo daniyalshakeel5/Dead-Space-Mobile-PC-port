@@ -12,7 +12,7 @@ on:
       - 'tests/Test-Installer-Synthetic.ps1'
       - '.github/workflows/xperia-windows-arm-runtime.yml'
 concurrency:
-  group: xperia-windows-runtime-${{ github.ref }}
+  group: xperia-windows-runtime-${{ github.sha }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -47,9 +47,6 @@ jobs:
       - name: Compile ARM32 JIT, ELF loader, Bionic and guest callbacks
         shell: pwsh
         run: cmake --build build/armjit --config Release --parallel 4
-      - name: Run translated ARM execution and Bionic regression suite
-        shell: pwsh
-        run: ctest --test-dir build/armjit -C Release --output-on-failure
       - name: Compile no-console Windows WPF launcher executable
         shell: powershell
         run: |
@@ -98,3 +95,6 @@ jobs:
           path: dist/DeadSpaceMobile-Xperia-Windows-Wrapper.zip
           retention-days: 20
           if-no-files-found: error
+      - name: Run translated ARM execution and Bionic regression suite
+        shell: pwsh
+        run: ctest --test-dir build/armjit -C Release --output-on-failure
