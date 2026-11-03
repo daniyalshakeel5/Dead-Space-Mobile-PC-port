@@ -42,6 +42,7 @@ u64 f_0035b2e0(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
   return 0;
 }
 u64 f_0035c844(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
+  { u64 rv = f_00365a2c(r0, r1, r2, r3, sp); r0 = (u32)rv; r1 = (u32)(rv>>32); }
   return f_0035b2e0(r0,r1,r2,r3,sp);
 }
 '''
@@ -49,6 +50,9 @@ class GuardTests(unittest.TestCase):
     def test_injects_only_verified_function_and_is_idempotent(self):
         s=probe.patch(GENERATED)
         self.assertIn(probe.MARKER,s)
+        self.assertIn(probe.CALLER_MARKER,s)
+        self.assertLess(s.index(probe.CALLER_MARKER),
+                        s.rindex("return f_0035b2e0"))
         self.assertEqual(s.count(probe.MARKER),1)
         self.assertIn("#include <stdio.h>",s)
         self.assertLess(s.index("if (r3 == 0u)"),s.rindex("r1 = LD32(ea);"))
