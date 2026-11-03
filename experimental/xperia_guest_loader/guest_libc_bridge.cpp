@@ -49,7 +49,13 @@ GuestLibcBridge::GuestLibcBridge() {
         "pthread_mutex_lock","pthread_mutex_trylock","pthread_mutex_unlock",
         "sem_init","sem_destroy","sem_post","sem_wait","sem_trywait",
         "sem_getvalue","pthread_once",
-        "__atomic_cmpxchg","__atomic_swap","__atomic_inc","__atomic_dec"
+        "__atomic_cmpxchg","__atomic_swap","__atomic_inc","__atomic_dec",
+        "pthread_create","pthread_join","pthread_detach","pthread_self",
+        "pthread_equal","pthread_attr_init","pthread_attr_destroy",
+        "pthread_attr_setdetachstate","pthread_attr_getdetachstate",
+        "pthread_attr_setstacksize","pthread_attr_getstacksize",
+        "pthread_attr_setguardsize","pthread_attr_getguardsize",
+        "sched_yield","pthread_exit"
     };
     for(unsigned i=0;i<last_svc;++i){
         const std::uint32_t id=i+1;
@@ -547,6 +553,52 @@ bool GuestLibcBridge::dispatch(
             result=previous; // Bionic inc/dec/swap return PREVIOUS value
             break;
         }
+        case 49: { // pthread_create: enqueue actual original ARM entrypoint
+            if(!guest_threads_.create(image,a,b,n,regs[3],result,failure))
+                return false;
+            break;
+        }
+        case 50: { // pthread_join (runner executes pending ARM worker first)
+            result=guest_threads_.join(image,a,b);break;
+        }
+        case 51:result=guest_threads_.detach(a);break;
+        case 52:result=guest_threads_.self();break;
+        case 53:result=a==b?1u:0u;break;
+        case 54: // pthread_attr_init
+            if(!GuestThreads::init_attr(image,a,failure))return false;
+            result=0;break;
+        case 55: // pthread_attr_destroy
+            if(!GuestThreads::destroy_attr(image,a,failure))return false;
+            result=0;break;
+        case 56: { // pthread_attr_setdetachstate(attr, state)
+            if(b>1u){result=22u;break;}
+            std::uint32_t flags=0;
+            if(!GuestThreads::attr_field(image,a,0u,flags,failure))return false;
+            flags=(flags&~1u)|b;
+            if(!GuestThreads::set_attr_field(image,a,0u,flags,failure))return false;
+            result=0;break;
+        }
+        case 57:case 59:case 61: { // attr getters, write 4-byte ARM result
+            const unsigned offset=id==57?0u:id==59?8u:12u;
+            std::uint32_t value=0;
+            if(!GuestThreads::attr_field(image,a,offset,value,failure))return false;
+            if(id==57)value&=1u;
+            auto* out=image.writeable(b,4);
+            if(!out || (b&3u)){failure="Unmapped Bionic pthread attr output";return false;}
+            for(unsigned i=0;i<4u;++i)out[i]=std::uint8_t(value>>(8u*i));
+            result=0;break;
+        }
+        case 58:case 60: { // attr stack and guard sizes
+            if(id==58 && (b<16384u||b>8u*1024u*1024u)){result=22u;break;}
+            if(id==60 && b>1024u*1024u){result=22u;break;}
+            if(!GuestThreads::set_attr_field(image,a,id==58?8u:12u,b,failure))
+                return false;
+            result=0;break;
+        }
+        case 62:result=0;break; // sched_yield, actual scheduling in ARM runner
+        case 63:
+            failure="pthread_exit needs original ARM call-runner scheduling";
+            return false;
         }
         regs[0]=result;
         failure.clear();return true;
