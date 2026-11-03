@@ -62,6 +62,12 @@ add_test(NAME xperia_jit_bionic_libc_a32_svc_roundtrip
 
 # Exercise the same Bionic/ELF/host-filesystem implementation directly
 # alongside the translated ARM call-runner on the Windows CI target.
+add_executable(xperia_guest_c_runtime_tests
+    ../xperia_guest_loader/guest_c_runtime_tests.cpp)
+target_link_libraries(xperia_guest_c_runtime_tests PRIVATE xperia_arm_guest_libc)
+add_test(NAME xperia_arm32_guest_safe_strings_printf_and_logs
+    COMMAND xperia_guest_c_runtime_tests)
+
 add_executable(xperia_guest_pthread_services_tests
     ../xperia_guest_loader/guest_pthread_services_tests.cpp)
 target_link_libraries(xperia_guest_pthread_services_tests PRIVATE xperia_arm_guest_libc)
