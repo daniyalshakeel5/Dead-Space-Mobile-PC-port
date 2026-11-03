@@ -47,7 +47,8 @@ add_test(NAME xperia_elf_mapped_a32_jit COMMAND xperia_elf_jit_synthetic)
 
 # ARM guest service integration: real A32 BLX -> SVC -> native memcpy
 # -> guest BX LR; service code is original-free and fail-closed.
-add_library(xperia_arm_guest_libc STATIC ../xperia_guest_loader/guest_libc_bridge.cpp ../xperia_guest_loader/guest_heap.cpp ../xperia_guest_loader/guest_filesystem.cpp ../xperia_guest_loader/guest_jni_vm.cpp ../xperia_guest_loader/guest_bionic_data.cpp)
+add_library(xperia_arm_guest_libc STATIC ../xperia_guest_loader/guest_libc_bridge.cpp ../xperia_guest_loader/guest_heap.cpp ../xperia_guest_loader/guest_filesystem.cpp ../xperia_guest_loader/guest_jni_vm.cpp ../xperia_guest_loader/guest_bionic_data.cpp
+    ../xperia_guest_loader/guest_threads.cpp)
 target_include_directories(xperia_arm_guest_libc PUBLIC ../xperia_guest_loader)
 target_compile_features(xperia_arm_guest_libc PUBLIC cxx_std_17)
 target_link_libraries(xperia_arm_guest_libc PUBLIC xperia_guest_elf32)
@@ -60,6 +61,12 @@ add_test(NAME xperia_jit_bionic_libc_a32_svc_roundtrip
 
 # Exercise the same Bionic/ELF/host-filesystem implementation directly
 # alongside the translated ARM call-runner on the Windows CI target.
+add_executable(xperia_guest_threads_tests
+    ../xperia_guest_loader/guest_threads_tests.cpp)
+target_link_libraries(xperia_guest_threads_tests PRIVATE xperia_arm_guest_libc)
+add_test(NAME xperia_bionic_pthread_worker_lifecycle
+    COMMAND xperia_guest_threads_tests)
+
 add_executable(xperia_guest_abi_tests
     ../xperia_guest_loader/guest_libc_bridge_tests.cpp)
 target_link_libraries(xperia_guest_abi_tests PRIVATE xperia_arm_guest_libc)
