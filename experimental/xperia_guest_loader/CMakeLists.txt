@@ -59,3 +59,8 @@ add_executable(xperia_guest_pthread_services_tests guest_pthread_services_tests.
 target_link_libraries(xperia_guest_pthread_services_tests PRIVATE xperia_guest_libc_bridge)
 add_test(NAME xperia_guest_pthread_cond_tls_and_mutex_attributes
     COMMAND xperia_guest_pthread_services_tests)
+
+add_executable(xperia_guest_c_runtime_tests guest_c_runtime_tests.cpp)
+target_link_libraries(xperia_guest_c_runtime_tests PRIVATE xperia_guest_libc_bridge)
+add_test(NAME xperia_arm32_guest_safe_strings_printf_and_logs
+    COMMAND xperia_guest_c_runtime_tests)
