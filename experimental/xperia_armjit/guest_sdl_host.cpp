@@ -1,4 +1,5 @@
 #include "guest_sdl_host.hpp"
+#include "guest_texture_decoder.hpp"
 #include <SDL_opengl.h>
 #include <algorithm>
 #include <cmath>
@@ -23,7 +24,8 @@ const char* const names[]={
 "glGetString","glGetIntegerv","glGetFloatv","glGetBooleanv",
 "glNormalPointer","glLightfv","glMaterialfv","glFogfv",
 "glLoadMatrixf","glMultMatrixf","glNormal3f","glColor4ub",
-"glPointSize","glTexEnvfv"
+"glPointSize","glTexEnvfv",
+"glCompressedTexImage2D","glCompressedTexSubImage2D"
 };
 constexpr std::size_t count=sizeof(names)/sizeof(names[0]);
 unsigned element_bytes(unsigned type){
@@ -446,6 +448,42 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
                            static_cast<GLubyte>(a(2)),
                            static_cast<GLubyte>(a(3)));break;
         case 56:glPointSize(f(0));break;
+        case 58:case 59: { // glCompressedTexImage2D / glCompressedTexSubImage2D
+            // Both APIs take 8 or 9 ARM words; last arguments are on
+            // the guest AAPCS stack, NOT native host pointers.
+            const auto fmt=a(which==58?2u:6u);
+            const auto width=static_cast<int>(a(which==58?3u:4u));
+            const auto height=static_cast<int>(a(which==58?4u:5u));
+            const auto n=static_cast<std::int32_t>(a(which==58?6u:7u));
+            const auto ptr=a(which==58?7u:8u);
+            std::size_t expected=0;
+            std::string reason;
+            if(!texture::expected_size(fmt,width,height,expected,reason))
+                throw std::runtime_error(reason);
+            if(n<0 || static_cast<std::uint64_t>(n)!=expected)
+                throw std::runtime_error("Original compressed texture payload size mismatch");
+            const auto* src=guest.read(ptr,expected);
+            if(!src)
+                throw std::runtime_error("Compressed texture ARM guest pointer unmapped");
+            std::vector<std::uint8_t> rgba;
+            if(!texture::decode(fmt,width,height,src,expected,rgba,reason))
+                throw std::runtime_error(reason);
+            // Software fallback is deterministic and works on GPUs without
+            // AMD ATC or PowerVR PVRTC support. Preserve mip level and
+            // texture state; never claim a successful upload if decode fails.
+            if(which==58) {
+                glTexImage2D(a(0),static_cast<GLint>(a(1)),GL_RGBA,width,height,
+                    static_cast<GLint>(a(5)),GL_RGBA,GL_UNSIGNED_BYTE,rgba.data());
+            }else{
+                glTexSubImage2D(a(0),static_cast<GLint>(a(1)),
+                    static_cast<GLint>(a(2)),static_cast<GLint>(a(3)),
+                    width,height,GL_RGBA,GL_UNSIGNED_BYTE,rgba.data());
+            }
+            const auto status=glGetError();
+            if(status!=GL_NO_ERROR)
+                throw std::runtime_error("Host OpenGL rejected decompressed RGBA texture, error "+std::to_string(status));
+            break;
+        }
         default:throw std::runtime_error("Unknown GLES1 dispatch index");
         }
         r[0]=result;
