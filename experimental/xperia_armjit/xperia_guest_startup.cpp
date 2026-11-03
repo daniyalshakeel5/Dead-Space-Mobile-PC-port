@@ -132,9 +132,13 @@ int main(int argc,char** argv){
         if(!guest.invoke(create,{0,0,0,0},ignored,error))
             throw std::runtime_error("Original Xperia NativeOnCreate: "+error);
         std::cerr<<"ORIGINAL_XPERIA_NATIVE_CREATE_COMPLETE\\n";
+        if(!guest.run_pending_guest_threads(error))
+            throw std::runtime_error("Original Xperia pthread scheduler after create: "+error);
         if(!guest.invoke(surface,{0,0,0,0},ignored,error))
             throw std::runtime_error("Original Xperia NativeOnSurfaceCreated: "+error);
         std::cerr<<"ORIGINAL_XPERIA_SURFACE_CREATED\\n";
+        if(!guest.run_pending_guest_threads(error))
+            throw std::runtime_error("Original Xperia pthread scheduler after surface: "+error);
         const auto visibility=elf.jni_exports.find(
             "Java_com_ea_blast_KeyboardAndroid_NativeOnVisibilityChanged");
         if(visibility!=elf.jni_exports.end()&&visibility->second){
@@ -151,6 +155,8 @@ int main(int argc,char** argv){
         while(!quit){
             platform.pump(controls,quit);
             if(quit)break;
+            if(!guest.run_pending_guest_threads(error))
+                throw std::runtime_error("Original Xperia ARM guest worker: "+error);
             if(!controls.flush(guest,error))
                 throw std::runtime_error("Original Xperia controller dispatch: "+error);
             if(!guest.invoke(frame,{0,0,0,0},ignored,error))
