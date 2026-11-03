@@ -9,6 +9,7 @@ on:
       - experimental/lifted_milestone6/tools/jni_vm.c
       - experimental/lifted_milestone6/tools/libc_files.c
       - tests/check_m6_host_c_syntax.py
+      - tests/test_m6_bionic_errno.c
       - experimental/lifted_milestone6/tools/build.sh
       - experimental/lifted_milestone6/tools/texturepack_fault_guard.py
       - tests/test_m6_texturepack_probe.py
@@ -27,6 +28,10 @@ jobs:
           sudo apt-get install -y -qq gcc-multilib libc6-dev-i386
       - name: Compile all milestone6 host C paths without original game assets
         run: python3 tests/check_m6_host_c_syntax.py
+      - name: Execute native 32-bit Bionic file errno and thread-isolation regressions
+        run: |
+          gcc -m32 -O1 -w -pthread tests/test_m6_bionic_errno.c -o /tmp/test_m6_bionic_errno
+          /tmp/test_m6_bionic_errno
       - name: Check imported milestone6 translator and diagnostic syntax
         run: |
           python3 -m py_compile experimental/lifted_milestone6/tools/gen_all.py
