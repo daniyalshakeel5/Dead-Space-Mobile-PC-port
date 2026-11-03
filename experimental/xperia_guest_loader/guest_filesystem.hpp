@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -26,10 +27,21 @@ public:
     int make_directory(const std::string& path) noexcept;
     int remove_file(const std::string& path) noexcept;
     int rename_file(const std::string& from,const std::string& to) noexcept;
+    int remove_directory(const std::string& path) noexcept;
+    int truncate(int fd,std::uint32_t bytes) noexcept;
+    // The 2011 Bionic ARM EABI struct stat has 64 bytes; never expose a
+    // host Windows struct stat or host FILE* to the original ARM executable.
+    int stat_path(const std::string& path,std::array<std::uint8_t,64>& out) noexcept;
+    int stat_fd(int fd,std::array<std::uint8_t,64>& out) noexcept;
+    int flush_all() noexcept;
     std::size_t handle_count() const noexcept {return handles_.size();}
     static constexpr std::size_t max_io=8u*1024u*1024u;
 private:
-    struct Handle {std::FILE* file=nullptr;bool write_allowed=false;};
+    struct Handle {
+        std::FILE* file=nullptr;
+        bool write_allowed=false;
+        std::filesystem::path path;
+    };
     std::filesystem::path root_,assets_,saves_;
     std::map<int,Handle> handles_;
     int next_handle_=3;
