@@ -48,7 +48,8 @@ add_test(NAME xperia_elf_mapped_a32_jit COMMAND xperia_elf_jit_synthetic)
 # ARM guest service integration: real A32 BLX -> SVC -> native memcpy
 # -> guest BX LR; service code is original-free and fail-closed.
 add_library(xperia_arm_guest_libc STATIC ../xperia_guest_loader/guest_libc_bridge.cpp ../xperia_guest_loader/guest_heap.cpp ../xperia_guest_loader/guest_filesystem.cpp ../xperia_guest_loader/guest_jni_vm.cpp ../xperia_guest_loader/guest_bionic_data.cpp
-    ../xperia_guest_loader/guest_threads.cpp)
+    ../xperia_guest_loader/guest_threads.cpp
+    ../xperia_guest_loader/guest_c_runtime.cpp)
 target_include_directories(xperia_arm_guest_libc PUBLIC ../xperia_guest_loader)
 target_compile_features(xperia_arm_guest_libc PUBLIC cxx_std_17)
 target_link_libraries(xperia_arm_guest_libc PUBLIC xperia_guest_elf32)
