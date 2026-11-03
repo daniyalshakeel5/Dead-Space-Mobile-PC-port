@@ -8,6 +8,17 @@
 #include <stdexcept>
 namespace xperia {
 namespace {
+template<typename Fn> Fn resolve_gl(const char* name) {
+    const auto p=SDL_GL_GetProcAddress(name);
+    if(!p)throw std::runtime_error(std::string("Required desktop GL extension missing: ")+name);
+    return reinterpret_cast<Fn>(p);
+}
+constexpr GLenum kArrayBuffer=0x8892u,kElementBuffer=0x8893u;
+constexpr GLenum kTextureEnvColor=0x2201u;
+constexpr std::uint64_t kMaxBuffer=64u*1024u*1024u;
+float fixed(std::uint32_t value) {
+    return static_cast<float>(static_cast<std::int32_t>(value))/65536.f;
+}
 float number(std::uint32_t bits){float x;std::memcpy(&x,&bits,4);return x;}
 constexpr int kDown=0x6000c,kMove=0x4000c,kUp=0x8000c;
 const char* const names[]={
@@ -25,7 +36,14 @@ const char* const names[]={
 "glNormalPointer","glLightfv","glMaterialfv","glFogfv",
 "glLoadMatrixf","glMultMatrixf","glNormal3f","glColor4ub",
 "glPointSize","glTexEnvfv",
-"glCompressedTexImage2D","glCompressedTexSubImage2D"
+"glCompressedTexImage2D","glCompressedTexSubImage2D",
+"glActiveTexture","glClientActiveTexture","glColorMask","glPolygonOffset",
+"glBindBuffer","glGenBuffers","glDeleteBuffers","glBufferData",
+"glBufferSubData","glReadPixels","glCopyTexSubImage2D",
+"glGenerateMipmapOES","glTexParameteriv","glTexEnviv",
+"glLoadMatrixx","glMultMatrixx","glTranslatex","glRotatex","glScalex",
+"glClearColorx","glColor4x","glOrthox","glFrustumx","glClearDepthx",
+"glDepthRangex","glTexEnvx","glTexParameterx","glTexCoord4f"
 };
 constexpr std::size_t count=sizeof(names)/sizeof(names[0]);
 unsigned element_bytes(unsigned type){
@@ -236,19 +254,37 @@ bool GuestSdlHost::apply_arrays(GuestElf32& g,std::uint32_t last,
         const std::uint64_t stride=d.stride?d.stride:d.size*bytes;
         const auto n=std::uint64_t(last)*stride+d.size*bytes;
         if(n>64u*1024u*1024u)return false;
-        const auto* ptr=g.read(d.ptr,static_cast<std::size_t>(n));
-        if(!ptr)return false;
+        const void* ptr=nullptr;
+        if(d.buffer){
+            const auto it=buffer_sizes_.find(d.buffer);
+            if(it==buffer_sizes_.end() || std::uint64_t(d.ptr)+n>it->second)return false;
+            auto bind_buffer=resolve_gl<void(*)(GLenum,GLuint)>("glBindBuffer");
+            bind_buffer(kArrayBuffer,d.buffer);
+            ptr=reinterpret_cast<const void*>(std::uintptr_t(d.ptr));
+        }else{
+            if(array_buffer_){
+                auto bind_buffer=resolve_gl<void(*)(GLenum,GLuint)>("glBindBuffer");
+                bind_buffer(kArrayBuffer,0u);
+            }
+            ptr=g.read(d.ptr,static_cast<std::size_t>(n));
+            if(!ptr)return false;
+        }
         if(which==0)glVertexPointer(d.size,d.type,d.stride,ptr);
         if(which==1)glColorPointer(d.size,d.type,d.stride,ptr);
         if(which==2)glTexCoordPointer(d.size,d.type,d.stride,ptr);
         if(which==3)glNormalPointer(d.type,d.stride,ptr);
         return true;
     };
-    if(!bind(vertex_,0)||!bind(color_,1)||!bind(texcoord_,2)||
-       !bind(normal_,3)){
-        error="OpenGL client vertex array unmapped in ARM guest";return false;
-    }
-    return true;
+    try{
+        if(!bind(vertex_,0)||!bind(color_,1)||!bind(texcoord_,2)||
+           !bind(normal_,3)){
+            error="GLES1 client array refers to unmapped ARM data or VBO range";
+            return false;
+        }
+        if(array_buffer_)
+            resolve_gl<void(*)(GLenum,GLuint)>("glBindBuffer")(kArrayBuffer,array_buffer_);
+        return true;
+    }catch(const std::exception& e){error=e.what();return false;}
 }
 bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
                              GuestElf32& guest,std::string& error) noexcept {
@@ -336,11 +372,11 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
             break;
         }
         case 20:vertex_={static_cast<int>(a(0)),static_cast<int>(a(1)),
-                          static_cast<int>(a(2)),a(3),vertex_.enabled};break;
+                          static_cast<int>(a(2)),a(3),vertex_.enabled,array_buffer_};break;
         case 21:texcoord_={static_cast<int>(a(0)),static_cast<int>(a(1)),
-                            static_cast<int>(a(2)),a(3),texcoord_.enabled};break;
+                            static_cast<int>(a(2)),a(3),texcoord_.enabled,array_buffer_};break;
         case 22:color_={static_cast<int>(a(0)),static_cast<int>(a(1)),
-                         static_cast<int>(a(2)),a(3),color_.enabled};break;
+                         static_cast<int>(a(2)),a(3),color_.enabled,array_buffer_};break;
         case 23:{
             const auto first=a(1),n=a(2);
             if(first>1000000u||n>1000000u||std::uint64_t(first)+n>1000000u)
@@ -437,7 +473,7 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
             break;
         }
         case 48:normal_={3,static_cast<int>(a(0)),static_cast<int>(a(1)),
-                         a(2),normal_.enabled};break;
+                         a(2),normal_.enabled,array_buffer_};break;
         case 49:case 50:case 51:case 57:{ // light, material, fog, tex-env floats
             const auto ptr=a(which==51?1:2);
             const auto n=(which==51)?4u:4u;
