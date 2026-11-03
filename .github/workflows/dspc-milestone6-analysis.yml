@@ -25,7 +25,8 @@ jobs:
           python3 tools/analyze_milestones.py \
             --old dspc_milestone5.zip \
             --new dspc_milestone6.rar \
-            --report milestone6-analysis.md
+            --report milestone6-analysis.md \
+            --details
       - name: Attach source comparison report (no game data)
         uses: actions/upload-artifact@v4
         with:
