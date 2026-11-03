@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <cstdlib>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -56,7 +57,9 @@ struct Varargs {
         return arg(regs,elf,cursor++);
     }
     std::uint64_t read64(){
-        if(cursor&1u)++cursor; // AAPCS 8-byte varargs alignment
+        if(list){
+            if((std::uint64_t(list)+4u*cursor)&7u)++cursor;
+        }else if(cursor&1u)++cursor; // AAPCS 8-byte varargs alignment
         const std::uint64_t lo=read32(),hi=read32();
         return lo|(hi<<32u);
     }
@@ -281,8 +284,8 @@ bool GuestCRuntime::dispatch(unsigned id,
             const auto fmt=log?n:id==95||id==97?n:b;
             const auto format_text=from_guest(elf,fmt,8192u);
             const unsigned first=log?3u:id==95||id==97?3u:2u;
-            Varargs args{regs,elf,use_va?0u:first,use_va?regs[3]:0u};
-            if(use_va && !regs[3])
+            Varargs args{regs,elf,use_va?0u:first,use_va?(id==98u?n:regs[3]):0u};
+            if(use_va && !(id==98u?n:regs[3]))
                 throw std::runtime_error("ARM formatted va_list pointer missing");
             const auto output=format(elf,format_text,args);
             if(log){
