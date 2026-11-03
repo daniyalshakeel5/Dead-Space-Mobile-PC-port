@@ -1,5 +1,8 @@
 #include "guest_filesystem.hpp"
 #include <algorithm>
+#include <array>
+#include <chrono>
+#include <functional>
 #include <cerrno>
 #include <climits>
 #include <cstdio>
@@ -99,7 +102,7 @@ int GuestFileSystem::open_internal(
         if(!file)return -1;
         try{
             const auto id=next_handle_++;
-            handles_.emplace(id,Handle{file,write_allowed});
+            handles_.emplace(id,Handle{file,write_allowed,path});
             return id;
         }catch(...){std::fclose(file);return -1;}
     }catch(...){return -1;}
@@ -191,6 +194,72 @@ int GuestFileSystem::make_directory(const std::string& name) noexcept{
         if(path==saves_)return 0;
         if(fs::exists(path))return -1;
         return fs::create_directories(path)?0:-1;
+    }catch(...){return -1;}
+}
+namespace {
+void stat_u16(std::array<std::uint8_t,64>& b,unsigned off,std::uint16_t v){
+    b[off]=std::uint8_t(v);b[off+1]=std::uint8_t(v>>8u);
+}
+void stat_u32(std::array<std::uint8_t,64>& b,unsigned off,std::uint32_t v){
+    for(unsigned i=0;i<4u;++i)b[off+i]=std::uint8_t(v>>(i*8u));
+}
+bool build_arm32_stat(const fs::path& path,
+                      std::array<std::uint8_t,64>& output){
+    try{
+        const bool is_dir=fs::is_directory(path);
+        if(!is_dir&&!fs::is_regular_file(path))return false;
+        const auto size=is_dir?std::uint64_t(0):fs::file_size(path);
+        if(size>UINT32_MAX)return false;
+        output.fill(0);
+        // Layout from Android ARM asm/stat.h, not the x86-64 C library.
+        // Offset 0 dev32, 4 ino32, 8 mode16, 10 nlink16,
+        // 12 uid16, 14 gid16, 16 rdev32, 20 size32, 24 blksize32,
+        // 28 blocks32; timestamps/nanoseconds occupy 32..55.
+        stat_u32(output,0,1u);
+        stat_u32(output,4,std::uint32_t(std::hash<std::string>{}(path.generic_string())));
+        stat_u16(output,8,is_dir?040755u:0100644u);
+        stat_u16(output,10,1u);
+        stat_u16(output,12,1000u);stat_u16(output,14,1000u);
+        stat_u32(output,20,static_cast<std::uint32_t>(size));
+        stat_u32(output,24,4096u);
+        stat_u32(output,28,static_cast<std::uint32_t>((size+511u)/512u));
+        return true;
+    }catch(...){return false;}
+}
+} // namespace
+int GuestFileSystem::stat_path(
+    const std::string& name,std::array<std::uint8_t,64>& out) noexcept{
+    fs::path path;bool save=false;
+    return resolve(name,path,save)&&build_arm32_stat(path,out)?0:-1;
+}
+int GuestFileSystem::stat_fd(
+    int fd,std::array<std::uint8_t,64>& out) noexcept{
+    const auto it=handles_.find(fd);
+    return it!=handles_.end()&&build_arm32_stat(it->second.path,out)?0:-1;
+}
+int GuestFileSystem::truncate(int fd,std::uint32_t n) noexcept{
+    try{
+        const auto it=handles_.find(fd);
+        if(it==handles_.end()||!it->second.write_allowed ||
+           n>256u*1024u*1024u || !below(saves_,it->second.path))
+            return -1;
+        if(std::fflush(it->second.file)!=0)return -1;
+        fs::resize_file(it->second.path,n);
+        return 0;
+    }catch(...){return -1;}
+}
+int GuestFileSystem::flush_all() noexcept{
+    for(auto& entry:handles_)
+        if(entry.second.write_allowed&&std::fflush(entry.second.file)!=0)
+            return -1;
+    return 0;
+}
+int GuestFileSystem::remove_directory(const std::string& name) noexcept{
+    try{
+        fs::path path;bool save=false;
+        if(!resolve(name,path,save)||!save || path==saves_ ||
+           !fs::is_directory(path))return -1;
+        return fs::remove(path)?0:-1; // only an empty save subdirectory
     }catch(...){return -1;}
 }
 int GuestFileSystem::remove_file(const std::string& name) noexcept{
