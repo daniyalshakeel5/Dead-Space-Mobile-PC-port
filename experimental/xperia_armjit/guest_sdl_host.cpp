@@ -296,12 +296,19 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
             else if(fmt==GL_RGB)components=3;
             else if(fmt==GL_ALPHA||fmt==GL_LUMINANCE)components=1;
             else if(fmt==GL_LUMINANCE_ALPHA)components=2;
-            if(!components||type!=GL_UNSIGNED_BYTE||width>8192||height>8192)
-                throw std::runtime_error("Unimplemented GLES1 texture format/type");
+            const bool packed=type==GL_UNSIGNED_SHORT_5_6_5||
+                type==GL_UNSIGNED_SHORT_4_4_4_4||
+                type==GL_UNSIGNED_SHORT_5_5_5_1;
+            if((packed && ((type==GL_UNSIGNED_SHORT_5_6_5&&fmt!=GL_RGB)||
+               (type!=GL_UNSIGNED_SHORT_5_6_5&&fmt!=GL_RGBA))) ||
+               (!packed && type!=GL_UNSIGNED_BYTE) ||
+               !components || width>8192||height>8192)
+                throw std::runtime_error("Unsupported GLES1 texture component/type combination");
+            const unsigned pixel_bytes=packed?2u:components;
             GLint align=4;glGetIntegerv(GL_UNPACK_ALIGNMENT,&align);
             if(align!=1&&align!=2&&align!=4&&align!=8)
                 throw std::runtime_error("Invalid GL pixel unpack alignment");
-            const auto row=std::uint64_t(width)*components;
+            const auto row=std::uint64_t(width)*pixel_bytes;
             const auto pitch=(row+unsigned(align)-1u)&~(unsigned(align)-1u);
             const auto bytes=height?pitch*(height-1u)+row:0u;
             if(bytes>64u*1024u*1024u)
@@ -386,15 +393,24 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
                     throw std::runtime_error("Guest OpenGL strings memory collision");
                 guest.segments.push_back({base,std::vector<std::uint8_t>(65536,0)});
             }
-            const auto* src=glGetString(enum_value);
-            if(!src)throw std::runtime_error("Host GL string unavailable");
-            const auto size=std::strlen(reinterpret_cast<const char*>(src));
+            const char* reported=nullptr;
+            if(enum_value==GL_VERSION)
+                reported="OpenGL ES-CM 1.1 Xperia ARM32 Windows wrapper";
+            else if(enum_value==GL_EXTENSIONS)
+                reported="GL_AMD_compressed_ATC_texture "
+                         "GL_IMG_texture_compression_pvrtc";
+            else{
+                const auto* src=glGetString(enum_value);
+                if(!src)throw std::runtime_error("Host OpenGL query string unavailable");
+                reported=reinterpret_cast<const char*>(src);
+            }
+            const auto size=std::strlen(reported);
             if(size>=16384u)
-                throw std::runtime_error("Host GL query string too large");
+                throw std::runtime_error("Host GL string exceeds bounded guest buffer");
             const auto guest_addr=base+(enum_value-GL_VENDOR)*16384u;
             auto* dst=guest.writeable(guest_addr,size+1u);
             if(!dst)throw std::runtime_error("Guest GL string buffer unmapped");
-            std::memcpy(dst,src,size+1u);
+            std::memcpy(dst,reported,size+1u);
             result=guest_addr;break;
         }
         case 45:case 46:case 47: { // glGet{Integer,Float,Boolean}v
