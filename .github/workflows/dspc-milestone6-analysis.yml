@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   compare-milestones:
@@ -27,6 +27,18 @@ jobs:
             --new dspc_milestone6.rar \
             --report milestone6-analysis.md \
             --details
+      - name: Import allowlisted milestone6 host sources to isolated development branch
+        run: |
+          python3 tools/import_milestone6_source.py dspc_milestone6.rar
+          git add experimental/lifted_milestone6
+          if git diff --cached --quiet; then
+            echo "Milestone 6 source files already imported."
+          else
+            git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "Import milestone6 portable native host sources without game assets"
+            git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
+          fi
       - name: Attach source comparison report (no game data)
         uses: actions/upload-artifact@v4
         with:
