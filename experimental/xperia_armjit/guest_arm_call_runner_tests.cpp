@@ -211,6 +211,18 @@ int main(){
     put32(elf,base+0xf48,0xe12fff3cu); // BLX IP
     put32(elf,base+0xf4c,0xe8bd8000u); // POP PC
     put32(elf,base+0xf54,libc.symbols().at("pthread_create"));
+    // Use distinct translated wrappers for join and yield so the test
+    // doesn't rely on editing a previously JIT-translated literal pool.
+    put32(elf,base+0xf80,0xe92d4000u);
+    put32(elf,base+0xf84,0xe59fc008u);
+    put32(elf,base+0xf88,0xe12fff3cu);
+    put32(elf,base+0xf8c,0xe8bd8000u);
+    put32(elf,base+0xf94,libc.symbols().at("pthread_join"));
+    put32(elf,base+0xfc0,0xe92d4000u);
+    put32(elf,base+0xfc4,0xe59fc008u);
+    put32(elf,base+0xfc8,0xe12fff3cu);
+    put32(elf,base+0xfcc,0xe8bd8000u);
+    put32(elf,base+0xfd4,libc.symbols().at("sched_yield"));
     put32(elf,base+0xf60,0xe3a0002au); // MOV R0,#42 (actual worker)
     put32(elf,base+0xf64,0xe12fff1eu); // BX LR
     assert(runner.invoke(base+0xf40,
@@ -220,21 +232,17 @@ int main(){
     assert(tid>1u && libc.guest_threads().pending()==1u);
     assert(runner.run_pending_guest_threads(error));
     assert(libc.guest_threads().finished(tid));
-    put32(elf,base+0xf54,libc.symbols().at("pthread_join"));
-    assert(runner.invoke(base+0xf40,
+    assert(runner.invoke(base+0xf80,
         {tid,base+0xfb0,0,0},result,error));
     assert(result==0 && elf.read_u32(base+0xfb0)==42u);
     assert(!libc.guest_threads().exists(tid));
     // A second worker scheduled from the original ARM sched_yield veneer.
-    put32(elf,base+0xf54,libc.symbols().at("pthread_create"));
     assert(runner.invoke(base+0xf40,
         {base+0xfa0,0,base+0xf60,0xaaaa},result,error));
     const auto tid2=elf.read_u32(base+0xfa0);
-    put32(elf,base+0xf54,libc.symbols().at("sched_yield"));
-    assert(runner.invoke(base+0xf40,{0,0,0,0},result,error));
+    assert(runner.invoke(base+0xfc0,{0,0,0,0},result,error));
     assert(libc.guest_threads().finished(tid2));
-    put32(elf,base+0xf54,libc.symbols().at("pthread_join"));
-    assert(runner.invoke(base+0xf40,
+    assert(runner.invoke(base+0xf80,
         {tid2,base+0xfb0,0,0},result,error));
     assert(elf.read_u32(base+0xfb0)==42u);
     // Fail closed rather than claim to boot unsupported game services.
