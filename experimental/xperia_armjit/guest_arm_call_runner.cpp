@@ -16,7 +16,7 @@ namespace {
 using u8=std::uint8_t; using u16=std::uint16_t;
 using u32=std::uint32_t; using u64=std::uint64_t;
 constexpr u32 kStack=0x60000000u;
-constexpr u32 kStackBytes=256u*1024u;
+constexpr u32 kStackBytes=1024u*1024u;
 constexpr u32 kReturnTrap=0x71000000u;
 constexpr u32 kReturnSvc=0xff00u;
 constexpr unsigned kMaxTraps=256;
@@ -114,6 +114,49 @@ struct GuestArmCallRunner::Impl {
         }
         host.jit=&jit;
     }
+    struct CpuSnapshot {
+        std::array<u32,16> regs{};
+        std::array<u32,64> floats{};
+        u32 cpsr=0,fpscr=0;
+    };
+    CpuSnapshot snapshot() const {
+        return {jit.Regs(),jit.ExtRegs(),jit.Cpsr(),jit.Fpscr()};
+    }
+    void restore(const CpuSnapshot& state) {
+        jit.Reset();
+        jit.Regs()=state.regs;
+        jit.ExtRegs()=state.floats;
+        jit.SetCpsr(state.cpsr);
+        jit.SetFpscr(state.fpscr);
+    }
+    // Runs the original ARM pthread start routine with an isolated guest
+    // stack and preserves the calling ARM context including NEON/VFP.
+    // One worker runs per scheduling decision; no host x64 pthread runs ARM.
+    bool run_one_worker(std::string& error,unsigned depth) {
+        GuestThreads::Task task;
+        if(!bridge.guest_threads().take_next(task)) {
+            error="No runnable ARM guest pthread";
+            return false;
+        }
+        if(depth+1u>=kMaxNestedCalls) {
+            error="ARM guest pthread nesting limit reached";
+            return false;
+        }
+        const auto parent=bridge.guest_threads().self();
+        const auto state=snapshot();
+        bridge.guest_threads().set_self(task.id);
+        u32 retval=0;
+        const bool success=invoke(task.entry,{task.arg,0,0,0},
+                                  retval,error,depth+1u);
+        restore(state);
+        bridge.guest_threads().set_self(parent);
+        if(!success)return false;
+        if(!bridge.guest_threads().complete(task.id,retval)){
+            error="Completed ARM guest pthread descriptor disappeared";
+            return false;
+        }
+        error.clear();return true;
+    }
     bool invoke(u32 address,const std::array<u32,4>& args,
                 u32& result,std::string& error,unsigned depth=0,
                 const std::vector<u32>& stack_args={}) {
@@ -173,15 +216,12 @@ struct GuestArmCallRunner::Impl {
                         return false;
                     const auto callback=java->take_callback();
                     if(callback.address){
-                        const auto saved=jit.Regs();
-                        const auto cpsr=jit.Cpsr();
+                        const auto saved=snapshot();
                         u32 ignored=0;
                         if(!invoke(callback.address,callback.arguments,
                                    ignored,error,depth+1))
                             return false;
-                        jit.Reset();
-                        jit.Regs()=saved;
-                        jit.SetCpsr(cpsr);
+                        restore(saved);
                     }
                     jit.Regs()[0]=regs[0];
                     jit.Regs()[15]=java->return_pc(id);
@@ -202,8 +242,7 @@ struct GuestArmCallRunner::Impl {
                 if(id==GuestLibcBridge::finalize_svc) {
                     // Save the suspended original caller; running an ARM
                     // destructor uses a separate stack and a JIT reset.
-                    const auto saved=jit.Regs();
-                    const auto cpsr=jit.Cpsr();
+                    const auto saved=snapshot();
                     const auto callbacks=bridge.take_destructors(saved[0]);
                     for(const auto& callback:callbacks) {
                         u32 ignored=0;
@@ -212,9 +251,7 @@ struct GuestArmCallRunner::Impl {
                                    ignored,error,depth+1))
                             return false;
                     }
-                    jit.Reset();
-                    jit.Regs()=saved;
-                    jit.SetCpsr(cpsr);
+                    restore(saved);
                     copy[0]=0;
                 } else if(id==GuestLibcBridge::once_svc) {
                     // Android pthread_once invokes the actual original ARM
@@ -228,8 +265,7 @@ struct GuestArmCallRunner::Impl {
                     if(state==0){
                         if(!image.read(callback&~1u,2))
                             throw std::runtime_error("Unmapped guest pthread_once callback");
-                        const auto saved=jit.Regs();
-                        const auto cpsr=jit.Cpsr();
+                        const auto saved=snapshot();
                         word[0]=1;word[1]=word[2]=word[3]=0;
                         u32 ignored=0;
                         if(!invoke(callback,{0,0,0,0},ignored,error,depth+1))
@@ -238,14 +274,45 @@ struct GuestArmCallRunner::Impl {
                         if(!word || image.read_u32(control)!=1)
                             throw std::runtime_error("Guest pthread_once control overwritten");
                         word[0]=2;word[1]=word[2]=word[3]=0;
-                        jit.Reset();
-                        jit.Regs()=saved;
-                        jit.SetCpsr(cpsr);
+                        restore(saved);
                     }else if(state!=2)
                         throw std::runtime_error("Reentrant pthread_once requires guest scheduler");
                     copy[0]=0;
-                } else if(!bridge.dispatch(id,copy,image,error,&heap,files))
-                    return false;
+                } else if(id==GuestLibcBridge::exit_thread_svc){
+                    if(bridge.guest_threads().self()==GuestThreads::main_thread)
+                        throw std::runtime_error("Main ARM thread cannot pthread_exit");
+                    // pthread_exit does not return to its ARM caller. Redirect
+                    // to this worker's bounded return trap with its result.
+                    jit.Regs()[0]=copy[0];
+                    jit.Regs()[15]=kReturnTrap;
+                    continue;
+                } else {
+                    // Join and contended synchronization are the scheduling
+                    // points; wake a pending original ARM worker before
+                    // resuming the blocked caller's same service.
+                    if(id==GuestLibcBridge::join_thread_svc){
+                        const u32 target=copy[0];
+                        unsigned turns=0;
+                        while(bridge.guest_threads().exists(target) &&
+                              !bridge.guest_threads().finished(target) &&
+                              bridge.guest_threads().pending() && turns++<16){
+                            if(!run_one_worker(error,depth))return false;
+                        }
+                    }else if(id==GuestLibcBridge::yield_thread_svc &&
+                             bridge.guest_threads().pending()){
+                        if(!run_one_worker(error,depth))return false;
+                    }
+                    bool ok=bridge.dispatch(id,copy,image,error,&heap,files);
+                    if(!ok && (id==35u||id==41u)){
+                        for(unsigned turns=0;turns<16u &&
+                            bridge.guest_threads().pending();++turns){
+                            if(!run_one_worker(error,depth))return false;
+                            ok=bridge.dispatch(id,copy,image,error,&heap,files);
+                            if(ok)break;
+                        }
+                    }
+                    if(!ok)return false;
+                }
                 jit.Regs()[0]=copy[0];
                 jit.Regs()[15]=static_cast<u32>(expected)+4u; // BX LR
             }
@@ -285,6 +352,18 @@ void GuestArmCallRunner::invalidate_code(std::uint32_t start,std::size_t length)
     // tests on both Windows and Linux.
     (void)start;(void)length;
     impl_->jit.ClearCache();
+}
+bool GuestArmCallRunner::run_pending_guest_threads(
+        std::string& error,unsigned max_workers){
+    if(max_workers>GuestThreads::max_live){
+        error="ARM guest worker pump exceeds hard scheduling cap";
+        return false;
+    }
+    for(unsigned i=0;i<max_workers &&
+        impl_->bridge.guest_threads().pending();++i){
+        if(!impl_->run_one_worker(error,0))return false;
+    }
+    error.clear();return true;
 }
 bool GuestArmCallRunner::run_original_initializers(std::string& error){
     // Original ELF parser returned ordered DT_INIT and DT_INIT_ARRAY,
