@@ -55,6 +55,7 @@ private:
     AudioSink audio_{};
     struct ShortArray {std::uint32_t data=0,length=0;};
     std::unordered_map<std::uint32_t,ShortArray> short_arrays_;
+    std::unordered_map<std::uint32_t,ShortArray> byte_arrays_;
     std::uint32_t next_array_=0x74600000u;
     std::unordered_map<std::uint32_t,std::uint32_t> strings_;
     std::unordered_map<unsigned,std::uint32_t> cached_method_strings_;
