@@ -179,7 +179,7 @@ int main(){
         vm_runner.invalidate_code(base+0xe04,4);
         assert(!vm_runner.invoke(base+0xe00,
             {jni.env_address,0,0,0},result,error));
-        assert(error.find("JNIEnv table entry 6")!=std::string::npos);
+        assert(error.find("FindClass")!=std::string::npos);
     }
     // Genuine ARM32 AAPCS stack parameter handoff: fifth, sixth and seventh
     // parameters are visible in the original ARM instructions at [SP+0/4/8].
