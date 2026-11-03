@@ -1,0 +1,60 @@
+name: Dead Space Milestone6 one-click WSL source update
+on:
+  push:
+    branches:
+      - work/deadspace-milestone6-analysis-2026-11-04
+    paths:
+      - experimental/lifted_milestone6/**
+      - .github/workflows/dspc-m6-oneclick-package.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-windows-installer:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test one-click install preserves mock APK and stale generated code
+        shell: pwsh
+        run: |
+          $p = Join-Path $env:RUNNER_TEMP "dspc_mock"
+          New-Item -ItemType Directory -Force (Join-Path $p "tools\out") | Out-Null
+          New-Item -ItemType Directory -Force (Join-Path $p "apk\lib\armeabi") | Out-Null
+          Set-Content (Join-Path $p "tools\gen_all.py") "old translation source"
+          Set-Content (Join-Path $p "tools\host.c") "old host source"
+          Set-Content (Join-Path $p "tools\out\protos.h") "old generated C"
+          Set-Content (Join-Path $p "apk\lib\armeabi\libDeadSpace.so") "user owned asset sentinel"
+          $installer = Join-Path $PWD "experimental\lifted_milestone6\Install-Milestone6.ps1"
+          & pwsh -NoProfile -File $installer -ProjectDir $p -Quiet
+          if ($LASTEXITCODE -ne 0) { throw "Installer exited $LASTEXITCODE" }
+          $new = Get-Content -Raw (Join-Path $p "tools\host.c")
+          if ($new -notmatch "RESOURCE_ROOTS") { throw "Updated host not installed" }
+          $asset = Get-Content -Raw (Join-Path $p "apk\lib\armeabi\libDeadSpace.so")
+          if ($asset -notmatch "user owned asset sentinel") { throw "Original ELF was modified" }
+          if (Test-Path (Join-Path $p "tools\out")) { throw "Stale generated C cache still active" }
+          $backup = @(Get-ChildItem -Directory (Join-Path $p "backups"))[0].FullName
+          if (-not (Test-Path (Join-Path $backup "tools\host.c"))) { throw "Old host not backed up" }
+          if (-not (Test-Path (Join-Path $backup "out\protos.h"))) { throw "Generated C not backed up" }
+          if (-not (Test-Path (Join-Path $p "tools\texturepack_fault_guard.py"))) { throw "No texture guard installed" }
+          Write-Host "PASS: offline one-click installer preserves APK, saves, old source and generated C"
+  package-update:
+    needs: validate-windows-installer
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage asset-free one-click update
+        run: |
+          mkdir -p update/tools
+          cp experimental/lifted_milestone6/tools/* update/tools/
+          cp experimental/lifted_milestone6/Install-Milestone6.ps1 update/
+          cp experimental/lifted_milestone6/Install-Milestone6.cmd update/
+          cp experimental/lifted_milestone6/README-ONECLICK.txt update/
+          echo "No original game ELF, APK, save data or extracted assets are included."
+          find update -type f -printf '%P\n' | sort
+      - name: Upload tested Windows one-click WSL source update
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeadSpace-Mobile-Milestone6-OneClick-Update
+          path: update/
+          if-no-files-found: error
+          retention-days: 30
