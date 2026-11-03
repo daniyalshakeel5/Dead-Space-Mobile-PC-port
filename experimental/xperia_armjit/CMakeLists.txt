@@ -110,6 +110,12 @@ add_executable(xperia_texture_decoder_tests
 target_compile_features(xperia_texture_decoder_tests PRIVATE cxx_std_17)
 add_test(NAME xperia_ATC_PVRTC_RGBA_and_payload_validation
     COMMAND xperia_texture_decoder_tests)
+if(WIN32)
+  add_executable(xperia_sdl_gl_imports_tests guest_sdl_imports_tests.cpp)
+  target_link_libraries(xperia_sdl_gl_imports_tests PRIVATE xperia_arm_call_runner)
+  add_test(NAME xperia_windows_original_gles_import_veneers
+    COMMAND xperia_sdl_gl_imports_tests)
+endif()
 add_executable(xperia_guest_input_tests guest_xperia_input_tests.cpp)
 target_link_libraries(xperia_guest_input_tests PRIVATE xperia_arm_call_runner)
 add_test(NAME xperia_ds4_real_arm_jni_input_delivery
