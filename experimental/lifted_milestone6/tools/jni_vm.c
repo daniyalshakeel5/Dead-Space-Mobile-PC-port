@@ -7,25 +7,28 @@
 enum { K_NONE, K_CLASS, K_STRING, K_OBJECT, K_ARRAY, K_OBJARR, K_ASSETMGR, K_STREAM, K_AFD };
 typedef struct { u8 kind; u8 esz; char* s; void* p; u32 n; u32 extra; } JObj;
 #define OBJ_CHUNK 1024
-static JObj* g_chunk[4096]; static u32 g_nobjs;
+static JObj* g_chunk[4096]; static u32 g_nobjs; /* published with release/acquire */
 static pthread_mutex_t g_objlock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;       // object table, class cache and Java-side state
 #define HANDLE(i) (0x10000u + 8u * (i))
 static inline JObj* obj_at(u32 i) { return &g_chunk[i / OBJ_CHUNK][i % OBJ_CHUNK]; }
-#define OBJ(h) (((h) >= 0x10000u && (((h) - 0x10000u) & 7) == 0 && ((h) - 0x10000u) / 8 < g_nobjs) ? obj_at(((h) - 0x10000u) / 8) : (JObj*)0)
+/* Obj slot/chunk is fully initialized before the handle becomes visible.
+ * Readers use an acquire-load; g_chunk[] entries are stable once created.
+ * Avoid a C data race when texture worker threads read freshly made objects. */
+#define OBJ(h) (((h) >= 0x10000u && (((h) - 0x10000u) & 7) == 0 && ((h) - 0x10000u) / 8 < __atomic_load_n(&g_nobjs, __ATOMIC_ACQUIRE)) ? obj_at(((h) - 0x10000u) / 8) : (JObj*)0)
 
 static u32 new_obj(u8 kind, const char* s, void* p, u32 n) {
     pthread_mutex_lock(&g_objlock);
-    u32 i = g_nobjs, c = i / OBJ_CHUNK;
+    u32 i = __atomic_load_n(&g_nobjs, __ATOMIC_RELAXED), c = i / OBJ_CHUNK;
     if (c >= 4096) { fprintf(stderr, "!! JNI object table full\n"); exit(3); }
     if (!g_chunk[c]) g_chunk[c] = calloc(OBJ_CHUNK, sizeof(JObj));         // chunks never move, so JObj* stays valid across threads
     JObj* o = &g_chunk[c][i % OBJ_CHUNK]; memset(o, 0, sizeof *o);
     o->kind = kind; o->s = s ? strdup(s) : 0; o->p = p; o->n = n;
-    g_nobjs = i + 1;
+    __atomic_store_n(&g_nobjs, i + 1, __ATOMIC_RELEASE);
     pthread_mutex_unlock(&g_objlock);
     return HANDLE(i);
 }
 static const char* g_assets_root = "assets";
-static int g_exception;                       // pending Java exception (set by failed asset opens)
+static __thread int g_exception;              // JNI exception state is per calling thread (Bionic/JNI)
 static u32 g_activity, g_assetmgr;
 static int g_log_java = 1;
 
@@ -203,8 +206,13 @@ static const char* sname(void) { return stub_names[g_stub_idx]; }
 static u64 jni_default(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
     const char* n = sname(); tr(n);
     static const char* seen[256]; static int ns;
+    /* Background texture workers may call unimplemented JNI functions too.
+     * This dedup cache is shared only for logging, so synchronize it with
+     * the already-recursive Java object/cache mutex. */
+    pthread_mutex_lock(&g_objlock);
     int dup = 0; for (int i = 0; i < ns; i++) if (seen[i] == n) dup = 1;
     if (!dup && ns < 256) { seen[ns++] = n; if (g_log_java) printf("   [jni] UNIMPLEMENTED %s (r1=%#x r2=%#x r3=%#x)\n", n, r1, r2, r3); }
+    pthread_mutex_unlock(&g_objlock);
     return 0;
 }
 static u64 jni_GetVersion(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr("JNI:GetVersion"); RET(0x10006); }
