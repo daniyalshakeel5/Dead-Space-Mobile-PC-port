@@ -35,36 +35,41 @@ static void fill_stat(u32 buf, const struct stat* s) {
     *(u64*)(b + 96) = (u64)s->st_ino;
 }
 IMP(stat)  { T(stat); const char* path = P(r0); struct stat s; int rc = stat(path, &s); int saved = errno;
-    if (!rc) fill_stat(r1, &s); ds_asset_io_note("stat", path, rc == 0, saved); errno = saved; RET(rc); }
-IMP(fstat) { T(fstat); struct stat s; int rc = fstat((int)r0, &s); if (!rc) fill_stat(r1, &s); RET(rc); }
+    if (!rc) fill_stat(r1, &s); else g_errno = saved;
+    ds_asset_io_note("stat", path, rc == 0, saved); errno = saved; RET(rc); }
+IMP(fstat) { T(fstat); struct stat s; int rc = fstat((int)r0, &s); int saved = errno;
+    if (!rc) fill_stat(r1, &s); else g_errno = saved; errno = saved; RET(rc); }
 IMP(open)  { T(open); const char* path = P(r0); int fd = open(path, (int)r1, (mode_t)r2); int saved = errno;
+    if (fd < 0) g_errno = saved;
     ds_asset_io_note("open", path, fd >= 0, saved); errno = saved; RET(fd); }
-IMP(close) { T(close); RET(close((int)r0)); }
-IMP(read)  { T(read);  RET(read((int)r0, P(r1), r2)); }
-IMP(write) { T(write); RET(write((int)r0, P(r1), r2)); }
-IMP(lseek) { T(lseek); RET((u32)lseek((int)r0, (off_t)(s32)r1, (int)r2)); }
-IMP(fsync) { T(fsync); RET(fsync((int)r0)); }
-IMP(ftruncate) { T(ftruncate); RET(ftruncate((int)r0, (off_t)(s32)r1)); }
-IMP(unlink) { T(unlink); RET(unlink(P(r0))); }
-IMP(rmdir)  { T(rmdir);  RET(rmdir(P(r0))); }
-IMP(mkdir)  { T(mkdir);  RET(mkdir(P(r0), (mode_t)r1)); }
-IMP(rename) { T(rename); RET(rename(P(r0), P(r1))); }
-IMP(remove) { T(remove); RET(remove(P(r0))); }
-IMP(chdir)  { T(chdir);  RET(chdir(P(r0))); }
-IMP(chmod)  { T(chmod);  RET(chmod(P(r0), (mode_t)r1)); }
-IMP(getcwd) { T(getcwd); RET(U(getcwd(P(r0), r1))); }
+IMP(close) { T(close); int rc = close((int)r0); if (rc < 0) g_errno = errno; RET(rc); }
+IMP(read)  { T(read); ssize_t rc = read((int)r0, P(r1), r2); if (rc < 0) g_errno = errno; RET(rc); }
+IMP(write) { T(write); ssize_t rc = write((int)r0, P(r1), r2); if (rc < 0) g_errno = errno; RET(rc); }
+IMP(lseek) { T(lseek); off_t rc = lseek((int)r0, (off_t)(s32)r1, (int)r2);
+    if (rc == (off_t)-1) g_errno = errno; RET((u32)rc); }
+IMP(fsync) { T(fsync); int rc = fsync((int)r0); if (rc < 0) g_errno = errno; RET(rc); }
+IMP(ftruncate) { T(ftruncate); int rc = ftruncate((int)r0, (off_t)(s32)r1); if (rc < 0) g_errno = errno; RET(rc); }
+IMP(unlink) { T(unlink); int rc = unlink(P(r0)); if (rc < 0) g_errno = errno; RET(rc); }
+IMP(rmdir)  { T(rmdir); int rc = rmdir(P(r0)); if (rc < 0) g_errno = errno; RET(rc); }
+IMP(mkdir)  { T(mkdir); int rc = mkdir(P(r0), (mode_t)r1); if (rc < 0) g_errno = errno; RET(rc); }
+IMP(rename) { T(rename); int rc = rename(P(r0), P(r1)); if (rc < 0) g_errno = errno; RET(rc); }
+IMP(remove) { T(remove); int rc = remove(P(r0)); if (rc < 0) g_errno = errno; RET(rc); }
+IMP(chdir)  { T(chdir); int rc = chdir(P(r0)); if (rc < 0) g_errno = errno; RET(rc); }
+IMP(chmod)  { T(chmod); int rc = chmod(P(r0), (mode_t)r1); if (rc < 0) g_errno = errno; RET(rc); }
+IMP(getcwd) { T(getcwd); char* rc = getcwd(P(r0), r1); if (!rc) g_errno = errno; RET(U(rc)); }
 
 IMP(fopen)   { T(fopen); const char* path = P(r0); FILE* fp = fopen(path, P(r1)); int saved = errno;
+    if (!fp) g_errno = saved;
     ds_asset_io_note("fopen", path, fp != NULL, saved); errno = saved; RET(U(fp)); }
-IMP(fclose)  { T(fclose);  RET(fclose(hostfile(r0))); }
+IMP(fclose)  { T(fclose); int rc = fclose(hostfile(r0)); if (rc == EOF) g_errno = errno; RET(rc); }
 IMP(fread)   { T(fread);   RET(fread(P(r0), r1, r2, hostfile(r3))); }
 IMP(fwrite)  { T(fwrite);  RET(fwrite(P(r0), r1, r2, hostfile(r3))); }
-IMP(fseek)   { T(fseek);   RET(fseek(hostfile(r0), (long)(s32)r1, (int)r2)); }
-IMP(ftell)   { T(ftell);   RET((u32)ftell(hostfile(r0))); }
+IMP(fseek)   { T(fseek); int rc = fseek(hostfile(r0), (long)(s32)r1, (int)r2); if (rc < 0) g_errno = errno; RET(rc); }
+IMP(ftell)   { T(ftell); long rc = ftell(hostfile(r0)); if (rc < 0) g_errno = errno; RET((u32)rc); }
 IMP(fgets)   { T(fgets);   RET(U(fgets(P(r0), (int)r1, hostfile(r2)))); }
 IMP(fgetc)   { T(fgetc);   RET(fgetc(hostfile(r0))); }
-IMP(ungetc)  { T(ungetc);  RET(ungetc((int)r0, hostfile(r1))); }
-IMP(fflush)  { T(fflush);  RET(r0 ? fflush(hostfile(r0)) : fflush(NULL)); }
+IMP(ungetc)  { T(ungetc); int rc = ungetc((int)r0, hostfile(r1)); if (rc == EOF) g_errno = errno; RET(rc); }
+IMP(fflush)  { T(fflush); int rc = r0 ? fflush(hostfile(r0)) : fflush(NULL); if (rc == EOF) g_errno = errno; RET(rc); }
 IMP(fputs)   { T(fputs);   RET(fputs(P(r0), hostfile(r1)) < 0 ? -1 : 0); }
 IMP(fwide)   { T(fwide);   RET(0); }
 IMP(fprintf) {
@@ -72,8 +77,9 @@ IMP(fprintf) {
     int n = gformat(buf, sizeof buf, P(r1), &a); fwrite(buf, 1, n < (int)sizeof buf ? n : (int)sizeof buf - 1, hostfile(r0)); RET(n);
 }
 IMP(opendir)  { T(opendir); const char* path = P(r0); DIR* d = opendir(path); int saved = errno;
+    if (!d) g_errno = saved;
     ds_asset_io_note("opendir", path, d != NULL, saved); errno = saved; RET(U(d)); }
-IMP(closedir) { T(closedir); RET(closedir(P(r0))); }
+IMP(closedir) { T(closedir); int rc = closedir(P(r0)); if (rc < 0) g_errno = errno; RET(rc); }
 static u8 g_dirent[280];
 IMP(readdir) {                                               // bionic struct dirent: ino(8) off(8) reclen(2) type(1) name[256]
     T(readdir); struct dirent* e = readdir(P(r0)); if (!e) RET(0);

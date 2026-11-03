@@ -159,7 +159,8 @@ IMP(sbrk) {
 }
 
 // ---- misc libc
-static int g_errno;
+/* Bionic __errno() is thread-local, not shared between guest pthreads. */
+static __thread int g_errno;
 static u32 data_object(const char* name);
 IMP(__errno)  { T(__errno); RET(U(&g_errno)); }
 IMP(sysconf)  { T(sysconf); RET(r0 == 39 ? 4096 : 1); }
