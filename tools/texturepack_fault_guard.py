@@ -82,8 +82,10 @@ def patch(source: str) -> str:
             "The translated TexturePack code differs from the verified "
             "crash report; refusing to modify an unknown code location.")
     m = found[0]
-    if m.end() >= body.find("r1 = LD32(ea);"):
-        raise ValueError("Unexpected source ordering: unsafe to instrument")
+    site = DEREF.search(body, m.end())
+    if site is None or site.start() > m.end() + 1100:
+        raise ValueError("Crash-site load is not adjacent to L_35b564; "
+                         "refusing to instrument an unknown source layout")
     replacement = body[:m.end()] + "\n" + GUARD + body[m.end():]
     if '#include <stdio.h>\n' not in source[:begin]:
         source = '#include <stdio.h>\n' + source
