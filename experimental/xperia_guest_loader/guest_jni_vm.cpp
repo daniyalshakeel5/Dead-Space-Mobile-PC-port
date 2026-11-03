@@ -98,7 +98,12 @@ constexpr Method methods[]={
     {9,"deinit","()V",true},
     {9,"isRewardedVideoAdAvailable","()Z",true},
     {9,"displayRewardedVideoAd","()V",true},
-    {9,"fetchVideoAdRewardPending","()Z",true}
+    {9,"fetchVideoAdRewardPending","()Z",true},
+    // Additional AudioTrack overloads from the original game-compatible
+    // JNI registry. Keep existing IDs stable for arm32 smoke tests.
+    {4,"<init>","(IIIIII)V",false},
+    {4,"write","([BII)I",false},
+    {4,"write","([BIII)I",false}
 };
 bool guest_string(GuestElf32& guest,std::uint32_t addr,std::string& output){
     output.clear();
@@ -427,8 +432,8 @@ bool GuestJniVm::dispatch(std::uint32_t id,
             error="JNI allocate with invalid class";return false;
         }
         const auto owner=(r1-kClassBase)/16u;
-        if(owner<5u||owner>7u){
-            error="JNI object allocation requires a registered Xperia delegate";
+        if(owner!=4u && (owner<5u||owner>7u)){
+            error="JNI object allocation requires Xperia delegate or AudioTrack";
             return false;
         }
         if(slot!=27){
@@ -480,6 +485,51 @@ bool GuestJniVm::dispatch(std::uint32_t id,
         error=std::string("Original Xperia instance method missing: ")+
               classes[owner].name+"."+name+sig;return false;
     }
+    if(slot==176){ // NewByteArray(jsize), original Android JNI ABI
+        if(static_cast<std::int32_t>(r1)<0||r1>1048576u ||
+           next_array_>0x75600000u-r1-4096u){
+            error="JNI byte array exceeds 1MiB per object or arena";
+            return false;
+        }
+        const auto bytes=16u+r1;
+        const auto reserved=(bytes+4095u)&~4095u;
+        const auto addr=next_array_;
+        if(guest.read(addr,1)||guest.read(addr+reserved-1u,1)){
+            error="JNI byte array overlaps original game memory";return false;
+        }
+        guest.segments.push_back({addr,std::vector<std::uint8_t>(reserved,0)});
+        byte_arrays_.emplace(addr,ShortArray{addr+16u,r1});
+        next_array_+=reserved;
+        regs[0]=addr;error.clear();return true;
+    }
+    if(slot==184 || slot==192 || slot==200 || slot==208){
+        const auto it=byte_arrays_.find(r1);
+        if(it==byte_arrays_.end()){error="Unknown JNI byte[] instance";return false;}
+        const auto arr=it->second;
+        if(slot==184){ // GetByteArrayElements, direct guest storage
+            if(r2){
+                auto* copied=guest.writeable(r2,1);
+                if(!copied){error="JNI byte isCopy address invalid";return false;}
+                *copied=0;
+            }
+            regs[0]=arr.data;error.clear();return true;
+        }
+        if(slot==192){regs[0]=0;error.clear();return true;}
+        const auto start=r2,amount=regs[3];
+        if(start>arr.length||amount>arr.length-start){
+            error="JNI byte[] region exceeds allocation";return false;
+        }
+        std::uint32_t source=0;
+        try{source=guest.read_u32(regs[13]);}
+        catch(...){error="JNI byte[] region ARM stack missing";return false;}
+        const auto* from=guest.read(
+            slot==208?source:arr.data+start,amount);
+        auto* to=guest.writeable(
+            slot==208?arr.data+start:source,amount);
+        if(!from||!to){error="JNI byte[] region pointer unmapped";return false;}
+        std::memmove(to,from,amount);
+        regs[0]=0;error.clear();return true;
+    }
     if(slot==178){ // NewShortArray(jsize)
         if(static_cast<std::int32_t>(r1)<0||r1>524288u ||
            next_array_>0x75600000u-r1*2u-4096u){
@@ -496,13 +546,20 @@ bool GuestJniVm::dispatch(std::uint32_t id,
         next_array_+=reserved;
         regs[0]=addr;error.clear();return true;
     }
-    if(slot==171 || slot==186 || slot==194 || slot==210){
+    if(slot==171){ // Shared JVM GetArrayLength for byte[] and short[]
+        const auto shorts=short_arrays_.find(r1);
+        const auto bytes=byte_arrays_.find(r1);
+        if(shorts!=short_arrays_.end())regs[0]=shorts->second.length;
+        else if(bytes!=byte_arrays_.end())regs[0]=bytes->second.length;
+        else {error="Unknown JVM array length receiver";return false;}
+        error.clear();return true;
+    }
+    if(slot==186 || slot==194 || slot==210){
         const auto it=short_arrays_.find(r1);
         if(it==short_arrays_.end()){
             error="Unknown guest JNI short array";return false;
         }
         const auto arr=it->second;
-        if(slot==171){regs[0]=arr.length;error.clear();return true;}
         if(slot==186){ // GetShortArrayElements, no host copy
             if(r2){
                 auto* flag=guest.writeable(r2,1);
@@ -576,25 +633,53 @@ bool GuestJniVm::dispatch(std::uint32_t id,
             else {error="Unknown Xperia display int getter";return false;}
             error.clear();return true;
         }
-        if(r1!=audio_track_address || r2!=kMethodBase+4u*16u){
+        const auto receiver=instances_.find(r1);
+        const bool is_audio=r1==audio_track_address ||
+            (receiver!=instances_.end()&&receiver->second==4u);
+        const int audio_method=method_index();
+        if(!is_audio || audio_method<0 ||
+           methods[audio_method].owner!=4u ||
+           std::string(methods[audio_method].name)!="write"){
             error="Unknown JNI CallIntMethod receiver/method";return false;
         }
-        const auto it=short_arrays_.find(regs[3]);
-        if(it==short_arrays_.end()){
-            error="AudioTrack.write unrecognized short array";return false;
+        const bool is_short=std::string(methods[audio_method].signature)=="([SII)I";
+        const bool is_bytes=std::string(methods[audio_method].signature)=="([BII)I" ||
+            std::string(methods[audio_method].signature)=="([BIII)I";
+        if(!is_short && !is_bytes){
+            error="Unknown AudioTrack.write overload";return false;
+        }
+        const auto& arrays=is_short?short_arrays_:byte_arrays_;
+        const auto it=arrays.find(regs[3]);
+        if(it==arrays.end()){
+            error="AudioTrack.write unknown guest PCM array";return false;
         }
         std::uint32_t offset=0,number=0;
         try{offset=guest.read_u32(regs[13]);number=guest.read_u32(regs[13]+4u);}
-        catch(...){error="AudioTrack.write AAPCS arguments unmapped";return false;}
+        catch(...){error="AudioTrack.write ARM varargs unmapped";return false;}
         if(offset>it->second.length||number>it->second.length-offset ||
            number>524288u){
-            error="AudioTrack.write(short[]) range invalid";return false;
+            error="AudioTrack.write sample range invalid";return false;
         }
-        const auto* pcm=guest.read(it->second.data+offset*2u,number*2u);
+        if(is_bytes &&
+           std::string(methods[audio_method].signature)=="([BIII)I"){
+            std::uint32_t mode=0;
+            try{mode=guest.read_u32(regs[13]+8u);}
+            catch(...){error="AudioTrack.write blocking mode unmapped";return false;}
+            if(mode>1u){error="Unknown AudioTrack write mode";return false;}
+        }
+        const auto unit=is_short?2u:1u;
+        const auto bytes=number*unit;
+        const auto* pcm=guest.read(it->second.data+offset*unit,bytes);
         if(!pcm||!audio_.enqueue){
-            error="AudioTrack PCM data or real audio output missing";return false;
+            error="AudioTrack PCM data or SDL output unavailable";return false;
         }
-        if(!audio_.enqueue(audio_.context,pcm,number*2u,error))return false;
+        // Windows device uses 44.1 kHz stereo S16, so only complete
+        // samples reach SDL; do not claim a partial/unaligned write succeeded.
+        if(bytes%4u){
+            error="AudioTrack.write cannot queue incomplete S16 stereo frame";
+            return false;
+        }
+        if(!audio_.enqueue(audio_.context,pcm,bytes,error))return false;
         regs[0]=number;error.clear();return true;
     }
     if(slot==61){ // Display orientation / AudioTrack.play-stop-release
@@ -606,7 +691,10 @@ bool GuestJniVm::dispatch(std::uint32_t id,
             // This is a fixed-landscape SDL window; orientation cannot rotate.
             regs[0]=0;error.clear();return true;
         }
-        if(r1!=audio_track_address || r2<kMethodBase+5u*16u ||
+        const auto receiver=instances_.find(r1);
+        const bool is_audio=r1==audio_track_address ||
+            (receiver!=instances_.end()&&receiver->second==4u);
+        if(!is_audio || r2<kMethodBase+5u*16u ||
            r2>kMethodBase+7u*16u || (r2-kMethodBase)%16u){
             error="Unknown JNI CallVoidMethod receiver/method";return false;
         }
