@@ -72,7 +72,23 @@ def main():
         f.write(f"const u32 JNI_N = {len(JNI_NAMES)};\n")
     import gen_gl; gen_gl.main(f"{OUT}/gl_gen.c")
     for fn in ("rt.h", "host.c", "jni_vm.c", "threads.c", "libc_files.c", "gl_shim.c", "front_sdl.c", "build.sh"): shutil.copy(fn, OUT)
-    tot = sum(os.path.getsize(f"{OUT}/{x}") for x in os.listdir(OUT))
+    # Preserve the exact guest translation. Add a fail-closed two-point probe
+    # only to the confirmed TexturePack::load NULL-vector site. Do not mask
+    # the exception or invent empty textures. DS_TEXTUREPACK_DIAG=0 disables.
+    if os.environ.get("DS_TEXTUREPACK_DIAG", "1").lower() not in ("0", "no", "false", "off"):
+        from texturepack_fault_guard import patch as patch_texturepack
+        from pathlib import Path as _Path
+        candidates = [p for p in _Path(OUT).glob("fn_*.c")
+                      if "u64 f_0035b2e0(" in p.read_text(encoding="utf-8")]
+        if len(candidates) != 1:
+            raise RuntimeError(
+                f"TexturePack probe requires one f_0035b2e0 translation; "
+                f"found {len(candidates)}. Check the original game library.")
+        p = candidates[0]
+        original = p.read_text(encoding="utf-8")
+        p.write_text(patch_texturepack(original), encoding="utf-8")
+        print(f"TexturePack null-vector diagnostics injected into {p}")
+        tot = sum(os.path.getsize(f"{OUT}/{x}") for x in os.listdir(OUT))
     print(f"{len(ok)} lifted, {len(unlifted)} unlifted stubs, {len(imps)} imports, {idx} chunks, {tot/1e6:.1f} MB of C")
 
 if __name__ == "__main__":

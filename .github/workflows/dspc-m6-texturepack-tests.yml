@@ -1,0 +1,26 @@
+name: Milestone 6 lifted TexturePack diagnostics (asset-free)
+on:
+  push:
+    branches:
+      - work/deadspace-milestone6-analysis-2026-11-04
+    paths:
+      - experimental/lifted_milestone6/tools/gen_all.py
+      - experimental/lifted_milestone6/tools/build.sh
+      - experimental/lifted_milestone6/tools/texturepack_fault_guard.py
+      - tests/test_m6_texturepack_probe.py
+      - .github/workflows/dspc-m6-texturepack-tests.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  translator-probe-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check imported milestone6 translator and diagnostic syntax
+        run: |
+          python3 -m py_compile experimental/lifted_milestone6/tools/gen_all.py
+          python3 -m py_compile experimental/lifted_milestone6/tools/texturepack_fault_guard.py
+          sh -n experimental/lifted_milestone6/tools/build.sh
+      - name: Verify translation guard and idempotence against synthetic data
+        run: python3 -m unittest discover -s tests -p 'test_m6_texturepack_probe.py' -v
