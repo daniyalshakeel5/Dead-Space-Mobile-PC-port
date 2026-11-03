@@ -1,0 +1,20 @@
+name: Lifted TexturePack crash guard (synthetic)
+on:
+  push:
+    paths:
+      - tools/texturepack_fault_guard.py
+      - tests/test_texturepack_fault_guard.py
+      - .github/workflows/texturepack-fault-guard.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  guard-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Guard matches exact generated ARM structure and is safe/idempotent
+        run: python -m unittest discover -s tests -p 'test_texturepack_fault_guard.py' -v
