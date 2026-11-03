@@ -17,7 +17,7 @@ jobs:
       - name: Install non-executing RAR archive reader
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq unar
+          sudo apt-get install -y -qq unar p7zip-full
       - name: Verify comparison tool on synthetic fixtures
         run: python3 tools/analyze_milestones.py --self-test
       - name: Compare milestone 5 ZIP and milestone 6 RAR
