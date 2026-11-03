@@ -1,6 +1,7 @@
 #include "guest_libc_bridge.hpp"
 #include "guest_heap.hpp"
 #include "guest_filesystem.hpp"
+#include "guest_c_runtime.hpp"
 #include <algorithm>
 #include <climits>
 #include <cstdio>
@@ -104,7 +105,11 @@ GuestLibcBridge::GuestLibcBridge() {
         "pthread_attr_setstack","pthread_attr_getstack",
         "pthread_getattr_np","pthread_attr_setschedparam",
         "pthread_getschedparam","pthread_setschedparam",
-        "sem_timedwait"
+        "sem_timedwait",
+        "strcpy","strncpy","strcat","strchr","strrchr","strstr",
+        "strdup","atoi","strtol","strtoul",
+        "snprintf","sprintf","vsnprintf","vsprintf",
+        "__android_log_print","__android_log_vprint","getenv"
     };
     for(unsigned i=0;i<last_svc;++i){
         const std::uint32_t id=i+1;
@@ -817,6 +822,12 @@ bool GuestLibcBridge::dispatch(
             failure="sem_timedwait needs translated scheduler and ARM timespec";
             return false;
         }
+        case 85:case 86:case 87:case 88:case 89:case 90:case 91:
+        case 92:case 93:case 94:case 95:case 96:case 97:
+        case 98:case 99:case 100:case 101:
+            if(!GuestCRuntime::dispatch(id,regs,image,heap,failure))
+                return false;
+            result=regs[0];break;
         }
         regs[0]=result;
         failure.clear();return true;
