@@ -61,7 +61,13 @@ private:
     std::array<ArrayDesc,kMaxTextureUnits> texcoord_units_{};
     unsigned client_texunit_=0;
     std::uint32_t array_buffer_=0,element_buffer_=0;
+    std::uint32_t active_texture_unit_=0;
+    std::array<std::uint32_t,kMaxTextureUnits> bound_textures_{};
+    std::unordered_map<std::uint32_t,std::array<std::int32_t,4>> crop_rects_;
     std::unordered_map<std::uint32_t,std::size_t> buffer_sizes_;
+    bool dispatch_draw_tex(std::uint32_t which,
+                           std::array<std::uint32_t,16>& regs,
+                           GuestElf32& guest,std::string& error) noexcept;
     bool dispatch_legacy(std::uint32_t which,std::array<std::uint32_t,16>& regs,
                          GuestElf32& guest,std::string& error) noexcept;
     bool apply_arrays(GuestElf32& guest,std::uint32_t highest,
