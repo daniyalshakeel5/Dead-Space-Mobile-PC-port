@@ -19,7 +19,8 @@ constexpr u32 kStack=0x60000000u;
 constexpr u32 kStackBytes=1024u*1024u;
 constexpr u32 kReturnTrap=0x71000000u;
 constexpr u32 kReturnSvc=0xff00u;
-constexpr unsigned kMaxTraps=256;
+constexpr unsigned kMaxServices=20000;
+constexpr unsigned kMaxCpuQuanta=1024;
 constexpr unsigned kMaxNestedCalls=4;
 constexpr u32 kStackStride=0x00100000u;
 struct Host final : Dynarmic::A32::UserCallbacks {
@@ -186,7 +187,9 @@ struct GuestArmCallRunner::Impl {
             jit.Regs()[13]=sp;
             jit.Regs()[14]=kReturnTrap;
             jit.Regs()[15]=address&~1u;
-            for(unsigned i=0;i<kMaxTraps;++i){
+            unsigned services=0;
+            unsigned quanta=0;
+            while(services<kMaxServices && quanta<kMaxCpuQuanta){
                 host.fault=false;
                 host.trapped=0;
                 host.budget=200000u;
@@ -199,8 +202,18 @@ struct GuestArmCallRunner::Impl {
                     result=jit.Regs()[0];
                     error.clear();return true;
                 }
-                if(id==0)
-                    throw std::runtime_error("ARM guest exceeded bounded instruction budget");
+                if(id==0) {
+                    // Dynarmic exhausted one 200k-instruction scheduling
+                    // quantum without an SVC. Resume the same ARM context;
+                    // it is not a crash and must not abort long constructors.
+                    ++quanta;
+                    if(depth+1u<kMaxNestedCalls &&
+                       bridge.guest_threads().pending()){
+                        if(!run_one_worker(error,depth))return false;
+                    }
+                    continue;
+                }
+                ++services;
 #ifdef _WIN32
                 if(sdl && sdl->handles(id)){
                     std::array<u32,16> gl_regs=jit.Regs();
@@ -316,7 +329,8 @@ struct GuestArmCallRunner::Impl {
                 jit.Regs()[0]=copy[0];
                 jit.Regs()[15]=static_cast<u32>(expected)+4u; // BX LR
             }
-            throw std::runtime_error("ARM guest exceeded host service-call limit");
+            throw std::runtime_error(
+                "ARM guest exhausted bounded service-call or CPU quantum budget");
         }catch(const std::exception& ex){
             error=ex.what();return false;
         }
