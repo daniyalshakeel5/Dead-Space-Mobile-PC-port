@@ -566,7 +566,8 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
                 reported="OpenGL ES-CM 1.1 Xperia ARM32 Windows wrapper";
             else if(enum_value==GL_EXTENSIONS)
                 reported="GL_AMD_compressed_ATC_texture "
-                         "GL_IMG_texture_compression_pvrtc";
+                         "GL_IMG_texture_compression_pvrtc "
+                         "GL_OES_draw_texture GL_OES_framebuffer_object";
             else{
                 const auto* src=glGetString(enum_value);
                 if(!src)throw std::runtime_error("Host OpenGL query string unavailable");
