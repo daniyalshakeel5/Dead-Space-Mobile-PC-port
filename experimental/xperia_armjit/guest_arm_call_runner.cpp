@@ -243,7 +243,7 @@ struct GuestArmCallRunner::Impl {
                     // Save the suspended original caller; running an ARM
                     // destructor uses a separate stack and a JIT reset.
                     const auto saved=snapshot();
-                    const auto callbacks=bridge.take_destructors(saved[0]);
+                    const auto callbacks=bridge.take_destructors(saved.regs[0]);
                     for(const auto& callback:callbacks) {
                         u32 ignored=0;
                         if(!invoke(callback.function,
