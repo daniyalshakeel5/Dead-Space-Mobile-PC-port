@@ -99,7 +99,7 @@ add_library(xperia_arm_call_runner STATIC
 target_include_directories(xperia_arm_call_runner PUBLIC ../../include)
 if(WIN32)
   target_sources(xperia_arm_call_runner PRIVATE
-    guest_sdl_host.cpp guest_texture_decoder.cpp
+    guest_sdl_host.cpp guest_sdl_legacy_gl.cpp guest_texture_decoder.cpp
     third_party/powervr/PVRTDecompress.cpp)
   if(TARGET SDL2::SDL2-static)
     set(XPERIA_SDL2_TARGET SDL2::SDL2-static)
