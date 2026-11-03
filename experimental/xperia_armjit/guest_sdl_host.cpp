@@ -271,16 +271,28 @@ bool GuestSdlHost::apply_arrays(GuestElf32& g,std::uint32_t last,
         }
         if(which==0)glVertexPointer(d.size,d.type,d.stride,ptr);
         if(which==1)glColorPointer(d.size,d.type,d.stride,ptr);
-        if(which==2)glTexCoordPointer(d.size,d.type,d.stride,ptr);
-        if(which==3)glNormalPointer(d.type,d.stride,ptr);
+        if(which>=2 && which<2+int(kMaxTextureUnits)) {
+            const auto unit=unsigned(which-2);
+            resolve_gl<void(*)(GLenum)>("glClientActiveTexture")(0x84c0u+unit);
+            glTexCoordPointer(d.size,d.type,d.stride,ptr);
+        }
+        if(which==11)glNormalPointer(d.type,d.stride,ptr);
         return true;
     };
     try{
-        if(!bind(vertex_,0)||!bind(color_,1)||!bind(texcoord_,2)||
-           !bind(normal_,3)){
+        if(!bind(vertex_,0)||!bind(color_,1)||!bind(normal_,11)){
             error="GLES1 client array refers to unmapped ARM data or VBO range";
             return false;
         }
+        for(unsigned unit=0;unit<kMaxTextureUnits;++unit){
+            if(!bind(texcoord_units_[unit],int(unit)+2)){
+                error="GLES1 multitexture coordinate unit "+
+                    std::to_string(unit)+" outside ARM/VBO memory";
+                return false;
+            }
+        }
+        resolve_gl<void(*)(GLenum)>("glClientActiveTexture")(
+            0x84c0u+client_texunit_);
         if(array_buffer_)
             resolve_gl<void(*)(GLenum,GLuint)>("glBindBuffer")(kArrayBuffer,array_buffer_);
         return true;
@@ -367,14 +379,19 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
             if(enabled)glEnableClientState(cap);else glDisableClientState(cap);
             if(cap==GL_VERTEX_ARRAY)vertex_.enabled=enabled;
             if(cap==GL_COLOR_ARRAY)color_.enabled=enabled;
-            if(cap==GL_TEXTURE_COORD_ARRAY)texcoord_.enabled=enabled;
+            if(cap==GL_TEXTURE_COORD_ARRAY)
+                texcoord_units_[client_texunit_].enabled=enabled;
             if(cap==GL_NORMAL_ARRAY)normal_.enabled=enabled;
             break;
         }
         case 20:vertex_={static_cast<int>(a(0)),static_cast<int>(a(1)),
                           static_cast<int>(a(2)),a(3),vertex_.enabled,array_buffer_};break;
-        case 21:texcoord_={static_cast<int>(a(0)),static_cast<int>(a(1)),
-                            static_cast<int>(a(2)),a(3),texcoord_.enabled,array_buffer_};break;
+        case 21:{
+            auto& tex=texcoord_units_[client_texunit_];
+            tex={static_cast<int>(a(0)),static_cast<int>(a(1)),
+                 static_cast<int>(a(2)),a(3),tex.enabled,array_buffer_};
+            break;
+        }
         case 22:color_={static_cast<int>(a(0)),static_cast<int>(a(1)),
                          static_cast<int>(a(2)),a(3),color_.enabled,array_buffer_};break;
         case 23:{
@@ -558,8 +575,14 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
         // inventory, not just a generic GLES compatibility wish list.
         case 60:
             resolve_gl<void(*)(GLenum)>("glActiveTexture")(a(0));break;
-        case 61:
-            resolve_gl<void(*)(GLenum)>("glClientActiveTexture")(a(0));break;
+        case 61: {
+            const auto texunit=a(0);
+            if(texunit<0x84c0u || texunit>=0x84c0u+kMaxTextureUnits)
+                throw std::runtime_error("GLES1 client texture unit exceeds supported slots");
+            client_texunit_=unsigned(texunit-0x84c0u);
+            resolve_gl<void(*)(GLenum)>("glClientActiveTexture")(texunit);
+            break;
+        }
         case 62:glColorMask(a(0)!=0,a(1)!=0,a(2)!=0,a(3)!=0);break;
         case 63:glPolygonOffset(f(0),f(1));break;
         case 64: { // glBindBuffer: VBO object identity belongs to host GL
