@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "dspc: load libDeadSpace.so",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/windows-msvc/dspc.exe",
+      "args": ["${workspaceFolder}/apk/lib/armeabi/libDeadSpace.so"],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
