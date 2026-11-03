@@ -15,7 +15,7 @@ int main(){
     // function pointers map to valid distinct SVC veneers, not x86 pointers.
     GuestSdlHost host;
     GuestLibcBridge bionic;
-    const std::array<const char*,24> imported={
+    const std::array<const char*,41> imported={
         "glActiveTexture","glClientActiveTexture","glColorMask",
         "glPolygonOffset","glBindBuffer","glGenBuffers","glDeleteBuffers",
         "glBufferData","glBufferSubData","glReadPixels",
@@ -23,7 +23,17 @@ int main(){
         "glTexParameteriv","glTexEnviv","glLoadMatrixx",
         "glMultMatrixx","glTranslatex","glRotatex","glScalex",
         "glCompressedTexImage2D","glCompressedTexSubImage2D",
-        "glTexImage2D","glTexSubImage2D","glDrawElements"
+        "glTexImage2D","glTexSubImage2D","glDrawElements",
+        "glGenFramebuffersOES","glBindFramebufferOES",
+        "glDeleteFramebuffersOES","glIsFramebufferOES",
+        "glCheckFramebufferStatusOES","glFramebufferTexture2DOES",
+        "glGetFramebufferAttachmentParameterivOES",
+        "glGenRenderbuffersOES","glBindRenderbufferOES",
+        "glDeleteRenderbuffersOES","glIsRenderbufferOES",
+        "glRenderbufferStorageOES","glFramebufferRenderbufferOES",
+        "glGetRenderbufferParameterivOES",
+        "glBlendEquationOES","glBlendFuncSeparateOES",
+        "glBlendEquationSeparateOES"
     };
     std::set<std::uint32_t> distinct;
     for(const auto* name:imported){
