@@ -72,11 +72,15 @@ jobs:
           1. Launch DeadSpaceLauncher.exe and install your own Xperia Play ZIP.
           2. Runtime -> Check installed ARM game imports uses the bundled native
              Windows ELF scanner. It produces guest-preflight.json in launcher logs.
-          3. The actual original ARM constructor experiment is available at
-             launcher/xperia_guest_startup.exe. It loads your own installed .so
-             and can stop at the first unsupported Android host service.
-          4. PLAY IS STILL DISABLED. A successful diagnostic or synthetic JIT
-             test does not mean the game renders or is playable.
+          3. When your original Xperia assets are verified and this Windows
+             runtime is present, the launcher enables TRY ORIGINAL ARM GAME.
+             The bundled xperia_guest_startup.exe attempts JNI_OnLoad,
+             original-game audio, NativeOnCreate, surface and game frames
+             with SDL/OpenGL/PS4 controller support.
+          4. THIS IS AN UNVERIFIED ENGINEERING BUILD. Original ARM code may
+             stop at a missing service or show no rendered menu. Logs go to
+             %%LOCALAPPDATA%%/DeadSpaceMobile-Xperia/launcher-logs.
+             A successful synthetic JIT test is NOT proof of playable game.
 
           No WSL2, Docker, Linux packaging, Python or original EA game files are
           required for the launcher or included in this archive.
