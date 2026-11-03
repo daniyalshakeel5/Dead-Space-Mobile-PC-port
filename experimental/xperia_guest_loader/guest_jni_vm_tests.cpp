@@ -146,6 +146,65 @@ int main(){
     r.fill(0);r[0]=vm.env_address;r[1]=vm.audio_track_address;r[2]=play_id;
     assert(vm.dispatch(vm.env_svc_base+61,r,elf,error));
     assert(probe.actions==1u);
+    // The Xperia audio-compatible JNI registry includes an AudioTrack
+    // constructor and byte[] writes as well as the short[] mixer path.
+    write_string(base+0x400,"write");
+    write_string(base+0x420,"([BII)I");
+    r.fill(0);r[0]=vm.env_address;r[1]=audio_class;
+    r[2]=base+0x400;r[3]=base+0x420;
+    assert(vm.dispatch(vm.env_svc_base+33,r,elf,error));
+    const auto byte_write=r[0];
+    r.fill(0);r[0]=vm.env_address;r[1]=8;
+    assert(vm.dispatch(vm.env_svc_base+176,r,elf,error));
+    const auto byte_array=r[0];
+    r.fill(0);r[0]=vm.env_address;r[1]=byte_array;
+    assert(vm.dispatch(vm.env_svc_base+184,r,elf,error));
+    auto* raw_pcm=elf.writeable(r[0],8);
+    assert(raw_pcm);
+    for(unsigned i=0;i<8u;++i)raw_pcm[i]=std::uint8_t(i+1u);
+    r.fill(0);r[0]=vm.env_address;r[1]=byte_array;
+    assert(vm.dispatch(vm.env_svc_base+171,r,elf,error)&&r[0]==8u);
+    stack[0]=0;stack[1]=stack[2]=stack[3]=0;stack[4]=8;
+    r.fill(0);r[0]=vm.env_address;r[1]=vm.audio_track_address;
+    r[2]=byte_write;r[3]=byte_array;r[13]=sp;
+    assert(vm.dispatch(vm.env_svc_base+49,r,elf,error)&&r[0]==8u);
+    assert(probe.bytes==24u);
+    stack[4]=9; // reject read past byte array
+    r.fill(0);r[0]=vm.env_address;r[1]=vm.audio_track_address;
+    r[2]=byte_write;r[3]=byte_array;r[13]=sp;
+    assert(!vm.dispatch(vm.env_svc_base+49,r,elf,error));
+    write_string(base+0x400,"<init>");
+    write_string(base+0x420,"(IIIIII)V");
+    r.fill(0);r[0]=vm.env_address;r[1]=audio_class;
+    r[2]=base+0x400;r[3]=base+0x420;
+    assert(vm.dispatch(vm.env_svc_base+33,r,elf,error));
+    const auto ctor=r[0];
+    const auto ctor_stack=base+0xa40u;
+    auto* constructor_args=elf.writeable(ctor_stack,20u);
+    assert(constructor_args);
+    auto put_word=[&](unsigned i,std::uint32_t value){
+        for(unsigned k=0;k<4u;++k)
+            constructor_args[i*4u+k]=std::uint8_t(value>>(k*8u));
+    };
+    put_word(0,44100u);put_word(1,12u);put_word(2,2u);
+    put_word(3,4096u);put_word(4,1u);
+    r.fill(0);r[0]=vm.env_address;r[1]=audio_class;r[2]=ctor;
+    r[3]=3u;r[13]=ctor_stack;
+    assert(vm.dispatch(vm.env_svc_base+28,r,elf,error));
+    const auto constructed=r[0];
+    assert(constructed!=0 && constructed!=vm.audio_track_address);
+    r.fill(0);r[0]=vm.env_address;r[1]=constructed;
+    assert(vm.dispatch(vm.env_svc_base+31,r,elf,error));
+    assert(r[0]==audio_class);
+    stack[4]=8;
+    r.fill(0);r[0]=vm.env_address;r[1]=constructed;r[2]=byte_write;
+    r[3]=byte_array;r[13]=sp;
+    assert(vm.dispatch(vm.env_svc_base+49,r,elf,error) && r[0]==8u);
+    assert(probe.bytes==32u);
+    put_word(0,22050u); // device doesn't support wrong sample rate
+    r.fill(0);r[0]=vm.env_address;r[1]=audio_class;r[2]=ctor;
+    r[3]=3u;r[13]=ctor_stack;
+    assert(!vm.dispatch(vm.env_svc_base+28,r,elf,error));
     // Device and storage Java delegate methods are original Xperia
     // class/method signatures, not ad hoc host property guesses.
     const auto find_class=[&](const char* name)->std::uint32_t {
