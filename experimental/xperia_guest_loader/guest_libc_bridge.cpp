@@ -3,6 +3,7 @@
 #include "guest_filesystem.hpp"
 #include "guest_c_runtime.hpp"
 #include <algorithm>
+#include <array>
 #include <climits>
 #include <cstdio>
 #include <chrono>
@@ -20,6 +21,18 @@ std::uint8_t byte(GuestElf32& image,std::uint32_t p) {
     const auto* at=image.read(p,1);
     if(!at)throw std::runtime_error("Unmapped ARM guest string byte");
     return *at;
+}
+std::string guest_file_path(GuestElf32& image,std::uint32_t pointer) {
+    if(!pointer)throw std::runtime_error("Guest file path is null");
+    std::string path;
+    for(unsigned i=0;i<4096u;++i){
+        if(std::uint64_t(pointer)+i>UINT32_MAX)
+            throw std::runtime_error("ARM file pathname pointer overflow");
+        const auto ch=byte(image,pointer+i);
+        if(!ch)return path;
+        path.push_back(static_cast<char>(ch));
+    }
+    throw std::runtime_error("Unterminated ARM file pathname");
 }
 std::uint32_t compare_strings(GuestElf32& image,std::uint32_t lhs,
                               std::uint32_t rhs,std::uint32_t max,bool require_terminator) {
@@ -109,7 +122,10 @@ GuestLibcBridge::GuestLibcBridge() {
         "strcpy","strncpy","strcat","strchr","strrchr","strstr",
         "strdup","atoi","strtol","strtoul",
         "snprintf","sprintf","vsnprintf","vsprintf",
-        "__android_log_print","__android_log_vprint","getenv"
+        "__android_log_print","__android_log_vprint","getenv",
+        "write","fwrite","fflush","fgetc","fgets","fputs",
+        "mkdir","unlink","remove","rename","stat","fstat",
+        "fsync","ftruncate","rmdir"
     };
     for(unsigned i=0;i<last_svc;++i){
         const std::uint32_t id=i+1;
@@ -315,8 +331,7 @@ bool GuestLibcBridge::dispatch(
             }
             if(mode.size()>=16)
                 throw std::runtime_error("Unterminated ARM fopen mode");
-            if(mode!="r"&&mode!="rb"){result=0;break;}
-            const auto handle=files->open_readonly(path,0);
+            const auto handle=files->open_stdio(path,mode);
             result=handle<0?0:static_cast<std::uint32_t>(handle);
             break;
         }
@@ -828,6 +843,111 @@ bool GuestLibcBridge::dispatch(
             if(!GuestCRuntime::dispatch(id,regs,image,heap,failure))
                 return false;
             result=regs[0];break;
+        case 102: { // write(fd, ARM buffer, count)
+            if(n>GuestFileSystem::max_io)
+                throw std::runtime_error("ARM write transfer exceeds limit");
+            const auto* source=n?image.read(b,n):nullptr;
+            if(n&&!source)throw std::runtime_error("Unmapped ARM write buffer");
+            if(a==1u||a==2u){
+                // Original Android diagnostic stream, bounded for logs.
+                if(n>8192u)throw std::runtime_error("ARM stdout log length cap");
+                if(n)std::clog.write(reinterpret_cast<const char*>(source),n);
+                std::clog.flush();
+                result=n;
+            }else{
+                if(!files)throw std::runtime_error("ARM save mount missing");
+                result=static_cast<std::uint32_t>(
+                    files->write(static_cast<int>(a),source,n));
+            }
+            break;
+        }
+        case 103: { // fwrite(buffer, bytes_per_item, count, guest FILE*)
+            if(!files)throw std::runtime_error("Guest fwrite mount unavailable");
+            const auto count=std::uint64_t(b)*n;
+            if(count>GuestFileSystem::max_io)
+                throw std::runtime_error("ARM fwrite byte limit");
+            const auto* src=count?image.read(a,static_cast<std::size_t>(count)):nullptr;
+            if(count&&!src)throw std::runtime_error("ARM fwrite source unmapped");
+            const auto wrote=files->write(static_cast<int>(regs[3]),
+                                            src,static_cast<std::size_t>(count));
+            result=wrote<0?0u:b?std::uint32_t(wrote)/b:0u;break;
+        }
+        case 104: // fflush(FILE*) / fflush(NULL)
+            if(!files)throw std::runtime_error("Guest fflush mount missing");
+            result=static_cast<std::uint32_t>(
+                a?files->flush(static_cast<int>(a)):files->flush_all());
+            break;
+        case 105: // fgetc(FILE*)
+            if(!files)throw std::runtime_error("Guest fgetc mount missing");
+            result=static_cast<std::uint32_t>(files->getc(static_cast<int>(a)));
+            break;
+        case 106: { // fgets(char*, count, FILE*)
+            if(!files)throw std::runtime_error("Guest fgets mount missing");
+            if(b==0u||b>65536u){result=0;break;}
+            auto* dst=image.writeable(a,b);
+            if(!dst)throw std::runtime_error("ARM fgets buffer unmapped");
+            std::uint32_t written=0;
+            while(written+1u<b){
+                const auto ch=files->getc(static_cast<int>(n));
+                if(ch<0)break;
+                dst[written++]=std::uint8_t(ch);
+                if(ch=='\n')break;
+            }
+            if(!written){result=0;break;}
+            dst[written]=0;
+            result=a;break;
+        }
+        case 107: { // fputs(const char*, FILE*)
+            if(!files)throw std::runtime_error("Guest fputs mount missing");
+            std::uint32_t length=0;
+            for(;length<65536u;++length)
+                if(!byte(image,a+length))break;
+            if(length==65536u)
+                throw std::runtime_error("Unterminated ARM fputs string");
+            const auto* data=length?image.read(a,length):nullptr;
+            const auto written=files->write(static_cast<int>(b),data,length);
+            result=written==static_cast<int>(length)?0u:UINT32_MAX;break;
+        }
+        case 108:case 109:case 110:case 116:{ // mkdir/unlink/remove/rmdir
+            if(!files)throw std::runtime_error("Guest save mount missing");
+            const auto path=guest_file_path(image,a);
+            const auto op=id==108?files->make_directory(path):
+                          id==116?files->remove_directory(path):
+                                  files->remove_file(path);
+            result=static_cast<std::uint32_t>(op);break;
+        }
+        case 111: { // rename(oldpath,newpath)
+            if(!files)throw std::runtime_error("Guest save mount missing");
+            result=static_cast<std::uint32_t>(files->rename_file(
+                guest_file_path(image,a),guest_file_path(image,b)));
+            break;
+        }
+        case 112:case 113: { // stat / fstat from original 2011 ARM ABI
+            if(!files)throw std::runtime_error("Guest file metadata mount missing");
+            std::array<std::uint8_t,64> arm32{};
+            const auto status=id==112?
+                files->stat_path(guest_file_path(image,a),arm32):
+                files->stat_fd(static_cast<int>(a),arm32);
+            if(status<0){result=UINT32_MAX;break;}
+            auto* destination=image.writeable(b,arm32.size());
+            if(!destination)
+                throw std::runtime_error("ARM 64-byte struct stat outptr unmapped");
+            std::memcpy(destination,arm32.data(),arm32.size());
+            result=0;break;
+        }
+        case 114: { // fsync(fd)
+            if(!files)throw std::runtime_error("Guest fsync mount missing");
+            result=static_cast<std::uint32_t>(
+                files->flush(static_cast<int>(a)));
+            break;
+        }
+        case 115: { // ftruncate(fd, length)
+            if(!files)throw std::runtime_error("Guest ftruncate mount missing");
+            if(static_cast<std::int32_t>(b)<0){result=UINT32_MAX;break;}
+            result=static_cast<std::uint32_t>(files->truncate(
+                static_cast<int>(a),b));
+            break;
+        }
         }
         regs[0]=result;
         failure.clear();return true;
