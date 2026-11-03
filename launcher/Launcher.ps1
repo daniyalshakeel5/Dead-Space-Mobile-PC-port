@@ -107,7 +107,8 @@ function Start-Tracked([string]$Executable,[string[]]$Arguments,[string]$Kind='A
  $stamp=(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,6)
  $stdout=Join-Path $logs ($stamp+'.out.log');$stderr=Join-Path $logs ($stamp+'.err.log')
  $argsText=($Arguments | ForEach-Object {Quote-Argument $_}) -join ' '
- $p=Start-Process -FilePath $Executable -ArgumentList $argsText -WorkingDirectory $PSScriptRoot -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle Hidden -PassThru
+ $style=if($Kind -eq 'Original Xperia ARM game boot'){'Normal'}else{'Hidden'}
+ $p=Start-Process -FilePath $Executable -ArgumentList $argsText -WorkingDirectory $PSScriptRoot -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle $style -PassThru
  $null=$p.Handle
  return @{Process=$p;Out=$stdout;Err=$stderr;Kind=$Kind}
 }
