@@ -253,6 +253,53 @@ int main(){
     put32(elf,base+0xfec,0xe12fff1eu); // BX LR
     assert(runner.invoke(base+0xfe0,{0,180000,0,0},result,error));
     assert(result==0u);
+    // Real translated ARM condition variable integration:
+    // main ARM code blocks in pthread_cond_wait, releases mutex, executes
+    // a queued original ARM worker that signals, then reacquires and joins.
+    elf.segments.push_back({base+0x2000u,std::vector<std::uint8_t>(4096,0)});
+    const u32 cmutex=base+0x2400u,ccond=base+0x2404u,thread_out=base+0x2408u;
+    std::array<u32,16> sync{};
+    sync[0]=cmutex;
+    assert(libc.dispatch(33,sync,elf,error));
+    sync.fill(0);sync[0]=ccond;
+    assert(libc.dispatch(64,sync,elf,error));
+    sync.fill(0);sync[0]=cmutex;
+    assert(libc.dispatch(35,sync,elf,error));
+    // Wrapper calls pthread_create with original ARM R0-R3 untouched.
+    put32(elf,base+0x2100u,0xe92d4000u);
+    put32(elf,base+0x2104u,0xe59fc008u);
+    put32(elf,base+0x2108u,0xe12fff3cu);
+    put32(elf,base+0x210cu,0xe8bd8000u);
+    put32(elf,base+0x2114u,libc.symbols().at("pthread_create"));
+    // Worker call to pthread_cond_signal, reading the original guest
+    // cond pointer from its literal pool, preserving trap LR on stack.
+    put32(elf,base+0x2200u,0xe92d4000u);
+    put32(elf,base+0x2204u,0xe59f0008u);
+    put32(elf,base+0x2208u,0xe59fc008u);
+    put32(elf,base+0x220cu,0xe12fff3cu);
+    put32(elf,base+0x2210u,0xe8bd8000u);
+    put32(elf,base+0x2214u,ccond);
+    put32(elf,base+0x2218u,libc.symbols().at("pthread_cond_signal"));
+    // Main original ARM cond_wait wrapper.
+    put32(elf,base+0x2300u,0xe92d4000u);
+    put32(elf,base+0x2304u,0xe59fc008u);
+    put32(elf,base+0x2308u,0xe12fff3cu);
+    put32(elf,base+0x230cu,0xe8bd8000u);
+    put32(elf,base+0x2314u,libc.symbols().at("pthread_cond_wait"));
+    assert(runner.invoke(base+0x2100u,
+        {thread_out,0,base+0x2200u,0},result,error));
+    assert(result==0 && libc.guest_threads().pending()==1u);
+    const auto child=elf.read_u32(thread_out);
+    const bool cond_ok=runner.invoke(base+0x2300u,
+        {ccond,cmutex,0,0},result,error);
+    if(!cond_ok)std::cerr<<"translated ARM pthread_cond_wait: "<<error<<"\\n";
+    assert(cond_ok && result==0u);
+    assert(libc.guest_threads().finished(child));
+    sync.fill(0);sync[0]=cmutex;
+    assert(libc.dispatch(37,sync,elf,error)&&sync[0]==0u);
+    sync.fill(0);sync[0]=child;sync[1]=base+0x240cu;
+    assert(libc.dispatch(50,sync,elf,error)&&sync[0]==0u);
+    assert(elf.read_u32(base+0x240cu)==0u);
     // Fail closed rather than claim to boot unsupported game services.
     assert(!runner.invoke(0xffffffffu,{0,0,0,0},result,error));
     assert(!error.empty());
