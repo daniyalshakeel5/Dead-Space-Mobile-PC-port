@@ -45,8 +45,8 @@ bool GuestThreads::attr_field(GuestElf32& elf,std::uint32_t at,
 }
 bool GuestThreads::set_attr_field(GuestElf32& elf,std::uint32_t at,
                                  unsigned off,std::uint32_t value,std::string& error){
-    if(!at || (at&3u) || off>=24u || off%4u || !put(elf,at+off,value)||
-       !elf.read(at,24u)){
+    if(!at || (at&3u) || off>=24u || off%4u ||
+       !elf.read(at,24u) || !put(elf,at+off,value)){
         error="Invalid original Bionic pthread attribute address";
         return false;
     }
@@ -66,7 +66,7 @@ bool GuestThreads::create(GuestElf32& elf,std::uint32_t out,
         if(!attr_field(elf,attr,0u,flags,error) ||
            !attr_field(elf,attr,8u,stack,error) ||
            !attr_field(elf,attr,12u,guard,error))return false;
-        if(flags&~1u || stack<16384u || stack>8u*1024u*1024u ||
+        if(flags&~1u || stack<16384u || stack>default_stack ||
            guard>1024u*1024u){
             error="Unsupported ARM Bionic detached flag/stack/guard";
             return false;
