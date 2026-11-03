@@ -1,6 +1,8 @@
 #!/bin/sh
 # build the translated program: every generated chunk -> .o, then link two binaries (real + compare mode)
 CF="-m32 -O1 -msse2 -mfpmath=sse -ffp-contract=off -w"
+# Preserve source and frame-pointer locations for local SIGSEGV diagnostics.
+if [ "${DS_DEBUG:-1}" = "1" ]; then CF="$CF -g3 -fno-omit-frame-pointer"; fi
 for f in fn_*.c unlifted.c overrides.c tables.c; do
   o="${f%.c}.o"
   [ "$o" -nt "$f" ] && continue
