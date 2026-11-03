@@ -66,6 +66,9 @@ jobs:
           Copy-Item 'dist/DeadSpaceLauncher.exe' $root
           Copy-Item 'launcher/Core.ps1','launcher/Installer.ps1','launcher/Launcher.ps1','launcher/Launcher.xaml','launcher/GuestPreflight.ps1' $launch
           Copy-Item 'build/armjit/Release/xperia_guest_import_report.exe','build/armjit/Release/xperia_guest_startup.exe' $launch
+          $license=Join-Path $root 'licenses'
+          New-Item -ItemType Directory -Force $license | Out-Null
+          Copy-Item 'experimental/xperia_armjit/third_party/powervr/LICENSE.md' (Join-Path $license 'PowerVR-PVRTC-MIT.txt')
           @'
           Dead Space Mobile Xperia Play - Windows ARM wrapper (engineering build)
 
