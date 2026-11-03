@@ -194,6 +194,40 @@ int main(){
     assert(result==27u);
     assert(!runner.invoke_aapcs(base+0xf00,std::vector<u32>(17,1),
                                 result,error));
+    // An actual translated ARM pthread_create invokes the Bionic host
+    // veneer, queues its original ARM entry, executes that entry on a guest
+    // stack, and joins the returned pthread_t without host x64 execution.
+    put32(elf,base+0xf40,0xe92d4000u); // PUSH LR
+    put32(elf,base+0xf44,0xe59fc008u); // LDR IP,[PC,#8] -> f54
+    put32(elf,base+0xf48,0xe12fff3cu); // BLX IP
+    put32(elf,base+0xf4c,0xe8bd8000u); // POP PC
+    put32(elf,base+0xf54,libc.symbols().at("pthread_create"));
+    put32(elf,base+0xf60,0xe3a0002au); // MOV R0,#42 (actual worker)
+    put32(elf,base+0xf64,0xe12fff1eu); // BX LR
+    assert(runner.invoke(base+0xf40,
+        {base+0xfa0,0,base+0xf60,0xfeed},result,error));
+    assert(result==0);
+    const auto tid=elf.read_u32(base+0xfa0);
+    assert(tid>1u && libc.guest_threads().pending()==1u);
+    assert(runner.run_pending_guest_threads(error));
+    assert(libc.guest_threads().finished(tid));
+    put32(elf,base+0xf54,libc.symbols().at("pthread_join"));
+    assert(runner.invoke(base+0xf40,
+        {tid,base+0xfb0,0,0},result,error));
+    assert(result==0 && elf.read_u32(base+0xfb0)==42u);
+    assert(!libc.guest_threads().exists(tid));
+    // A second worker scheduled from the original ARM sched_yield veneer.
+    put32(elf,base+0xf54,libc.symbols().at("pthread_create"));
+    assert(runner.invoke(base+0xf40,
+        {base+0xfa0,0,base+0xf60,0xaaaa},result,error));
+    const auto tid2=elf.read_u32(base+0xfa0);
+    put32(elf,base+0xf54,libc.symbols().at("sched_yield"));
+    assert(runner.invoke(base+0xf40,{0,0,0,0},result,error));
+    assert(libc.guest_threads().finished(tid2));
+    put32(elf,base+0xf54,libc.symbols().at("pthread_join"));
+    assert(runner.invoke(base+0xf40,
+        {tid2,base+0xfb0,0,0},result,error));
+    assert(elf.read_u32(base+0xfb0)==42u);
     // Fail closed rather than claim to boot unsupported game services.
     assert(!runner.invoke(0xffffffffu,{0,0,0,0},result,error));
     assert(!error.empty());
