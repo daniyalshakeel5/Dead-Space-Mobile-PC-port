@@ -5,6 +5,10 @@ on:
       - work/deadspace-milestone6-analysis-2026-11-04
     paths:
       - experimental/lifted_milestone6/tools/gen_all.py
+      - experimental/lifted_milestone6/tools/host.c
+      - experimental/lifted_milestone6/tools/jni_vm.c
+      - experimental/lifted_milestone6/tools/libc_files.c
+      - tests/check_m6_host_c_syntax.py
       - experimental/lifted_milestone6/tools/build.sh
       - experimental/lifted_milestone6/tools/texturepack_fault_guard.py
       - tests/test_m6_texturepack_probe.py
@@ -17,6 +21,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Install native 32-bit C headers for asset-free host syntax checks
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-multilib libc6-dev-i386
+      - name: Compile all milestone6 host C paths without original game assets
+        run: python3 tests/check_m6_host_c_syntax.py
       - name: Check imported milestone6 translator and diagnostic syntax
         run: |
           python3 -m py_compile experimental/lifted_milestone6/tools/gen_all.py
