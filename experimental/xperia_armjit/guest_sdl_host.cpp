@@ -124,7 +124,15 @@ const char* const names[]={
 "glGetTexGenivOES",
 "glGetTexGenxvOES",
 "glGetClipPlanex",
-"glClipPlanex"
+"glClipPlanex",
+"glDrawTexfOES",
+"glDrawTexiOES",
+"glDrawTexsOES",
+"glDrawTexxOES",
+"glDrawTexfvOES",
+"glDrawTexivOES",
+"glDrawTexsvOES",
+"glDrawTexxvOES"
 };
 constexpr std::size_t count=sizeof(names)/sizeof(names[0]);
 unsigned element_bytes(unsigned type){
@@ -396,7 +404,11 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
         case 3:glEnable(a(0));break;
         case 4:glDisable(a(0));break;
         case 5:glBlendFunc(a(0),a(1));break;
-        case 6:glBindTexture(a(0),a(1));break;
+        case 6:
+            glBindTexture(a(0),a(1));
+            if(a(0)==GL_TEXTURE_2D)
+                bound_textures_[active_texture_unit_]=a(1);
+            break;
         case 7:case 8: {
             const auto n=a(0);
             if(n>4096u)throw std::runtime_error("Texture allocation count cap");
@@ -413,6 +425,10 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
                 for(unsigned i=0;i<n;++i)for(unsigned j=0;j<4;++j)
                     textures[i]|=GLuint(p[i*4u+j])<<(j*8u);
                 glDeleteTextures(n,textures.data());
+                for(const auto id:textures){
+                    crop_rects_.erase(id);
+                    for(auto& bound:bound_textures_)if(bound==id)bound=0;
+                }
             }break;
         }
         case 9:glTexParameteri(a(0),a(1),a(2));break;
@@ -655,6 +671,9 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
         // These are directly evidenced by the Xperia v1.1.33 ELF import
         // inventory, not just a generic GLES compatibility wish list.
         case 60:
+            if(a(0)<0x84c0u || a(0)>=0x84c0u+kMaxTextureUnits)
+                throw std::runtime_error("Original GLES active texture slot exceeds eight units");
+            active_texture_unit_=unsigned(a(0)-0x84c0u);
             resolve_gl<void(*)(GLenum)>("glActiveTexture")(a(0));break;
         case 61: {
             const auto texunit=a(0);
@@ -769,14 +788,22 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
             resolve_gl<void(*)(GLenum)>("glGenerateMipmap")(a(0));break;
         case 72:case 73:{ // glTexParameteriv / glTexEnviv
             const auto token=a(1);
-            const auto n=(which==73 && token==kTextureEnvColor)?4u:1u;
+            constexpr GLenum kTextureCrop=0x8b9du;
+            const auto n=(which==73 && token==kTextureEnvColor) ||
+                         (which==72 && token==kTextureCrop)?4u:1u;
             const auto* bytes=guest.read(a(2),n*4u);
             if(!bytes)throw std::runtime_error("GLES integer parameter array unmapped");
             GLint values[4]={};
             for(unsigned i=0;i<n;++i)
                 for(unsigned k=0;k<4;++k)
                     values[i]|=GLint(std::uint32_t(bytes[i*4u+k])<<(k*8u));
-            if(which==72)glTexParameteriv(a(0),token,values);
+            if(which==72 && token==kTextureCrop){
+                if(a(0)!=GL_TEXTURE_2D ||
+                   !bound_textures_[active_texture_unit_])
+                    throw std::runtime_error("OES texture crop requires bound 2D texture");
+                crop_rects_[bound_textures_[active_texture_unit_]]={
+                    values[0],values[1],values[2],values[3]};
+            }else if(which==72)glTexParameteriv(a(0),token,values);
             else glTexEnviv(a(0),token,values);
             break;
         }
@@ -921,6 +948,8 @@ bool GuestSdlHost::dispatch(std::uint32_t id,std::array<std::uint32_t,16>& r,
                 "glBlendEquationSeparate","glBlendEquationSeparateEXT")(a(0),a(1));
             break;
         default:
+            if(which>=169u && which<177u)
+                return dispatch_draw_tex(which,r,guest,error);
             if(which>=105u)return dispatch_legacy(which,r,guest,error);
             throw std::runtime_error("Unknown GLES1 dispatch index");
         }
