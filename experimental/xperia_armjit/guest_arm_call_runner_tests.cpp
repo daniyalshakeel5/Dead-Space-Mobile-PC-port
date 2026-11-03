@@ -245,6 +245,14 @@ int main(){
     assert(runner.invoke(base+0xf80,
         {tid2,base+0xfb0,0,0},result,error));
     assert(elf.read_u32(base+0xfb0)==42u);
+    // CPU scheduling: more than one 200k-instruction Dynarmic quantum
+    // must resume an original ARM context without resetting its registers.
+    put32(elf,base+0xfe0,0xe2511001u); // SUBS R1,R1,#1
+    put32(elf,base+0xfe4,0x1afffffdu); // BNE back -12 bytes
+    put32(elf,base+0xfe8,0xe1a00001u); // MOV R0,R1
+    put32(elf,base+0xfec,0xe12fff1eu); // BX LR
+    assert(runner.invoke(base+0xfe0,{0,180000,0,0},result,error));
+    assert(result==0u);
     // Fail closed rather than claim to boot unsupported game services.
     assert(!runner.invoke(0xffffffffu,{0,0,0,0},result,error));
     assert(!error.empty());
