@@ -279,7 +279,12 @@ bool GuestArmCallRunner::invoke_aapcs(u32 address,
     return impl_->invoke(address,first,result,error,0,stack);
 }
 void GuestArmCallRunner::invalidate_code(std::uint32_t start,std::size_t length){
-    impl_->jit.InvalidateCacheRange(start,length);
+    // The ARM guest is patched before the next top-level invoke. A full
+    // JIT cache flush is necessary for blocks whose translation spans the
+    // edited instructions; invalidating only one word left stale blocks in
+    // tests on both Windows and Linux.
+    (void)start;(void)length;
+    impl_->jit.ClearCache();
 }
 bool GuestArmCallRunner::run_original_initializers(std::string& error){
     // Original ELF parser returned ordered DT_INIT and DT_INIT_ARRAY,
