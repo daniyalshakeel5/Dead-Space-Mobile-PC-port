@@ -36,13 +36,22 @@ public:
     // guest-call runner's translated ARM callback path, in reverse order.
     struct Destructor { std::uint32_t function, argument, dso; };
     std::vector<Destructor> take_destructors(std::uint32_t dso);
-    static constexpr unsigned last_svc=63;
+    static constexpr unsigned last_svc=84;
+    static constexpr unsigned cond_wait_svc=68;
+    static constexpr unsigned cond_timedwait_svc=69;
     static constexpr unsigned create_thread_svc=49;
     static constexpr unsigned join_thread_svc=50;
     static constexpr unsigned yield_thread_svc=62;
     static constexpr unsigned exit_thread_svc=63;
     GuestThreads& guest_threads() noexcept {return guest_threads_;}
     const GuestThreads& guest_threads() const noexcept {return guest_threads_;}
+    // Cond-wait releases the ARM mutex, runs a translated worker, and
+    // reacquires only after that worker signalled the actual condition.
+    bool begin_cond_wait(std::uint32_t cond,std::uint32_t mutex,
+                         std::uint32_t& generation,std::string& error);
+    bool cond_signalled(std::uint32_t cond,std::uint32_t generation) const noexcept;
+    bool end_cond_wait(std::uint32_t mutex,std::string& error);
+    bool cancel_cond_wait(std::uint32_t mutex,std::string& error);
     static constexpr unsigned once_svc=44;
     static constexpr unsigned finalize_svc=32;
     // Called AFTER Dynarmic's SVC callback halts JIT execution.
@@ -58,9 +67,21 @@ private:
     std::vector<Destructor> destructors_;
     // Guest ARM address keyed synchronization objects. The guest runtime
     // executes one translated guest thread until scheduling is implemented.
-    struct GuestMutex { bool locked=false; };
+    struct GuestMutex {
+        bool locked=false;
+        std::uint32_t owner=0,recursion=0,type=0;
+    };
     std::unordered_map<std::uint32_t,GuestMutex> mutexes_;
     std::unordered_map<std::uint32_t,std::uint32_t> semaphores_;
+    struct GuestCondition { std::uint32_t generation=0; };
+    std::unordered_map<std::uint32_t,GuestCondition> conditions_;
+    struct GuestTlsKey {
+        std::uint32_t destructor=0;
+        std::unordered_map<std::uint32_t,std::uint32_t> values;
+    };
+    std::unordered_map<std::uint32_t,GuestTlsKey> tls_keys_;
+    std::uint32_t next_tls_key_=1;
+    std::unordered_map<std::uint32_t,std::uint32_t> mutex_attrs_;
     GuestThreads guest_threads_;
 };
 }
