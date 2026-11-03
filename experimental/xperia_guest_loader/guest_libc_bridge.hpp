@@ -36,7 +36,7 @@ public:
     // guest-call runner's translated ARM callback path, in reverse order.
     struct Destructor { std::uint32_t function, argument, dso; };
     std::vector<Destructor> take_destructors(std::uint32_t dso);
-    static constexpr unsigned last_svc=84;
+    static constexpr unsigned last_svc=101;
     static constexpr unsigned cond_wait_svc=68;
     static constexpr unsigned cond_timedwait_svc=69;
     static constexpr unsigned create_thread_svc=49;
