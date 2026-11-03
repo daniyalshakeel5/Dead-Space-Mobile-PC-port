@@ -15,6 +15,7 @@ constexpr std::uint32_t kClassBase=GuestJniVm::vm_address+0x3000u;
 constexpr std::uint32_t kMethodBase=GuestJniVm::vm_address+0x3400u;
 constexpr std::uint32_t kString=GuestJniVm::vm_address+0x3800u;
 constexpr std::uint32_t kVersion=GuestJniVm::vm_address+0x3900u;
+constexpr std::uint32_t kFieldBase=GuestJniVm::vm_address+0x3e00u;
 struct Class {
     const char* name;
 };
@@ -24,7 +25,9 @@ constexpr Class classes[]={
     {"android/media/AudioTrack"},
     {"com/ea/blast/SystemAndroidDelegate"},
     {"com/ea/blast/DisplayAndroidDelegate"},
-    {"com/ea/blast/GetAppDataDirectoryDelegate"}
+    {"com/ea/blast/GetAppDataDirectoryDelegate"},
+    {"xtSystem"},
+    {"com/ea/blast/xtPlay"}
 };
 struct Method {
     unsigned owner;
@@ -81,7 +84,21 @@ constexpr Method methods[]={
     {6,"SetStdOrientation","(I)V",false},
     {7,"<init>","()V",false},
     {7,"GetAppDataDirectory","()Ljava/lang/String;",false,"deadspace"},
-    {7,"GetExternalStorageDirectory","()Ljava/lang/String;",false,"deadspace"}
+    {7,"GetExternalStorageDirectory","()Ljava/lang/String;",false,"deadspace"},
+    {8,"init","(Landroid/app/NativeActivity;)V",true},
+    {8,"deinit","()V",true},
+    {8,"getDeviceInfo","()Ljava/lang/String;",true},
+    {8,"getDisplayDensityInfo","()F",true},
+    {8,"getNetworkAvailability","()Z",true},
+    {8,"getInputDeviceNameByDeviceId","(I)Ljava/lang/String;",true},
+    {8,"launchBrowser","(Ljava/lang/String;)V",true},
+    {8,"displayToast","(Ljava/lang/String;)V",true},
+    {8,"displayDialog","(Ljava/lang/String;)V",true},
+    {9,"init","(Landroid/app/NativeActivity;)V",true},
+    {9,"deinit","()V",true},
+    {9,"isRewardedVideoAdAvailable","()Z",true},
+    {9,"displayRewardedVideoAd","()V",true},
+    {9,"fetchVideoAdRewardPending","()Z",true}
 };
 bool guest_string(GuestElf32& guest,std::uint32_t addr,std::string& output){
     output.clear();
@@ -231,6 +248,83 @@ bool GuestJniVm::dispatch(std::uint32_t id,
     if(slot==24){ // IsSameObject
         regs[0]=r1==r2?1u:0u;error.clear();return true;
     }
+    if(slot==15 || slot==228){ // ExceptionOccurred / ExceptionCheck
+        // All unsupported guest operations trap rather than setting a
+        // synthetic Java exception. There is no pending Java exception.
+        regs[0]=0;error.clear();return true;
+    }
+    if(slot==17){regs[0]=0;error.clear();return true;} // ExceptionClear
+    if(slot==219){ // GetJavaVM(JNIEnv*, JavaVM**)
+        auto* out=guest.writeable(r1,4u);
+        if(!out || (r1&3u)){error="JNI GetJavaVM output invalid";return false;}
+        put32(out,vm_address);regs[0]=0;error.clear();return true;
+    }
+    if(slot==167){ // NewStringUTF(JNIEnv*, const char*)
+        std::string text;
+        if(!guest_string(guest,r1,text)){
+            error="JNI NewStringUTF source outside original ARM memory";
+            return false;
+        }
+        const auto object=store_string(guest,text,error);
+        if(!object)return false;
+        regs[0]=object;error.clear();return true;
+    }
+    if(slot==144){ // GetStaticFieldID: original android.os.Build.MANUFACTURER
+        std::string name,sig;
+        if(!guest_string(guest,r2,name) ||
+           !guest_string(guest,regs[3],sig)){
+            error="JNI GetStaticFieldID unmapped name/signature";return false;
+        }
+        if(r1!=kClassBase+3u*16u || name!="MANUFACTURER" ||
+           sig!="Ljava/lang/String;"){
+            error="Unimplemented JNI static field "+name+sig;return false;
+        }
+        regs[0]=kFieldBase;error.clear();return true;
+    }
+    if(slot==145){ // GetStaticObjectField
+        if(r1!=kClassBase+3u*16u || r2!=kFieldBase){
+            error="Unrecognized JNI static Build field";return false;
+        }
+        const unsigned id=120u;
+        auto cached=cached_method_strings_.find(id);
+        if(cached!=cached_method_strings_.end()){
+            regs[0]=cached->second;error.clear();return true;
+        }
+        const auto string=store_string(guest,"sony",error);
+        if(!string)return false;
+        cached_method_strings_.emplace(id,string);
+        regs[0]=string;error.clear();return true;
+    }
+    if(slot==215){ // RegisterNatives validates the real JNI method descriptors
+        if(r1<kClassBase || (r1-kClassBase)%16u ||
+           (r1-kClassBase)/16u>=sizeof(classes)/sizeof(classes[0]) ||
+           static_cast<std::int32_t>(regs[3])<0 || regs[3]>128u){
+            error="JNI RegisterNatives unknown class/count";return false;
+        }
+        for(std::uint32_t i=0;i<regs[3];++i){
+            if(std::uint64_t(r2)+12u*i+12u>0xffffffffull){
+                error="JNI RegisterNatives address overflow";return false;
+            }
+            const auto* method=guest.read(r2+12u*i,12u);
+            if(!method){error="JNI RegisterNatives guest descriptors unmapped";return false;}
+            auto read_word=[&](unsigned offset){
+                return std::uint32_t(method[offset]) |
+                    std::uint32_t(method[offset+1])<<8u |
+                    std::uint32_t(method[offset+2])<<16u |
+                    std::uint32_t(method[offset+3])<<24u;
+            };
+            std::string name,sig;
+            if(!guest_string(guest,read_word(0),name) ||
+               !guest_string(guest,read_word(4),sig) || name.empty() ||
+               sig.empty() || !guest.read(read_word(8)&~1u,2u)){
+                error="JNI RegisterNatives uncallable original ARM method";
+                return false;
+            }
+        }
+        // Registration only validates ABI here. These methods are still
+        // entered by the Xperia exported Java_* lifecycle bindings.
+        regs[0]=0;error.clear();return true;
+    }
     if(slot==113){ // GetStaticMethodID(jclass, name, signature)
         if(r1<kClassBase || (r1-kClassBase)%16u ||
            (r1-kClassBase)/16u>=sizeof(classes)/sizeof(classes[0])){
@@ -252,7 +346,7 @@ bool GuestJniVm::dispatch(std::uint32_t id,
         return false;
     }
     if(slot==117 || slot==114 || slot==132 || slot==141 ||
-       slot==129){
+       slot==129 || slot==135){
         if(r2<kMethodBase || (r2-kMethodBase)%16u ||
            (r2-kMethodBase)/16u>=sizeof(methods)/sizeof(methods[0])){
             error="JNI static invocation invalid method ID";return false;
@@ -270,6 +364,50 @@ bool GuestJniVm::dispatch(std::uint32_t id,
         }
         if(index==8 && slot==129){
             regs[0]=4096;error.clear();return true;
+        }
+        const auto& method=methods[index];
+        if(method.owner==8u || method.owner==9u){
+            const std::string name=method.name;
+            // Both Java facades represent Android system services rather
+            // than game-native engine code. Advertising, billing and network
+            // access are unavailable in this asset-owned offline PC port.
+            if(slot==117u && (name=="isRewardedVideoAdAvailable"||
+               name=="fetchVideoAdRewardPending"||
+               name=="getNetworkAvailability")){
+                regs[0]=0;error.clear();return true;
+            }
+            if(name=="getDisplayDensityInfo" && slot==117u){
+                // This specific Xperia game calls the declared ()F method
+                // using CallStaticBooleanMethod, then interprets r0 as 1.
+                regs[0]=1;error.clear();return true;
+            }
+            if(name=="getDisplayDensityInfo" && slot==135u){
+                constexpr float scale=1.f;
+                std::memcpy(&regs[0],&scale,4);
+                error.clear();return true;
+            }
+            if(slot==114u && (name=="getDeviceInfo"||
+               name=="getInputDeviceNameByDeviceId")){
+                const auto cached=cached_method_strings_.find(
+                    static_cast<unsigned>(index));
+                if(cached!=cached_method_strings_.end()){
+                    regs[0]=cached->second;error.clear();return true;
+                }
+                const std::string value=name=="getDeviceInfo"?
+                    "Manufacturer:sony\nModel:R800\nDevice:R800\nProduct:deadspace-xperia-windows\nBrand:sony\nHardware:x86_64-arm32\nBoard:pc\nOS:Windows\nRelease:4.4.4\nSDK:19\nABI:armeabi-v7a\nBuild:Xperia PC wrapper":
+                    "Sony Xperia Play";
+                const auto ref=store_string(guest,value,error);
+                if(!ref)return false;
+                cached_method_strings_.emplace(static_cast<unsigned>(index),ref);
+                regs[0]=ref;error.clear();return true;
+            }
+            if(slot==141u && (name=="init"||name=="deinit")){
+                // No Android ad SDK is initialized or invoked on Windows.
+                regs[0]=0;error.clear();return true;
+            }
+            error="Original Xperia Java system callback not implemented: "+
+                  std::string(classes[method.owner].name)+"."+name;
+            return false;
         }
         if(index==3 && slot==141){ // EAIO.Startup(AssetManager)V
             if(!eaio_startup_){
