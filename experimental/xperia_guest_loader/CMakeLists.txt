@@ -16,7 +16,7 @@ target_include_directories(xperia_guest_heap PUBLIC .)
 add_library(xperia_guest_filesystem STATIC guest_filesystem.cpp)
 target_include_directories(xperia_guest_filesystem PUBLIC .)
 add_library(xperia_guest_libc_bridge STATIC guest_libc_bridge.cpp guest_jni_vm.cpp guest_bionic_data.cpp
-    guest_threads.cpp)
+    guest_threads.cpp guest_c_runtime.cpp)
 target_link_libraries(xperia_guest_libc_bridge PUBLIC xperia_guest_elf32 xperia_guest_heap xperia_guest_filesystem)
 target_include_directories(xperia_guest_libc_bridge PUBLIC .)
 add_executable(xperia_guest_libc_bridge_tests guest_libc_bridge_tests.cpp)
