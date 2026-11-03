@@ -1,0 +1,34 @@
+name: Inspect Dead Space Mobile milestone 6 (source only)
+on:
+  push:
+    branches:
+      - work/deadspace-milestone6-analysis-2026-11-04
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare-milestones:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install non-executing RAR archive reader
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq unar
+      - name: Verify comparison tool on synthetic fixtures
+        run: python3 tools/analyze_milestones.py --self-test
+      - name: Compare milestone 5 ZIP and milestone 6 RAR
+        run: |
+          python3 tools/analyze_milestones.py \
+            --old dspc_milestone5.zip \
+            --new dspc_milestone6.rar \
+            --report milestone6-analysis.md
+      - name: Attach source comparison report (no game data)
+        uses: actions/upload-artifact@v4
+        with:
+          name: deadspace-milestone6-metadata-report
+          path: milestone6-analysis.md
+          if-no-files-found: error
