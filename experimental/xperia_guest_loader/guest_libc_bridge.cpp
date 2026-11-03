@@ -35,6 +35,44 @@ std::uint32_t compare_strings(GuestElf32& image,std::uint32_t lhs,
     return 0;
 }
 }
+bool GuestLibcBridge::begin_cond_wait(
+        std::uint32_t cond,std::uint32_t mutex,
+        std::uint32_t& generation,std::string& error){
+    const auto condition=conditions_.find(cond);
+    const auto lock=mutexes_.find(mutex);
+    if(condition==conditions_.end()||lock==mutexes_.end() ||
+       !lock->second.locked ||
+       lock->second.owner!=guest_threads_.self() ||
+       lock->second.recursion!=1u){
+        error="pthread_cond_wait requires initialized condition and singly held owned mutex";
+        return false;
+    }
+    generation=condition->second.generation;
+    lock->second.locked=false;
+    lock->second.owner=0;
+    lock->second.recursion=0;
+    error.clear();return true;
+}
+bool GuestLibcBridge::cond_signalled(
+        std::uint32_t cond,std::uint32_t generation) const noexcept{
+    const auto it=conditions_.find(cond);
+    return it!=conditions_.end()&&it->second.generation!=generation;
+}
+bool GuestLibcBridge::end_cond_wait(std::uint32_t mutex,std::string& error){
+    const auto it=mutexes_.find(mutex);
+    if(it==mutexes_.end()||it->second.locked){
+        error="pthread_cond_wait resumed before mutex was available";
+        return false;
+    }
+    it->second.locked=true;
+    it->second.owner=guest_threads_.self();
+    it->second.recursion=1;
+    error.clear();return true;
+}
+bool GuestLibcBridge::cancel_cond_wait(
+        std::uint32_t mutex,std::string& error){
+    return end_cond_wait(mutex,error);
+}
 GuestLibcBridge::GuestLibcBridge() {
     static const char* const names[]={
         "memcpy","memmove","memset","memcmp","strlen","strcmp","strncmp",
