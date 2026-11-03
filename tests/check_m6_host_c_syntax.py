@@ -56,7 +56,16 @@ def main():
         # This additionally includes full resource IO, OpenGL, threading.
         check_run([cc,"-m32","-std=gnu11","-w","-fsyntax-only",
                    "host.c"],root)
-    print("Milestone 6 host C syntax tests PASS (no original game files)")
+        # Exercise the ACTUAL JNI VM, not a simplified copy. All original
+        # game code/ELF calls are in unused sections discarded at link time.
+        shutil.copyfile(ROOT/"tests"/"test_m6_jni_threads_main.c",
+                        root/"test_m6_jni_threads_main.c")
+        check_run([cc,"-m32","-std=gnu11","-O1","-w","-pthread",
+                   "-ffunction-sections","-fdata-sections","-no-pie",
+                   "test_m6_jni_threads_main.c","-Wl,--gc-sections",
+                   "-lm","-ldl","-o","test_m6_jni_threads"],root)
+        check_run([str(root/"test_m6_jni_threads")],root)
+    print("Milestone 6 host C syntax and JNI worker tests PASS (no original game files)")
 
 if __name__=="__main__":
     main()
