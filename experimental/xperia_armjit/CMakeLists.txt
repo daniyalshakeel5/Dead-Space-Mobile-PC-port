@@ -85,7 +85,9 @@ add_library(xperia_arm_call_runner STATIC
     ../../src/dualshock4_input.cpp ../../src/original_ui_interaction.cpp)
 target_include_directories(xperia_arm_call_runner PUBLIC ../../include)
 if(WIN32)
-  target_sources(xperia_arm_call_runner PRIVATE guest_sdl_host.cpp)
+  target_sources(xperia_arm_call_runner PRIVATE
+    guest_sdl_host.cpp guest_texture_decoder.cpp
+    third_party/powervr/PVRTDecompress.cpp)
   if(TARGET SDL2::SDL2-static)
     set(XPERIA_SDL2_TARGET SDL2::SDL2-static)
   elseif(TARGET SDL2::SDL2)
@@ -95,6 +97,12 @@ if(WIN32)
   endif()
   target_link_libraries(xperia_arm_call_runner PUBLIC ${XPERIA_SDL2_TARGET} OpenGL::GL)
 endif()
+add_executable(xperia_texture_decoder_tests
+    guest_texture_decoder_tests.cpp guest_texture_decoder.cpp
+    third_party/powervr/PVRTDecompress.cpp)
+target_compile_features(xperia_texture_decoder_tests PRIVATE cxx_std_17)
+add_test(NAME xperia_ATC_PVRTC_RGBA_and_payload_validation
+    COMMAND xperia_texture_decoder_tests)
 add_executable(xperia_guest_input_tests guest_xperia_input_tests.cpp)
 target_link_libraries(xperia_guest_input_tests PRIVATE xperia_arm_call_runner)
 add_test(NAME xperia_ds4_real_arm_jni_input_delivery
