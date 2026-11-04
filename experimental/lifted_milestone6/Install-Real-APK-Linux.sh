@@ -61,6 +61,7 @@ python3 gen_all.py
 echo "[3/5] Integrating verified native BufferedInputStream and M3G loader..."
 python3 native_buffered_input.py --source out/fn_058.c --instrument
 python3 m3g_loader_serialization.py --source out/fn_055.c --instrument
+python3 modelcache_null_duplicate_recovery.py --source out/fn_003.c --instrument
 echo "[4/5] Building SDL2/OpenGL PC executable..."
 cd -- out
 export DS_BUILD_JOBS="${DS_BUILD_JOBS:-1}"
@@ -79,6 +80,7 @@ export DS_STEPS="create,surface,frame"
 export DS_FRAMES=0
 export DS_NATIVE_BUFFERED_IO=1
 export DS_M3G_SERIALIZE=1
+export DS_MODELCACHE_NULL_SOURCE_RETURN=1
 export DS_QUIET_JAVA=1
 export DS_WIDTH="${DS_WIDTH:-1280}"
 export DS_HEIGHT="${DS_HEIGHT:-720}"
