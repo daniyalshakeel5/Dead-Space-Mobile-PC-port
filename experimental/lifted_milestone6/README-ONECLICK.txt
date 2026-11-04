@@ -40,3 +40,28 @@ wsl-game-*.symbolized.txt file alongside the log and opens it in Notepad.
 It does not change, replace, rebuild, or upload the old game files.
 Use the symbolized report to identify the actual translated C function;
 do not assume the last Java log message is the crashing instruction.
+
+
+ORIGINAL MILESTONE 5 LINUX/TEXTUREPACK FAULT (2026-11-04):
+Original Linux i686 SIGSEGV at 0x08627456 symbolized to f_0035b2e0
+(im::TexturePack::load), called by f_0035c844 and f_000adfc4.
+It is NOT proof that Query.getTotalMemory caused the fault.
+The original TexturePack vector diagnostics already exist in Milestone 6.
+This one-click script applies those diagnostics to your existing Linux
+dspc_sdl binary while retaining the Milestone 5 host and game files.
+
+1. Extract this ZIP outside the existing game folder.
+2. Double-click "Diagnose TexturePack Linux.cmd" from the package.
+3. It expects the WSL Milestone 5 project at:
+   Downloads\dspc_milestone5_one_click_WSL_FIXED\dspc
+4. It validates the exact translated source and backs up both the original
+   native executable and original generated function before modifications.
+   It recompiles only the translated TexturePack chunk and re-links the
+   original Linux i686 SDL executable. It does not regenerate the guest.
+5. Launch through the existing original Play Dead Space (WSL).cmd.
+6. Send the next wsl-game-*.log containing TEXPACK_SOURCE_VECTOR or
+   FATAL:TEXPACK_NULL_VECTOR so we can determine when vector becomes null.
+
+Old executable: tools/out/dspc_sdl.pre-texturepack-diagnostic.bak
+Old C source: tools/out/fn_NNN.c.pre-texturepack-probe.bak
+This is a data-flow diagnostic, not a proven playable-game crash fix.

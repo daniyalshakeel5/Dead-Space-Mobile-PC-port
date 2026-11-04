@@ -43,6 +43,58 @@ jobs:
             if (!$s.Contains($needle)) { throw "Missing parser output: $needle" }
           }
           Write-Host 'PASS Milestone5 Linux SIGSEGV address and game-path extraction'
+      - name: Validate source-preserving TexturePack Linux crash diagnostic
+        shell: pwsh
+        run: |
+          $file = 'experimental/lifted_milestone6/Diagnose-TexturePack-Linux.ps1'
+          $tokens = $null; $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path $file).Path,[ref]$tokens,[ref]$errors) | Out-Null
+          if ($errors.Count) { throw ("TexturePack PowerShell parse failed: " + ($errors | Out-String)) }
+          Write-Host 'PASS original Linux native TexturePack diagnostic PowerShell syntax'
+      - name: Test original ARM TexturePack guard and Linux relink shell
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n experimental/lifted_milestone6/Apply-TexturePack-Linux.sh
+          python3 -m py_compile experimental/lifted_milestone6/tools/texturepack_fault_guard.py
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          p = Path('experimental/lifted_milestone6/tools/texturepack_fault_guard.py')
+          spec = importlib.util.spec_from_file_location('guard', p)
+          mod = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          s = '''#include "protos.h"
+          u64 f_0035b2e0(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { /* TexturePack::load */
+          L_35b564:;
+            {
+              u32 ea = r10 + 0u;
+              r3 = LD32(ea);
+            }
+            {
+              u32 ea = r3 + 0u;
+              r1 = LD32(ea);
+            }
+          }
+          u64 f_0035c844(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
+            { u64 rv = f_00365a2c(r0, r1, r2, r3, sp); r0 = (u32)rv; r1 = (u32)(rv>>32); }
+          }
+          u64 f_0035c850(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { return 0; }
+          '''
+          s = '\n'.join(line[10:] if line.startswith('          ') else line for line in s.splitlines())
+          patched = mod.patch(s)
+          assert 'FATAL:TEXPACK_NULL_VECTOR' in patched
+          assert 'TEXPACK_SOURCE_VECTOR' in patched
+          assert patched == mod.patch(patched)
+          try:
+              mod.patch(s.replace('L_35b564:;', 'L_35b560:;'))
+          except ValueError:
+              pass
+          else:
+              raise AssertionError('Accepted wrong ARM crash site')
+          print('PASS TexturePack guard: source validation, idempotence, fail closed')
+          PY
       - name: Test one-click install preserves mock APK and stale generated code
         shell: pwsh
         run: |
@@ -78,6 +130,9 @@ jobs:
           cp experimental/lifted_milestone6/Install-Milestone6.ps1 update/
           cp experimental/lifted_milestone6/Install-Milestone6.cmd update/
           cp experimental/lifted_milestone6/README-ONECLICK.txt update/
+          cp experimental/lifted_milestone6/Diagnose-TexturePack-Linux.ps1 update/
+          cp 'experimental/lifted_milestone6/Diagnose TexturePack Linux.cmd' update/
+          cp experimental/lifted_milestone6/Apply-TexturePack-Linux.sh update/
           cp experimental/lifted_milestone6/Diagnose-WSL-Crash.ps1 update/
           cp 'experimental/lifted_milestone6/Diagnose WSL Crash.cmd' update/
           echo "No original game ELF, APK, save data or extracted assets are included."
