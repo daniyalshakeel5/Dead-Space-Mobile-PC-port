@@ -161,7 +161,14 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
             if (g_log_java) printf("   [java] AssetManager.openFd(%s) -> %s\n", path, f ? "ok" : "FileNotFound");
             if (!f) { g_exception = 1; return 0; }
             fseek(f, 0, SEEK_END); u32 len = (u32)ftell(f); fseek(f, 0, SEEK_SET);
-            u32 h = new_obj(K_AFD, "android/content/res/AssetFileDescriptor", f, len); return h;
+            /* The descriptor describes a resource; it is not a reusable FILE*.
+             * Each createInputStream() call must get its own file position and
+             * ownership. Sharing f between streams causes cross-thread seeks,
+             * short reads, and double fclose() while decoding real M3G models. */
+            fclose(f);
+            u32 h = new_obj(K_AFD, "android/content/res/AssetFileDescriptor",
+                            strdup(path), len);
+            return h;
         }
         if (!strcmp(nm, "list")) {
             char path[1024]; JObj* s = OBJ(a[0].i); snprintf(path, sizeof path, "%s/%s", g_assets_root, s && s->s ? s->s : "");
@@ -214,8 +221,21 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
     if (!strcmp(c, "android/content/res/AssetFileDescriptor") && so && so->kind == K_AFD) {
         if (!strcmp(nm, "getStartOffset")) return 0;
         if (!strcmp(nm, "getLength") || !strcmp(nm, "getDeclaredLength")) return so->n;
-        if (!strcmp(nm, "createInputStream")) return new_obj(K_STREAM, "java/io/InputStream", so->p, 0);
-        if (!strcmp(nm, "close")) return 0;
+        if (!strcmp(nm, "createInputStream")) {
+            /* Independent fopen, not dup(): duplicated FDs share a file offset. */
+            pthread_mutex_lock(&g_objlock);
+            FILE* stream = so->p ? fopen((const char*)so->p, "rb") : NULL;
+            pthread_mutex_unlock(&g_objlock);
+            if (!stream) { g_exception = 1; return 0; }
+            return new_obj(K_STREAM, "java/io/InputStream", stream, 0);
+        }
+        if (!strcmp(nm, "close")) {
+            pthread_mutex_lock(&g_objlock);
+            free(so->p);
+            so->p = NULL;
+            pthread_mutex_unlock(&g_objlock);
+            return 0;
+        }
     }
     if (!strcmp(c, "com/ea/blast/MainActivity")) {
         if (!strcmp(nm, "getInstance") || !strcmp(nm, "GetInstance")) return g_activity;
