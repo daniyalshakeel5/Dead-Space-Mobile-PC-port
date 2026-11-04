@@ -56,11 +56,33 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/dspc-python"
           "$RUNNER_TEMP/dspc-python/bin/pip" install --disable-pip-version-check pyelftools Pillow
           echo "$RUNNER_TEMP/dspc-python/bin" >> "$GITHUB_PATH"
-      - name: "Original APK, reconstructed native input and real KeyframeSequence allocator, 120 SDL frames"
+      - name: "Original APK: 900 actual SDL frames, input clicks, last-frame screenshot and source model loading"
         shell: bash
         env:
-          DS_REAL_TEST_FRAMES: "120"
+          DS_REAL_TEST_FRAMES: "900"
         run: bash experimental/lifted_milestone6/Run-Real-Game-CI.sh
+      - name: Save actual 900-frame native render and crash evidence
+        if: always()
+        shell: bash
+        run: |
+          root="$RUNNER_TEMP/dspc-live/logs"
+          if [[ -s "$root/native-run.log" ]]; then
+            tail -n 5000 "$root/native-run.log" > "$root/native-run-tail.log"
+          fi
+          if [[ -s "$root/native-build.log" ]]; then
+            tail -n 300 "$root/native-build.log" > "$root/native-build-tail.log"
+          fi
+      - name: Upload actual native framebuffer and compact game runtime logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dead-space-mobile-real-apk-native-900-frame-evidence
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/dspc-live/logs/native-frame.png
+            ${{ runner.temp }}/dspc-live/logs/native-run-tail.log
+            ${{ runner.temp }}/dspc-live/logs/native-build-tail.log
       - name: Report authentic runtime result
         if: always()
         shell: bash
