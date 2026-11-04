@@ -171,7 +171,8 @@ try {
         "rt.h","host.c","jni_vm.c","threads.c","libc_files.c","gl_shim.c",
         "front_sdl.c","build.sh","build_win32_lifted.sh",
         "gen_all.py","gen_gl.py","lift.py","overrides.py","jninames.py",
-        "texturepack_fault_guard.py","modelcache_empty_vector.py","object3d_duplicate_probe.py","windows_lifted_compat.h","win32_bionic_openflags.h",
+        "texturepack_fault_guard.py","modelcache_empty_vector.py","object3d_duplicate_probe.py",
+        "native_buffered_input.py","m3g_loader_serialization.py","windows_lifted_compat.h","win32_bionic_openflags.h",
         "win32_substrate.h","win32_substrate.c",
         "win32_import_bridge.h","win32_missing_imports.c","win32_missing_gles.c"
     )
