@@ -1,0 +1,72 @@
+name: Dead Space Mobile — actual APK full native Win32 game compilation
+on:
+  push:
+    branches: [work/deadspace-windows-lifted-host-2026-11-04]
+    paths:
+      - .github/workflows/deadspace-real-apk-win32-crossbuild.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile-actual-game-win32:
+    name: Translate real ARM ELF and compile all game functions to native PE32
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    steps:
+      - name: Checkout Windows native host and portable original-code translator
+        uses: actions/checkout@v4
+      - name: Install real MinGW-w64 x86 compiler and ELF translator dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            python3 python3-pyelftools gcc-mingw-w64-i686-posix \
+            binutils-mingw-w64-i686 unzip curl tar file
+      - name: Retrieve the actual released APK, not a synthetic fixture
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/deadspace-real-win32"
+          mkdir -p "$dir/apk" "$dir/tools"
+          gh release download apk-files-for-testing \
+            --repo daniyalshakeel5/Dead-Space-Mobile-PC-port \
+            --pattern 'Deas.Space.Mobile.Fixes.apk' --dir "$dir"
+          original="$dir/Deas.Space.Mobile.Fixes.apk"
+          [[ -s "$original" ]] || { echo 'ACTUAL WINDOWS FAIL: real APK missing'; exit 20; }
+          unzip -qq "$original" -d "$dir/apk"
+          [[ -s "$dir/apk/lib/armeabi/libDeadSpace.so" ]] || exit 21
+          [[ -d "$dir/apk/assets/published" ]] || exit 22
+          echo "ACTUAL_WINDOWS_APK_SHA256=$(sha256sum "$original" | cut -d ' ' -f 1)"
+          cp -a experimental/lifted_milestone6/tools/. "$dir/tools/"
+          cp experimental/windows_native_host/win32_substrate.{c,h} "$dir/tools/"
+      - name: Compile the REAL original Dead Space game to Win32 PE32
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/deadspace-real-win32"
+          cd "$dir/tools"
+          export DS_SO="$dir/apk/lib/armeabi/libDeadSpace.so"
+          python3 gen_all.py
+          [[ -s out/fn_058.c && -s out/fn_055.c ]] ||
+            { echo 'ACTUAL WINDOWS FAIL: genuine decoded game source missing'; exit 23; }
+          echo "REAL_GAME_TRANSLATED_FUNCTION_CHUNKS=$(find out -maxdepth 1 -name 'fn_*.c' | wc -l)"
+          bash build_win32_lifted.sh "$dir"
+          test -s "$dir/windows-build/DeadSpaceMobile-Win32.exe"
+          file "$dir/windows-build/DeadSpaceMobile-Win32.exe"
+          file "$dir/windows-build/DeadSpaceMobile-Win32.exe" | grep -q 'PE32 executable'
+          sha256sum "$dir/windows-build/DeadSpaceMobile-Win32.exe"
+          echo "ACTUAL WINDOWS PASS: all game functions linked into real native Win32 PE32."
+          echo "Runtime boot not yet verified. No proprietary game file or executable is uploaded."
+      - name: Report actual Windows native game compiler failure
+        if: failure()
+        shell: bash
+        run: |
+          dir="$RUNNER_TEMP/deadspace-real-win32"
+          if [[ -f "$dir/windows-build/compile-windows.log" ]]; then
+            echo '==== REAL GAME BUILD ERROR, LAST 140 LINES ===='
+            tail -n 140 "$dir/windows-build/compile-windows.log"
+          fi
+          find "$dir/tools/out" -maxdepth 1 -name 'fn_*.o' 2>/dev/null | wc -l || true
