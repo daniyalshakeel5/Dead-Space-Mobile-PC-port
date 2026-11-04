@@ -62,3 +62,21 @@ function objects and creates windows-build/DeadSpaceMobile-Win32.exe on success.
 This proves a native Win32 link, NOT that the game's runtime boots or plays.
 On any error send windows-build/compile-windows.log. For a startup crash send
 windows-build/logs/windows-run.log. Never upload original game assets.
+
+CRASH RECOVERY / FIRST-RUN STORAGE (2026-11-04):
+The Windows game passed all 208 static initializers, JNI_OnLoad, OpenGL
+initialization and reached resource loading before a null-pointer read at
+0x00A8ADA0. The first user log repeatedly failed to access apk/assets/var.
+This kit creates the missing var/ directory before launch and adds a
+host-side directory check. It does NOT manufacture empty binary save files.
+
+Double-click "Repair Dead Space Windows.cmd" to apply these changes to an
+existing private installation and rebuild only the native host and adapters.
+Your original APK and translated game source are not overwritten.
+If the game still exits after the splash, the Play launcher automatically
+writes windows-build/logs/crash-symbolized.log containing the exact C
+function and line (resolved through the locally installed MinGW addr2line).
+"Diagnose Dead Space Crash.cmd" can also symbolize an existing previous
+windows-run.log without requiring another game run; an older host log lacks
+the loaded PE base, so the address mapping assumes the PE preferred base.
+Please send only crash-symbolized.log and windows-run.log, not the APK or EXE.

@@ -10,6 +10,8 @@ on:
       - experimental/windows_native_host/README-TEST-WINDOWS.txt
       - experimental/windows_native_host/Repair-DeadSpace-Windows.ps1
       - experimental/windows_native_host/Repair Dead Space Windows.cmd
+      - experimental/windows_native_host/Diagnose-DeadSpace-Crash.ps1
+      - experimental/windows_native_host/Diagnose Dead Space Crash.cmd
       - experimental/lifted_milestone6/tools/**
       - .github/workflows/windows-private-game-build-kit.yml
   workflow_dispatch:
@@ -26,7 +28,8 @@ jobs:
           $files = @(
              'experimental/windows_native_host/Install-DeadSpace-Fresh.ps1',
              'experimental/windows_native_host/Build-DeadSpace-Windows.ps1',
-             'experimental/windows_native_host/Repair-DeadSpace-Windows.ps1'
+             'experimental/windows_native_host/Repair-DeadSpace-Windows.ps1',
+             'experimental/windows_native_host/Diagnose-DeadSpace-Crash.ps1'
           )
           foreach($p in $files) {
              $tokens = $null
@@ -129,6 +132,8 @@ jobs:
           cp experimental/windows_native_host/README-TEST-WINDOWS.txt package/
           cp experimental/windows_native_host/Repair-DeadSpace-Windows.ps1 package/
           cp 'experimental/windows_native_host/Repair Dead Space Windows.cmd' package/
+          cp experimental/windows_native_host/Diagnose-DeadSpace-Crash.ps1 package/
+          cp 'experimental/windows_native_host/Diagnose Dead Space Crash.cmd' package/
           if find package -type f | grep -E '\.(apk|so|m3g|ogg|dex|bin)$'; then
              echo "Refusing to publish original EA binaries/assets"; exit 1
           fi
