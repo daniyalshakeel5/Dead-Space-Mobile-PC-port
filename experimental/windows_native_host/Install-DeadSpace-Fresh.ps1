@@ -132,8 +132,14 @@ setlocal
 title Dead Space Mobile - Native Windows x86
 cd /d "%~dp0"
 if not exist logs mkdir logs
-if not exist "%~dp0..\apk\assets\var" mkdir "%~dp0..\apk\assets\var"
-if not exist "%~dp0..\apk\assets\var" echo [DS SAVE ERROR] Cannot create app var directory.
+rem First run: choose difficulty, play opening cutscene, then enter gameplay.
+rem Saved progress is needed for the main menu on subsequent launches.
+rem Do not put user saves inside the extracted, immutable APK asset tree.
+if not exist "%~dp0..\userdata\var" mkdir "%~dp0..\userdata\var"
+if not exist "%~dp0..\userdata\var" (
+  echo [DS SAVE ERROR] Cannot create writable app data directory.
+  exit /b 12
+)
 set "DS_WINDOW=1"
 set "DS_STEPS=create,surface,frame"
 set "DS_FRAMES=0"
@@ -142,10 +148,12 @@ set "DS_M3G_SERIALIZE=1"
 set "DS_MODELCACHE_NULL_SOURCE_RETURN=1"
 set "DS_QUIET_JAVA=1"
 set "DS_ASSETS=%~dp0..\apk\assets"
-set "DS_DATA=%~dp0..\apk\assets"
+set "DS_DATA=%~dp0..\userdata"
 set "DS_MODEL=R800i"
 set "DS_MANUFACTURER=Sony Ericsson"
 echo Launching Dead Space Mobile on native Windows x86...
+echo [DS FIRST BOOT] New install: difficulty selection, intro cutscene, gameplay.
+echo [DS NEXT BOOT] Main menu expected only after first-run progress is saved.
 "DeadSpaceMobile-Win32.exe" "%~dp0..\apk\lib\armeabi\libDeadSpace.so" > "logs\windows-run.log" 2>&1
 set "rc=%errorlevel%"
 echo Game exit code: %rc%
