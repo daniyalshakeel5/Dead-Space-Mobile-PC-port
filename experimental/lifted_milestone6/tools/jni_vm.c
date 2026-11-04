@@ -111,7 +111,19 @@ static int stream_read(JObj* o, u8* dst, int len) {
     if (len == 0) return 0;
     if (len < 0 || !o || !o->p || !dst) return -1;
     FILE* fp = (FILE*)o->p;
+    const char* resource = o->s ? o->s : "";
+    int is_m3g = getenv("DS_ASSET_TRACE") &&
+        strlen(resource) >= 4 &&
+        strcmp(resource + strlen(resource) - 4, ".m3g") == 0;
+    long begin = is_m3g ? ftell(fp) : -1;
     size_t n = fread(dst, 1, (size_t)len, fp);
+    if (is_m3g && begin == 0 && n >= 12) {
+        fprintf(stderr, "[JAVA_REAL_M3G_READ] path=%s len=%zu header=",
+                resource, n);
+        for (int ds_i=0; ds_i<12; ds_i++)
+            fprintf(stderr, "%02x ", (unsigned)dst[ds_i]);
+        fprintf(stderr, "\\n");
+    }
     if (getenv("DS_ASSET_TRACE") && n != (size_t)len) {
         fprintf(stderr, "[JAVA_STREAM_PARTIAL] resource=%s request=%d got=%zu "
                 "position=%ld eof=%d error=%d\n",
