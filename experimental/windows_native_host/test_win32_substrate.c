@@ -19,7 +19,7 @@ typedef struct test_shared {
     ds_win32_tls tls;
     int counter;
     int done;
-    int invalid;
+    volatile LONG invalid;
 } test_shared;
 typedef struct test_arg {
     test_shared* shared;
@@ -31,8 +31,8 @@ static void* worker(void* ctx) {
     test_shared* s = arg->shared;
     const uintptr_t cookie = 0x1000U + arg->thread_num;
     unsigned i;
-    if (ds_win32_tls_get(&s->tls) != NULL) s->invalid = 1;
-    if (ds_win32_tls_set(&s->tls, (void*)cookie)) s->invalid = 1;
+    if (ds_win32_tls_get(&s->tls) != NULL) InterlockedExchange(&s->invalid, 1);
+    if (ds_win32_tls_set(&s->tls, (void*)cookie)) InterlockedExchange(&s->invalid, 1);
     for (i = 0; i < LOOPS; ++i) {
         ds_win32_mutex_lock(&s->mutex);
         /* Recursive mutex semantics expected by translated guest. */
@@ -41,12 +41,12 @@ static void* worker(void* ctx) {
         ds_win32_mutex_unlock(&s->mutex);
         ds_win32_mutex_unlock(&s->mutex);
     }
-    if ((uintptr_t)ds_win32_tls_get(&s->tls) != cookie) s->invalid = 1;
+    if ((uintptr_t)ds_win32_tls_get(&s->tls) != cookie) InterlockedExchange(&s->invalid, 1);
     ds_win32_mutex_lock(&s->mutex);
     ++s->done;
     ds_win32_cond_broadcast(&s->cond);
     ds_win32_mutex_unlock(&s->mutex);
-    if (ds_win32_sem_post(&s->sem)) s->invalid = 1;
+    if (ds_win32_sem_post(&s->sem)) InterlockedExchange(&s->invalid, 1);
     return (void*)(uintptr_t)(0x4000U + arg->thread_num);
 }
 
