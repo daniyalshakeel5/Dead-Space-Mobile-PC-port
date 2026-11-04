@@ -38,32 +38,6 @@ def trace(stage:str, branch:str) -> str:
   fflush(stderr);
 """ % (stage,branch)
 
-def patch(source:str)->str:
-    lo,hi=region(source)
-    f=source[lo:hi]
-    if MARK in f:
-        if f.count(MARK)!=4: raise ValueError("Incorrect previously installed audit marker count")
-        return source
-    if "m3g6Loader4load" not in f[:240]:
-        raise ValueError("Wrong original m3g Loader function")
-    if f.count(CALL)!=2 or f.count(FINISH)!=2:
-        raise ValueError("Expected both original Loader branch calls; source differs")
-    if "r5 = t;" not in f or "r7 = t;" not in f:
-        raise ValueError("Output/name saved-register assignments absent")
-    # Preserve original calls and branches verbatim.
-    for idx in range(2):
-        branch = ("A", "B")[idx]
-        f = f.replace(CALL,CALL+trace("AFTER_DECODE",branch),1)
-        # Replace only the earliest as-yet-uninstrumented occurrence.
-        # To avoid re-hitting the first call after augmentation, split
-        # via a cursor at the original call's END.
-        if idx==0:
-            first=f.find(CALL)
-            f=f[:first+len(CALL)]+f[first+len(CALL):].replace(CALL,"__DS_SECOND_CALL__",1)
-        else:
-            raise ValueError("Internal instrumentation selection error")
-    return source
-
 # Use controlled string split to avoid matching the same original site twice.
 def safe_patch(source: str) -> str:
     lo,hi=region(source)
