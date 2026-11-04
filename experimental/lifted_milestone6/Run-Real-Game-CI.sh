@@ -79,6 +79,13 @@ if (( code != 0 )); then
       addr2line -e ./dspc_sdl -a -f -C "$pc" || true
     done
   fi
+  # Resolve true native caller addresses emitted by Object3D::duplicate.
+  # These come from the genuine i686 game executable, not guessed ARM labels.
+  mapfile -t dup_callers < <(grep -oE 'native_return_pc=0x[0-9a-fA-F]+' "$root/logs/native-run.log" | sed 's/native_return_pc=//' | sort -u || true)
+  for caller in "${dup_callers[@]}"; do
+    echo "Actual Object3D duplicate caller: $caller"
+    addr2line -e ./dspc_sdl -a -f -C -i "$caller" || true
+  done
   echo '===== LAST REAL RESOURCE/M3G/OBJECT LOADING EVENTS ====='
   grep -E 'M3G_LOADER|TEXPACK_|FATAL:|GUEST_RESOURCE_(MISS|OK)|AssetManager.openFd|AssetManager.open\('     "$root/logs/native-run.log" | tail -n 65 || true
   echo '===== END ACTUAL RUNTIME SYMBOLS ====='
