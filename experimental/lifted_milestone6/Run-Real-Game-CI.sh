@@ -96,7 +96,7 @@ echo "REAL NATIVE TEST: frame target=$test_frames screenshot_at=$shot_at"
 set +e
 timeout --kill-after=20s "${runtime_budget}s" xvfb-run -a env \
   LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy \
-  DS_WINDOW=1 DS_NOVSYNC=1 DS_ASSET_TRACE=1 DS_M3G_TRACE=1 DS_M3G_SERIALIZE=1 DS_WATCHDOG=45 \
+  DS_WINDOW=1 DS_NOVSYNC=1 DS_ASSET_TRACE=1 DS_QUIET_JAVA=1 DS_M3G_TRACE=1 DS_M3G_SERIALIZE=1 DS_WATCHDOG=45 \
   DS_DATA="$assets" DS_ASSETS="$assets" \
   DS_STEPS=create,surface,frame DS_FRAMES="$test_frames" \
   DS_CLICKS="60:640:360,180:640:360,300:640:360,510:640:360" \
@@ -132,6 +132,8 @@ if (( code != 0 )); then
     echo "Actual Object3D duplicate caller: $caller"
     addr2line -e ./dspc_sdl -a -f -C -i "$caller" || true
   done
+  echo '===== EARLIEST REAL M3G ASSET READS, PARSER AND JNI BUFFER TRANSFERS ====='
+  grep -E 'REAL_M3G_|JAVA_M3G_STREAM_POSITION|JNI_M3G_ARRAY_ELEMENTS|JAVA_REAL_M3G_READ|JNI_12_BYTE|REAL_MODEL_' "$root/logs/native-run.log" | head -n 90 || true
   echo '===== ORIGINAL MODEL LOADER / JAVA STREAM FAILURE EVENTS ====='
   grep -E 'REAL_MODEL_|REAL_OBJECT3D_|REAL_M3G_|JAVA_STREAM_PARTIAL|JAVA_STREAM_SKIP_CLAMP|JNI_STREAM_SELFTEST' "$root/logs/native-run.log" | tail -n 80 || true
   echo '===== LAST REAL RESOURCE/M3G/OBJECT LOADING EVENTS ====='
