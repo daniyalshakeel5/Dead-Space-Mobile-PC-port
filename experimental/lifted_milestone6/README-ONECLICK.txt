@@ -22,3 +22,21 @@ Log signatures on next run:
 
 Source development branch:
 https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/tree/work/deadspace-milestone6-analysis-2026-11-04
+
+
+EXISTING LINUX/WSL NATIVE CRASH DIAGNOSIS (NOV 4, 2026):
+The archived Milestone 5 Linux build completed 208 native initializers,
+opened a 1280x720 SDL/OpenGL window, and reached EAIO/JNI setup before
+SIGSEGV at native PC 0x08627456 after Query.getTotalMemory. This trace
+also contains an AssetManager.open(data.zip) FileNotFoundException and a
+software llvmpipe renderer. The log alone cannot establish root cause.
+
+Double-click "Diagnose WSL Crash.cmd" from this update package on the
+Windows machine where the Milestone 5 build and wsl-game-*.log exist.
+The diagnostic finds the latest log in Downloads, discovers the ORIGINAL
+Linux i686 binary from the recorded APK pathname, and runs WSL addr2line
+against the native fault PC and the whole 32-bit backtrace. It writes a
+wsl-game-*.symbolized.txt file alongside the log and opens it in Notepad.
+It does not change, replace, rebuild, or upload the old game files.
+Use the symbolized report to identify the actual translated C function;
+do not assume the last Java log message is the crashing instruction.

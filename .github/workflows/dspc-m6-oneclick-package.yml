@@ -14,6 +14,35 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
+      - name: Parse and validate original Linux crash symbolizer without needing WSL
+        shell: pwsh
+        run: |
+          $p='experimental/lifted_milestone6/Diagnose-WSL-Crash.ps1'
+          $tokens=$null
+          $errs=$null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path $p).Path,[ref]$tokens,[ref]$errs) | Out-Null
+          if ($errs.Count) { throw ("PowerShell parse errors: "+($errs | Out-String)) }
+          $log=Join-Path $env:RUNNER_TEMP 'wsl-game-20261104-184532.log'
+          @'
+          loaded /mnt/c/Users/Test/Downloads/dspc_milestone5_one_click_WSL_FIXED/dspc/apk/lib/armeabi/libDeadSpace.so at 0xe56c0000 (5000 KB)
+          208/208 initializers completed
+          JNI_OnLoad returned 0x10004
+          window 1280x720; GL_RENDERER=llvmpipe (LLVM 19.1.7, 256 bits)
+             [java] AssetManager.open(/mnt/c/Users/Test/Downloads/dspc/apk/assets/data.zip) -> FileNotFoundException
+             [java] call com/eamobile/Query.getTotalMemory ()J (self=0x10188)
+          !! signal 11 at pc=0x8627456, fault address (nil)
+          backtrace (use nm -n dspc_native to map): 0x878f493 0xf7f38590 0x8627456
+          guest image base 0xe56c0000
+          '@ | Set-Content -Path $log -Encoding UTF8
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p -LogPath $log -ParseOnly -Quiet
+          if ($LASTEXITCODE -ne 0) { throw 'Crash parser test failed' }
+          $report=[IO.Path]::ChangeExtension($log,'.symbolized.txt')
+          $s=Get-Content -Raw $report
+          foreach($needle in @('0x8627456','Captured backtrace frames: 3','Signal: 11','dspc_milestone5_one_click_WSL_FIXED','ParseOnly','data.zip')) {
+            if (!$s.Contains($needle)) { throw "Missing parser output: $needle" }
+          }
+          Write-Host 'PASS Milestone5 Linux SIGSEGV address and game-path extraction'
       - name: Test one-click install preserves mock APK and stale generated code
         shell: pwsh
         run: |
@@ -49,6 +78,8 @@ jobs:
           cp experimental/lifted_milestone6/Install-Milestone6.ps1 update/
           cp experimental/lifted_milestone6/Install-Milestone6.cmd update/
           cp experimental/lifted_milestone6/README-ONECLICK.txt update/
+          cp experimental/lifted_milestone6/Diagnose-WSL-Crash.ps1 update/
+          cp 'experimental/lifted_milestone6/Diagnose WSL Crash.cmd' update/
           echo "No original game ELF, APK, save data or extracted assets are included."
           find update -type f -printf '%P\n' | sort
       - name: Upload tested Windows one-click WSL source update
