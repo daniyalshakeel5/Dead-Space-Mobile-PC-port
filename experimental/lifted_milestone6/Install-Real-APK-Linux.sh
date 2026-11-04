@@ -31,7 +31,6 @@ python3 -c 'import elftools' >/dev/null 2>&1 ||
 [[ -f /usr/include/SDL2/SDL.h ]] ||
   { echo 'Install 32-bit SDL2 headers: libsdl2-dev:i386' >&2; exit 3; }
 probe="$(mktemp /tmp/dspc-i686-XXXXXXXX)"
-trap 'rm -f "$probe"' RETURN
 if ! printf 'int main(void){return 0;}\n' |
     gcc -m32 -x c - -o "$probe" >/dev/null 2>&1; then
   echo 'Missing GCC i686 toolchain: install gcc-multilib libc6-dev-i386' >&2
@@ -39,7 +38,7 @@ if ! printf 'int main(void){return 0;}\n' |
 fi
 rm -f "$probe"
 for asset in lib/armeabi/libDeadSpace.so assets/EAMCore.ini; do
-  unzip -Z1 "$apk" | grep -Fxq "$asset" ||
+  unzip -Z1 "$apk" | grep -Fx "$asset" >/dev/null ||
     { echo "Original APK is missing: $asset" >&2; exit 4; }
 done
 [[ -d "$here/tools" ]] ||
@@ -47,6 +46,7 @@ done
 [[ ! -e "$dest" ]] ||
   { echo "Already exists: $dest (choose a fresh destination; no files deleted)" >&2; exit 5; }
 mkdir -p -- "$(dirname -- "$dest")"
+dest="$(cd -- "$(dirname -- "$dest")" && pwd -P)/$(basename -- "$dest")"
 stage="$(mktemp -d "$(dirname -- "$dest")/.dspc-install-XXXXXXXX")"
 cleanup() { rm -rf -- "$stage"; }
 trap cleanup EXIT
