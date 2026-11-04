@@ -41,6 +41,9 @@ python3 modelcache_node_probe.py --source out/fn_003.c --instrument
 python3 object3d_duplicate_probe.py --source out/fn_060.c --instrument
 cd out
 chmod +x build.sh
+# Use three independent GCC workers on GitHub's four-core Linux runner;
+# leave end-user WSL/local builds at the conservative one-worker default.
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then export DS_BUILD_JOBS="${DS_BUILD_JOBS:-3}"; fi
 SDL_CFLAGS="-I/usr/include/SDL2" SDL_LIBS="-lSDL2" ./build.sh > "$root/logs/native-build.log" 2>&1 || {
   echo 'REAL FAIL: i686 compile/link failed'
   tail -n 80 "$root/logs/native-build.log"; exit 44;
