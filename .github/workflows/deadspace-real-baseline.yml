@@ -20,7 +20,14 @@ jobs:
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update -qq
-          sudo apt-get install -y gcc-multilib libc6-dev-i386 libsdl2-dev:i386 libgl1-mesa-dri:i386 xvfb xauth unar
+          sudo apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386 libsdl2-2.0-0:i386 libgl1-mesa-dri:i386 libgl1:i386 xvfb xauth unar
+          # Extract target headers without installing unrelated i386 GUI
+          # development tools that conflict with the runner's host packages.
+          mkdir -p "$RUNNER_TEMP/sdl-dev"
+          cd "$RUNNER_TEMP/sdl-dev"
+          apt-get download libsdl2-dev:i386
+          dpkg-deb -x ./*.deb "$RUNNER_TEMP/sdl-prefix"
+          echo "SDL_PREFIX=$RUNNER_TEMP/sdl-prefix" >> "$GITHUB_ENV"
           python3 -m venv "$RUNNER_TEMP/py"
           "$RUNNER_TEMP/py/bin/pip" install pyelftools Pillow
           echo "$RUNNER_TEMP/py/bin" >> "$GITHUB_PATH"
@@ -55,7 +62,7 @@ jobs:
           export DS_SO="$DS_ROOT/apk/lib/armeabi/libDeadSpace.so"
           python3 gen_all.py > "$DS_ROOT/logs/generation.log" 2>&1
           cd out
-          DS_BUILD_JOBS=3 SDL_CFLAGS="-I/usr/include/SDL2" SDL_LIBS="-lSDL2" bash build.sh > "$DS_ROOT/logs/build.log" 2>&1
+          DS_BUILD_JOBS=3 SDL_CFLAGS="-I$SDL_PREFIX/usr/include/SDL2 -I$SDL_PREFIX/usr/include/i386-linux-gnu" SDL_LIBS="/usr/lib/i386-linux-gnu/libSDL2-2.0.so.0" bash build.sh > "$DS_ROOT/logs/build.log" 2>&1
           file dspc_sdl | tee "$DS_ROOT/logs/executable.txt"
       - name: Run real first boot through difficulty and intro
         run: |
@@ -91,6 +98,8 @@ jobs:
           fi
           python3 - "$root" <<'PY'
           import pathlib, sys
+          if not list((pathlib.Path(sys.argv[1]) / "shots").glob("*.ppm")):
+              sys.exit(0)
           from PIL import Image
           root = pathlib.Path(sys.argv[1])
           for path in (root / "shots").glob("*.ppm"):
