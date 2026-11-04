@@ -24,7 +24,9 @@ static int sdl_open(int w, int h) {
 static int map_scancode(int sc, int* alt) {
     *alt = 0;
     switch (sc) {
-        case SDL_SCANCODE_UP: return 19;    case SDL_SCANCODE_DOWN: return 20;  case SDL_SCANCODE_LEFT: return 21; case SDL_SCANCODE_RIGHT: return 22;
+        case SDL_SCANCODE_UP: case SDL_SCANCODE_W: return 19;    case SDL_SCANCODE_DOWN: case SDL_SCANCODE_S: return 20;
+        case SDL_SCANCODE_LEFT: case SDL_SCANCODE_A: return 21;  case SDL_SCANCODE_RIGHT: case SDL_SCANCODE_D: return 22;
+        case SDL_SCANCODE_ESCAPE: case SDL_SCANCODE_BACKSPACE: *alt = 1; return 4; // Android Back; window close/Alt+F4 exits
         case SDL_SCANCODE_RETURN: case SDL_SCANCODE_E: return 23;            // Cross: interact / confirm
         case SDL_SCANCODE_Q: *alt = 1; return 4;                              // Circle: kinesis / back
         case SDL_SCANCODE_R: return 99;                                       // Square: reload
@@ -51,7 +53,7 @@ static int sdl_pump(int* resized) {
     SDL_Event e; *resized = 0;
     while (SDL_PollEvent(&e)) {
         if (e.type == SDL_QUIT) return 0;
-        if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) return 0;
+        // Escape is Android Back/Pause (handled by map_scancode), not a forced shutdown.
         if ((e.type == SDL_KEYDOWN && !e.key.repeat) || e.type == SDL_KEYUP) { int alt, k = map_scancode(e.key.keysym.scancode, &alt); if (k) host_key(e.type == SDL_KEYDOWN, k, alt); }
         if (e.type == SDL_CONTROLLERBUTTONDOWN || e.type == SDL_CONTROLLERBUTTONUP) { int alt, k = map_button(e.cbutton.button, &alt); if (k) host_key(e.type == SDL_CONTROLLERBUTTONDOWN, k, alt); }
         if (e.type == SDL_CONTROLLERDEVICEADDED) SDL_GameControllerOpen(e.cdevice.which);
