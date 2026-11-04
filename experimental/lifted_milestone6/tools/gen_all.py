@@ -71,7 +71,7 @@ def main():
         f.write("const char* const JNI_NAMES[] = {" + ",".join('"%s"' % n for n in JNI_NAMES) + "};\n")
         f.write(f"const u32 JNI_N = {len(JNI_NAMES)};\n")
     import gen_gl; gen_gl.main(f"{OUT}/gl_gen.c")
-    for fn in ("rt.h", "host.c", "jni_vm.c", "threads.c", "libc_files.c", "gl_shim.c", "front_sdl.c", "build.sh"): shutil.copy(fn, OUT)
+    for fn in ("rt.h", "host.c", "jni_vm.c", "threads.c", "libc_files.c", "gl_shim.c", "front_sdl.c", "windows_lifted_compat.h", "build.sh"): shutil.copy(fn, OUT)
     # Preserve the exact guest translation. Add a fail-closed two-point probe
     # only to the confirmed TexturePack::load NULL-vector site. Do not mask
     # the exception or invent empty textures. DS_TEXTUREPACK_DIAG=0 disables.
@@ -88,7 +88,7 @@ def main():
         original = p.read_text(encoding="utf-8")
         p.write_text(patch_texturepack(original), encoding="utf-8")
         print(f"TexturePack null-vector diagnostics injected into {p}")
-        tot = sum(os.path.getsize(f"{OUT}/{x}") for x in os.listdir(OUT))
+    tot = sum(os.path.getsize(f"{OUT}/{x}") for x in os.listdir(OUT))
     print(f"{len(ok)} lifted, {len(unlifted)} unlifted stubs, {len(imps)} imports, {idx} chunks, {tot/1e6:.1f} MB of C")
 
 if __name__ == "__main__":

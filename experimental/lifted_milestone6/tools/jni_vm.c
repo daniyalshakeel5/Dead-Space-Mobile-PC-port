@@ -191,8 +191,25 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
     if (!strcmp(c, "com/ea/blast/PowerManagerAndroid")) return 0;
     if (!strcmp(c, "com/ea/blast/TouchSurfaceAndroid") && !strcmp(nm, "IsTouchScreenMultiTouch")) return 1;
     if (!strcmp(c, "com/ea/blast/GetAppDataDirectoryDelegate") && !strcmp(m->sig, "()Ljava/lang/String;")) {
-        const char* d = getenv("DS_DATA") ? getenv("DS_DATA") : "userdata"; mkdir(d, 0755);
+        const char* d = getenv("DS_DATA") ? getenv("DS_DATA") : "userdata";
+        if (mkdir(d, 0755) != 0 && errno != EEXIST)
+            fprintf(stderr, "[APP_STORAGE_ERROR] create root %s errno=%d\n", d, errno);
         char full[4096]; if (!realpath(d, full)) snprintf(full, sizeof full, "%s", d);
+#ifdef _WIN32
+        /* Android's first-launch files live in <appdata>/var. The donor APK
+         * contains no initial settings/level-save files, and the Windows
+         * launcher intentionally sets DS_DATA to the existing asset root for
+         * resource-path compatibility. Create only the directory; the game
+         * owns and generates its actual binary save file contents. */
+        char var_dir[4096];
+        int nv = snprintf(var_dir, sizeof var_dir, "%s/var", full);
+        if (nv < 0 || (size_t)nv >= sizeof var_dir)
+            fprintf(stderr, "[APP_STORAGE_ERROR] save directory path too long\n");
+        else if (mkdir(var_dir, 0755) != 0 && errno != EEXIST)
+            fprintf(stderr, "[APP_STORAGE_ERROR] mkdir %s errno=%d\n", var_dir, errno);
+        else
+            fprintf(stderr, "[APP_STORAGE_READY] var_dir=%s\n", var_dir);
+#endif
         if (getenv("DS_ASSET_TRACE")) fprintf(stderr, "[JAVA_APP_STORAGE] %s -> %s\n", nm, full);
         return new_obj(K_STRING, full, 0, 0);
     }

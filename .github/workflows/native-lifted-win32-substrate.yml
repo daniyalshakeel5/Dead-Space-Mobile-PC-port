@@ -1,0 +1,60 @@
+name: Native Windows x86 host substrate (no game assets)
+on:
+  push:
+    branches:
+      - work/deadspace-windows-lifted-host-2026-11-04
+    paths:
+      - experimental/windows_native_host/**
+      - experimental/lifted_milestone6/tools/win32_bionic_openflags.h
+      - .github/workflows/native-lifted-win32-substrate.yml
+      - tools/compare_gles_texture_trace.py
+      - tests/test_gles_texture_trace.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  x86-native-windows:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile x86 Win32 memory/thread substrate with MSVC and execute
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (!(Test-Path $vswhere)) { throw "vswhere missing on Windows runner" }
+          $vsRoot = (& $vswhere -latest -products '*' -property installationPath).Trim()
+          $vcvars = Join-Path $vsRoot 'VC\Auxiliary\Build\vcvarsall.bat'
+          if (!(Test-Path $vcvars)) { throw "MSVC x86 setup unavailable" }
+          $dir = 'experimental\windows_native_host'
+          $cmd = 'call "' + $vcvars + '" x86 >nul && cl /nologo /O2 /W4 /TC /Fe:win32_substrate_test.exe "' + $dir + '\win32_substrate.c" "' + $dir + '\test_win32_substrate.c" && win32_substrate_test.exe'
+          & cmd.exe /d /s /c $cmd
+          if ($LASTEXITCODE -ne 0) { throw "x86 native Windows test/build failed with $LASTEXITCODE" }
+      - name: Test Android-Bionic file flags against actual Windows x86 filesystem
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vsRoot = (& $vswhere -latest -products '*' -property installationPath).Trim()
+          $vcvars = Join-Path $vsRoot 'VC\Auxiliary\Build\vcvarsall.bat'
+          $test = 'experimental\windows_native_host\test_win32_bionic_openflags.c'
+          $cmd = 'call "' + $vcvars + '" x86 >nul && cl /nologo /O2 /W4 /TC /Fe:win32_bionic_flags_test.exe "' + $test + '" && win32_bionic_flags_test.exe'
+          & cmd.exe /d /s /c $cmd
+          if ($LASTEXITCODE -ne 0) { throw "Bionic openflags Windows test failed with $LASTEXITCODE" }
+      - name: Confirm executable is a real x86 Windows PE image
+        shell: pwsh
+        run: |
+          $bytes = [IO.File]::ReadAllBytes('win32_substrate_test.exe')
+          if ($bytes[0] -ne 0x4d -or $bytes[1] -ne 0x5a) { throw 'Not a Windows PE executable' }
+          $p = [BitConverter]::ToInt32($bytes, 0x3c)
+          if ($bytes[$p] -ne 0x50 -or $bytes[$p+1] -ne 0x45) { throw 'PE signature missing' }
+          $machine = [BitConverter]::ToUInt16($bytes, $p+4)
+          if ($machine -ne 0x014c) { throw ('Expected x86 machine 0x014c, got 0x{0:x4}' -f $machine) }
+          Write-Host 'PASS: executed native Windows PE32 x86, not ARM or x64'
+  format-audit-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify GPU trace format classification (no game files)
+        run: python3 -m unittest discover -s tests -p 'test_gles_texture_trace.py' -v

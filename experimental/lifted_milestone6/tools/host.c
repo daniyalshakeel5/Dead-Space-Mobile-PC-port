@@ -10,6 +10,9 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#if defined(_WIN32)
+#include "windows_lifted_compat.h"
+#else
 #include <unistd.h>
 #include <pthread.h>
 #include <sys/mman.h>
@@ -19,6 +22,7 @@
 #include <dirent.h>
 #include <execinfo.h>
 #include <ucontext.h>
+#endif
 #include "protos.h"
 
 #define STR2(x) #x
@@ -376,6 +380,7 @@ static void load_image(const char* path) {
     free(file);
 }
 
+#ifndef _WIN32
 static void segv_handler(int sig, siginfo_t* si, void* uc_) {
     ucontext_t* uc = uc_; void* bt[40];
     fprintf(stderr, "\n!! signal %d at pc=%#x, fault address %p\n", sig, (u32)uc->uc_mcontext.gregs[REG_EIP], si->si_addr);
@@ -384,6 +389,7 @@ static void segv_handler(int sig, siginfo_t* si, void* uc_) {
     for (int i = 0; i < n; i++) fprintf(stderr, " %p", bt[i]);
     fprintf(stderr, "\nguest image base %#x\n", g_base); fflush(stdout); fflush(stderr); if (trace_f) fflush(trace_f); _exit(139);
 }
+#endif
 static u32 g_sp0_for_input, g_id_down, g_id_move, g_id_up, g_id_touchscreen; static int g_ids_ready;
 static u32 call_static_int(const char* name, u32 sp) { u32 a = find_export(name); return a ? (u32)call_ind(a, U(g_env_obj), 0, 0, 0, sp) : 0; }
 static void host_pointer(int kind, float x, float y) {
@@ -400,6 +406,7 @@ static void host_pointer(int kind, float x, float y) {
     call_java_native(addr, class_handle("com/ea/blast/TouchSurfaceAndroid"), "IIIFF", 5, a, g_sp0_for_input);
 }
 static volatile u32 g_frame_counter;
+#ifndef _WIN32
 static void usr2_handler(int s) {
     void* bt[40]; int n = backtrace(bt, 40);
     fprintf(stderr, "THREAD %ld backtrace:", (long)syscall(SYS_gettid));
@@ -421,6 +428,7 @@ static void* watchdog(void* a) {                     // DS_WATCHDOG=<seconds>: d
     }
     return 0;
 }
+#endif
 // keyboard / gamepad keys use the Android key-code protocol the game was built for (KeyboardAndroid.NativeOnKeyDown/Up).
 // The Xperia Play mapping (KeyboardAndroidXperiaPlay::RawToStdKey): 23=Cross 99=Square 100=Triangle, 4(+alt)=Circle, 19-22=D-pad.
 static void host_key(int down, int keycode, int alt) {
@@ -437,7 +445,13 @@ static void* run(void* p) {
     Args* a = p;
     load_image(a->so);
     build_jni();
-    u32 sp0 = U(mmap(NULL, 0x1000000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) + 0x1000000 - 0x100;
+    void* guest_stack = mmap(NULL, 0x1000000, PROT_READ | PROT_WRITE,
+                             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (guest_stack == MAP_FAILED) {
+        fprintf(stderr, "!! Unable to allocate 16MB guest x86 stack\n");
+        exit(2);
+    }
+    u32 sp0 = U(guest_stack) + 0x1000000 - 0x100;
     g_sp0 = sp0; g_sp0_for_input = sp0 - 0x40000;
     printf("loaded %s at %#x (%u KB), %u translated functions, %u imports\n", a->so, g_base, g_top / 1024, FNTAB_N, IMPTAB_N);
     u32 done = 0;
@@ -509,12 +523,19 @@ int main(int argc, char** argv) {
     const char* so = argc > 1 ? argv[1] : "libDeadSpace.so";
     setvbuf(stdout, NULL, _IONBF, 0);
     if (getenv("TRACE")) trace_f = fopen(getenv("TRACE"), "w");
+#ifdef _WIN32
+    SetUnhandledExceptionFilter(ds_windows_crash_filter);
+    if (getenv("DS_WATCHDOG")) fprintf(stderr,
+       "[WIN32 HOST] DS_WATCHDOG Linux stack enumerator not available; "
+       "Windows unhandled exception report is enabled.\n");
+#else
     { struct sigaction sa; memset(&sa, 0, sizeof sa); sa.sa_sigaction = segv_handler; sa.sa_flags = SA_SIGINFO;
       sigaction(SIGSEGV, &sa, 0); sigaction(SIGBUS, &sa, 0); sigaction(SIGFPE, &sa, 0); sigaction(SIGILL, &sa, 0); sigaction(SIGABRT, &sa, 0); }
     if (getenv("DS_WATCHDOG")) {
         struct sigaction su; memset(&su, 0, sizeof su); su.sa_handler = usr2_handler; sigaction(SIGUSR2, &su, 0);
         pthread_t wt; pthread_create(&wt, 0, watchdog, (void*)(intptr_t)atoi(getenv("DS_WATCHDOG")));
     }
+#endif
     pthread_attr_t at; pthread_attr_init(&at); pthread_attr_setstacksize(&at, 256u << 20);
     pthread_t th; Args a = {so};
     pthread_create(&th, &at, run, &a); pthread_join(th, 0);
