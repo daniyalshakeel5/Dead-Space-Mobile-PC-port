@@ -139,6 +139,7 @@ set "DS_STEPS=create,surface,frame"
 set "DS_FRAMES=0"
 set "DS_NATIVE_BUFFERED_IO=1"
 set "DS_M3G_SERIALIZE=1"
+set "DS_MODELCACHE_NULL_SOURCE_RETURN=1"
 set "DS_QUIET_JAVA=1"
 set "DS_ASSETS=%~dp0..\apk\assets"
 set "DS_DATA=%~dp0..\apk\assets"
@@ -172,7 +173,7 @@ try {
         "front_sdl.c","build.sh","build_win32_lifted.sh",
         "gen_all.py","gen_gl.py","lift.py","overrides.py","jninames.py",
         "texturepack_fault_guard.py","modelcache_empty_vector.py","object3d_duplicate_probe.py",
-        "native_buffered_input.py","m3g_loader_serialization.py","windows_lifted_compat.h","win32_bionic_openflags.h",
+        "native_buffered_input.py","m3g_loader_serialization.py","modelcache_null_duplicate_recovery.py","windows_lifted_compat.h","win32_bionic_openflags.h",
         "win32_substrate.h","win32_substrate.c",
         "win32_import_bridge.h","win32_missing_imports.c","win32_missing_gles.c"
     )
