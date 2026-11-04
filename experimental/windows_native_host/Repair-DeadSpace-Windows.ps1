@@ -22,6 +22,7 @@ try {
     $packageTools = Join-Path $PSScriptRoot 'tools'
     $patchFiles = @(
         'build_win32_lifted.sh',
+        'modelcache_empty_vector.py',
         'win32_import_bridge.h',
         'win32_missing_imports.c',
         'win32_missing_gles.c',
