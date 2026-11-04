@@ -94,3 +94,21 @@ the earlier log showed repeated ENOENT from that Android system path.
 No original game functions or asset files have been changed.
 On a repeat crash, the diagnostic report now includes x86 registers and
 a 41-line excerpt from the exact private generated C function.
+
+MODELCACHE CRASH SOURCE CONTEXT (2026-11-04):
+After all previous environment fixes, the crash remained at the exact
+native guest address corresponding to fn_003.c:17449. The instruction
+is r7 = LD32(r3), where r3 = LD32(sp + 52u), and r3 was zero.
+It occurs in ModelCache::loadNodeUncached after f_0027e644 runs.
+This is a confirmed null stack-slot value, not evidence that a missing
+settings save or /proc/cpuinfo caused the problem.
+No speculative skip of a native engine destructor was added.
+
+To investigate the underlying data flow WITHOUT rerunning or rebuilding:
+double-click "Inspect Dead Space Model Cache.cmd" from the kit.
+The script reads only the owner's private translated source and writes
+windows-build/logs/modelcache-source-context.txt. It extracts the complete
+crashing function, its immediately preceding helper f_0027e644 and relevant
+stack references, keeping other game code out. The report is never
+uploaded to GitHub or the build service.
+Send modelcache-source-context.txt privately in chat for a source-level patch.
