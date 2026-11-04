@@ -15,10 +15,15 @@ WRAPPER=r'''
 u64 f_00324884(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
     u64 result=ds_original_DataInputStream_read(r0,r1,r2,r3,sp);
     if (getenv("DS_M3G_TRACE") && r2==12u) {
+        u32 ds_substream = LD32(r0+4u);
+        u32 ds_vtable = ds_substream ? LD32(ds_substream) : 0u;
+        u32 ds_method = ds_vtable ? LD32(ds_vtable+12u) : 0u;
         fprintf(stderr,
-                "[REAL_M3G_NATIVE_READ] tid=%lu input=%08x dest=%08x "
+                "[REAL_M3G_NATIVE_READ] tid=%lu input=%08x source=%08x "
+                "vtbl=%08x virtual_read=%08x arm_offset=%08x dest=%08x "
                 "requested=12 returned=%08x bytes=",
-                (unsigned long)pthread_self(),r0,r1,(unsigned)result);
+                (unsigned long)pthread_self(),r0,ds_substream,
+                ds_vtable,ds_method,ds_method-g_base,r1,(unsigned)result);
         if (result==12) {
             for (u32 k=0;k<12;k++) fprintf(stderr,"%02x ",(unsigned)LD8(r1+k));
         }
