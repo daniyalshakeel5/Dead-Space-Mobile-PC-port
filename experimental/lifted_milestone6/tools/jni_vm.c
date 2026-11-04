@@ -110,6 +110,8 @@ static int ds_asset_name_compare(const void* aa, const void* bb) {
 static int stream_read(JObj* o, u8* dst, int len) {
     if (len == 0) return 0;
     if (len < 0 || !o || !o->p || !dst) return -1;
+    pthread_mutex_lock(&g_objlock);
+    if (!o->p) { pthread_mutex_unlock(&g_objlock); return -1; }
     FILE* fp = (FILE*)o->p;
     const char* resource = o->s ? o->s : "";
     int is_m3g = getenv("DS_ASSET_TRACE") &&
@@ -130,7 +132,9 @@ static int stream_read(JObj* o, u8* dst, int len) {
                 o->s ? o->s : "(unknown)", len, n,
                 ftell(fp), feof(fp), ferror(fp));
     }
-    return n ? (int)n : -1;
+    int result = n ? (int)n : -1;
+    pthread_mutex_unlock(&g_objlock);
+    return result;
 }
 static int stream_byte_array_ok(JObj* b, s32 offset, s32 count) {
     return b && b->kind == K_ARRAY && b->esz == 1 && b->p &&
@@ -234,7 +238,12 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
             u8 ch = 0;
             return stream_read(so, &ch, 1) == 1 ? (u32)ch : (u32)-1;
         }
-        if (!strcmp(nm, "close")) { if (so->p) fclose((FILE*)so->p); so->p = 0; return 0; }
+        if (!strcmp(nm, "close")) {
+            pthread_mutex_lock(&g_objlock);
+            if (so->p) { fclose((FILE*)so->p); so->p = 0; }
+            pthread_mutex_unlock(&g_objlock);
+            return 0;
+        }
         if (!strcmp(nm, "available")) {
             if (!so->p) { g_exception = 1; return 0; }
             FILE* fp = (FILE*)so->p;
@@ -258,10 +267,13 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
         if (!strcmp(nm, "createInputStream")) {
             /* Independent fopen, not dup(): duplicated FDs share a file offset. */
             pthread_mutex_lock(&g_objlock);
-            FILE* stream = so->p ? fopen((const char*)so->p, "rb") : NULL;
+            char* path = so->p ? strdup((const char*)so->p) : NULL;
             pthread_mutex_unlock(&g_objlock);
-            if (!stream) { g_exception = 1; return 0; }
-            return new_obj(K_STREAM, (const char*)so->p, stream, 0);
+            FILE* stream = path ? fopen(path, "rb") : NULL;
+            if (!stream) { free(path); g_exception = 1; return 0; }
+            u32 h = new_obj(K_STREAM, path, stream, 0);
+            free(path);
+            return h;
         }
         if (!strcmp(nm, "close")) {
             pthread_mutex_lock(&g_objlock);
