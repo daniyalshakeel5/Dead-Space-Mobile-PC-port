@@ -38,6 +38,7 @@ python3 gen_all.py
 # This is derived from the live APK; it never suppresses a loader error or
 # substitutes an Object3D for a missing node.
 python3 modelcache_node_probe.py --source out/fn_003.c --instrument
+python3 object3d_duplicate_probe.py --source out/fn_060.c --instrument
 cd out
 chmod +x build.sh
 SDL_CFLAGS="-I/usr/include/SDL2" SDL_LIBS="-lSDL2" ./build.sh > "$root/logs/native-build.log" 2>&1 || {
