@@ -8,7 +8,7 @@ Dead Space Mobile APK (the version containing lib/armeabi/libDeadSpace.so).
 NO TERMINAL COMMANDS:
 1. Download the GitHub Actions artifact DeadSpaceMobile-FRESH-Windows-Installer.
 2. Extract it anywhere, e.g. your Downloads folder.
-3. Double-click Build-DeadSpace-Windows.cmd.
+3. Double-click Install Dead Space Mobile.cmd (or Build-DeadSpace-Windows.cmd).
 4. Select the original .apk file in the Windows file picker.
 5. The installer automatically creates Documents\DeadSpaceMobilePC,
    extracts the original APK, validates the ARM32 library, installs the full
@@ -20,6 +20,7 @@ NO TERMINAL COMMANDS:
    - DeadSpaceMobile-Win32.exe
    - Play Dead Space Windows.cmd
    - compile-windows.log
+   - ../install.log (extraction/dependency/translation log)
    - logs\windows-run.log
 
 Important: the Xperia Play release with libEAMGameDeadSpace.so will be
@@ -46,8 +47,8 @@ NOT YET VERIFIED:
   game functions, or successful original-engine startup/rendering/gameplay.
 - Audio and advanced analog controls are still under development.
 
-When testing, send either compile-windows.log or logs\windows-run.log if it
-fails. No need to type terminal commands.
+When testing, send install.log, compile-windows.log or logs\windows-run.log
+if it fails. The installer stores the logs automatically. No need to type terminal commands.
 
 Development branch / PR:
 https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/pull/2
