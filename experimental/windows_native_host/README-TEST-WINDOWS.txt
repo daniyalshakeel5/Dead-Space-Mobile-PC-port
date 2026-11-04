@@ -52,3 +52,13 @@ if it fails. The installer stores the logs automatically. No need to type termin
 
 Development branch / PR:
 https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/pull/2
+
+BUILD REPAIR (for the 2026-11-04 undefined import link failure):
+If the original fresh installer extracted your APK and produced tools/out but failed
+at the final Windows PE link, DO NOT delete your installation and do not reinstall.
+Double-click "Repair Dead Space Windows.cmd" from the new kit. It patches only the
+Windows cross-build script and guest import adapters, reuses existing compiled
+function objects and creates windows-build/DeadSpaceMobile-Win32.exe on success.
+This proves a native Win32 link, NOT that the game's runtime boots or plays.
+On any error send windows-build/compile-windows.log. For a startup crash send
+windows-build/logs/windows-run.log. Never upload original game assets.

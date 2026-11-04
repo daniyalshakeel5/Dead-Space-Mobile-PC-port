@@ -8,6 +8,8 @@ on:
       - experimental/windows_native_host/Build-DeadSpace-Windows.cmd
       - experimental/windows_native_host/Install Dead Space Mobile.cmd
       - experimental/windows_native_host/README-TEST-WINDOWS.txt
+      - experimental/windows_native_host/Repair-DeadSpace-Windows.ps1
+      - experimental/windows_native_host/Repair Dead Space Windows.cmd
       - experimental/lifted_milestone6/tools/**
       - .github/workflows/windows-private-game-build-kit.yml
   workflow_dispatch:
@@ -23,7 +25,8 @@ jobs:
         run: |
           $files = @(
              'experimental/windows_native_host/Install-DeadSpace-Fresh.ps1',
-             'experimental/windows_native_host/Build-DeadSpace-Windows.ps1'
+             'experimental/windows_native_host/Build-DeadSpace-Windows.ps1',
+             'experimental/windows_native_host/Repair-DeadSpace-Windows.ps1'
           )
           foreach($p in $files) {
              $tokens = $null
@@ -113,7 +116,7 @@ jobs:
         run: |
           mkdir -p package/tools
           src=experimental/lifted_milestone6/tools
-          for f in rt.h host.c jni_vm.c threads.c libc_files.c gl_shim.c front_sdl.c build.sh build_win32_lifted.sh gen_all.py gen_gl.py lift.py overrides.py jninames.py texturepack_fault_guard.py windows_lifted_compat.h; do
+          for f in rt.h host.c jni_vm.c threads.c libc_files.c gl_shim.c front_sdl.c build.sh build_win32_lifted.sh gen_all.py gen_gl.py lift.py overrides.py jninames.py texturepack_fault_guard.py windows_lifted_compat.h win32_import_bridge.h win32_missing_imports.c win32_missing_gles.c; do
             test -s "$src/$f"
             cp "$src/$f" package/tools/
           done
@@ -124,6 +127,8 @@ jobs:
           cp experimental/windows_native_host/Build-DeadSpace-Windows.cmd package/
           cp 'experimental/windows_native_host/Install Dead Space Mobile.cmd' package/
           cp experimental/windows_native_host/README-TEST-WINDOWS.txt package/
+          cp experimental/windows_native_host/Repair-DeadSpace-Windows.ps1 package/
+          cp 'experimental/windows_native_host/Repair Dead Space Windows.cmd' package/
           if find package -type f | grep -E '\.(apk|so|m3g|ogg|dex|bin)$'; then
              echo "Refusing to publish original EA binaries/assets"; exit 1
           fi

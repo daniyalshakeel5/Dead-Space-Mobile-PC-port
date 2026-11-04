@@ -42,8 +42,8 @@ const char* const JNI_NAMES[1] = {0}; const u32 JNI_N=0;
 # Synthetic import table forces a real PE32 linker resolution of all 28 symbols.
 REQUIRED_IMPORTS=['__gnu_Unwind_Find_exidx','__cxa_type_match','__cxa_begin_cleanup','vsscanf','readdir_r','pthread_attr_setstack','sscanf','setsockopt','recvfrom','recv','sendto','send','socket','getpeername','getsockname','connect','bind','shutdown','getaddrinfo','freeaddrinfo','glPointSizePointerOES','glGetTexParameterxv','glGetTexEnvxv','glGetMaterialxv','glGetLightxv','glGetFixedv','glGetClipPlanex','glGetClipPlanef']
 def require_imports():
-    decl="".join(f"u64 imp_{name}(u32,u32,u32,u32,u32);\\n" for name in REQUIRED_IMPORTS)
-    tbl='const ImpEnt IMPTAB[] = {' + ','.join(f'{{"{n}",imp_{n}}}' for n in REQUIRED_IMPORTS) + '};\\n'
+    decl="".join(f"u64 imp_{name}(u32,u32,u32,u32,u32);\n" for name in REQUIRED_IMPORTS)
+    tbl='const ImpEnt IMPTAB[] = {' + ','.join(f'{{"{n}",imp_{n}}}' for n in REQUIRED_IMPORTS) + '};\n'
     tbl+=f'const u32 IMPTAB_N={len(REQUIRED_IMPORTS)};'
     return decl,tbl
 
