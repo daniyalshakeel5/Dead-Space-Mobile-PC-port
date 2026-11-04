@@ -65,7 +65,7 @@ try {
             $marker = if ($lines[$i] -match 'r7\s*=\s*LD32\(ea\)' -and $i+1 -ge 17439 -and $i+1 -le 17460) { '>>' } else { '  ' }
             [void]$summary.Add(('{0}{1,6}: {2}' -f $marker, ($i+1), $lines[$i]))
         }
-        if ($limit -lt $stop) [void]$summary.Add(('TRUNCATED: {0} further source lines' -f ($stop-$limit)))
+        if ($limit -lt $stop) { [void]$summary.Add(('TRUNCATED: {0} further source lines' -f ($stop-$limit))) }
         [void]$summary.Add('')
         [void]$summary.Add('Stack slot mentions (C source, not necessarily dynamically executed):')
         for ($i = $start; $i -lt $stop; $i++) {
