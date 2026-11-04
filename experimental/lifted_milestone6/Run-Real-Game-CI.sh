@@ -39,6 +39,7 @@ python3 gen_all.py
 # substitutes an Object3D for a missing node.
 python3 modelcache_node_probe.py --source out/fn_003.c --instrument
 python3 object3d_duplicate_probe.py --source out/fn_060.c --instrument
+python3 m3g_magic_probe.py --source out/fn_055.c --instrument
 cd out
 chmod +x build.sh
 # Use three independent GCC workers on GitHub's four-core Linux runner;
@@ -104,7 +105,7 @@ if (( code != 0 )); then
     addr2line -e ./dspc_sdl -a -f -C -i "$caller" || true
   done
   echo '===== ORIGINAL MODEL LOADER / JAVA STREAM FAILURE EVENTS ====='
-  grep -E 'REAL_MODEL_|REAL_OBJECT3D_|JAVA_STREAM_PARTIAL|JAVA_STREAM_SKIP_CLAMP|JNI_STREAM_SELFTEST' "$root/logs/native-run.log" | tail -n 80 || true
+  grep -E 'REAL_MODEL_|REAL_OBJECT3D_|REAL_M3G_|JAVA_STREAM_PARTIAL|JAVA_STREAM_SKIP_CLAMP|JNI_STREAM_SELFTEST' "$root/logs/native-run.log" | tail -n 80 || true
   echo '===== LAST REAL RESOURCE/M3G/OBJECT LOADING EVENTS ====='
   grep -E 'M3G_LOADER|TEXPACK_|FATAL:|GUEST_RESOURCE_(MISS|OK)|AssetManager.openFd|AssetManager.open\('     "$root/logs/native-run.log" | tail -n 65 || true
   echo '===== END ACTUAL RUNTIME SYMBOLS ====='
