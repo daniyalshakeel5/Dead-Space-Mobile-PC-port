@@ -119,6 +119,16 @@ static int stream_read(JObj* o, u8* dst, int len) {
         strcmp(resource + strlen(resource) - 4, ".m3g") == 0;
     long begin = is_m3g ? ftell(fp) : -1;
     size_t n = fread(dst, 1, (size_t)len, fp);
+    if (is_m3g && o->extra++ < 3) {
+        char h[40]={0};
+        for (size_t ds_i=0; ds_i<n && ds_i<12; ds_i++)
+            snprintf(h+3*ds_i, 4, "%02x ", (unsigned)dst[ds_i]);
+        fprintf(stderr,
+                "[JAVA_M3G_STREAM_POSITION] tid=%lu stream=%p path=%s "
+                "begin=%ld wanted=%d got=%zu end=%ld bytes=%s\n",
+                (unsigned long)pthread_self(),(void*)fp,resource,
+                begin,len,n,ftell(fp),h);
+    }
     if (is_m3g && begin == 0 && n >= 12) {
         fprintf(stderr, "[JAVA_REAL_M3G_READ] path=%s len=%zu header=",
                 resource, n);
@@ -482,7 +492,7 @@ static u64 jni_ArrayElements(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
 static u64 jni_ArrayRegionGet(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
     const char* n = sname(); tr(n); JObj* o = OBJ(r1); int esz = esz_of(n); u32 buf = *(u32*)P(sp);
     if (!o || o->kind != K_ARRAY || o->esz != esz || !o->p ||
-        r2 > o->n || r3 > o->n-r2 || !buf) {
+        r2 > o->n || r3 > o->n-r2 || (r3 && !buf)) {
         g_exception=1;
         if (getenv("DS_ASSET_TRACE"))
             fprintf(stderr, "[JNI_ARRAY_REGION_BAD] method=%s handle=%08x offset=%u len=%u buffer=%08x\n",
