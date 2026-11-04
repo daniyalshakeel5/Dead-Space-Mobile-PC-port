@@ -61,10 +61,10 @@ export DS_ASSETS="$build/apk/assets"
 export DS_WINDOW=1 DS_NOVSYNC=1 DS_STEPS=create,surface,frame DS_FRAMES=0
 export DS_WATCHDOG=45 DS_QUIET_JAVA=1
 # Match the reference agent single-CPU environment for first boot.
-cpu=$(python3 -c "import os; print(min(os.sched_getaffinity(0)))")
+cpu=\$(python3 -c "import os; print(min(os.sched_getaffinity(0)))")
 set +e
-taskset -c "$cpu" ./dspc_sdl "$so" 2>&1 | tee "$build/logs/game.log"
-rc=${PIPESTATUS[0]}
+taskset -c "\$cpu" ./dspc_sdl "$so" 2>&1 | tee "$build/logs/game.log"
+rc=\${PIPESTATUS[0]}
 set -e
 if (( rc != 0 )); then
   echo "Native game crashed. Mapping logged PCs to C functions:" >&2
@@ -72,7 +72,7 @@ if (( rc != 0 )); then
     xargs -r addr2line -a -f -C -e "$tools/out/dspc_sdl" > "$build/logs/backtrace.txt" || true
   cat "$build/logs/backtrace.txt" >&2
 fi
-exit "$rc"
+exit "\$rc"
 PLAY
 chmod +x "$build/play.sh"
 echo "Linux game built. Launching now. Next time: $build/play.sh"
