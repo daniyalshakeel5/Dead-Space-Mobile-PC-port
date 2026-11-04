@@ -468,6 +468,15 @@ static u64 jni_ArrayElements(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
         RET(0);
     }
     if (r2) *(u8*)P(r2) = 0; /* array is pinned, no copied storage */
+    if (getenv("DS_ASSET_TRACE") && esz==1 && o->n>=12) {
+        const unsigned char* ptr=(const unsigned char*)o->p;
+        if (ptr[0]==0xab && ptr[1]==0x49 && ptr[2]==0x4d) {
+            fprintf(stderr, "[JNI_M3G_ARRAY_ELEMENTS] tid=%lu name=%s handle=%08x data=%p size=%u head=",
+                    (unsigned long)pthread_self(),n,(unsigned)r1,o->p,(unsigned)o->n);
+            for (int i=0;i<12;i++) fprintf(stderr,"%02x ",ptr[i]);
+            fputc('\n',stderr);
+        }
+    }
     RET(U(o->p));
 }
 static u64 jni_ArrayRegionGet(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
