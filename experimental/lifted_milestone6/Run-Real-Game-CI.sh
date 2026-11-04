@@ -47,14 +47,20 @@ SDL_CFLAGS="-I/usr/include/SDL2" SDL_LIBS="-lSDL2" ./build.sh > "$root/logs/nati
 }
 [[ -s ./dspc_sdl ]] || { echo 'REAL FAIL: no native SDL game executable'; exit 45; }
 file ./dspc_sdl
+test_frames="${DS_REAL_TEST_FRAMES:-900}"
+[[ "$test_frames" =~ ^[0-9]+$ && "$test_frames" -ge 60 && "$test_frames" -le 900 ]] || {
+  echo 'REAL FAIL: DS_REAL_TEST_FRAMES must be 60..900'; exit 45;
+}
+if (( test_frames > 650 )); then shot_at=650; else shot_at=$((test_frames-10)); fi
+echo "REAL NATIVE TEST: frame target=$test_frames screenshot_at=$shot_at"
 set +e
-timeout --kill-after=20s 900s xvfb-run -a env \
+timeout --kill-after=20s 360s xvfb-run -a env \
   LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy \
   DS_WINDOW=1 DS_NOVSYNC=1 DS_ASSET_TRACE=1 \
   DS_DATA="$assets" DS_ASSETS="$assets" \
-  DS_STEPS=create,surface,frame DS_FRAMES=900 \
+  DS_STEPS=create,surface,frame DS_FRAMES="$test_frames" \
   DS_CLICKS="60:640:360,180:640:360,300:640:360,510:640:360" \
-  DS_SHOT="650:$root/logs/native-frame.ppm" \
+  DS_SHOT="$shot_at:$root/logs/native-frame.ppm" \
   ./dspc_sdl "$root/apk/lib/armeabi/libDeadSpace.so" \
   > "$root/logs/native-run.log" 2>&1
 code=$?
@@ -93,7 +99,7 @@ if (( code != 0 )); then
   tail -n 100 "$root/logs/native-run.log"; exit 46;
 fi
 if ! grep -q '^ran frames' "$root/logs/native-run.log"; then
-  echo 'REAL FAIL: game did not complete 900 native frames'
+  echo "REAL FAIL: game did not complete $test_frames native frames"
   tail -n 100 "$root/logs/native-run.log"; exit 47;
 fi
 [[ -s "$root/logs/native-frame.ppm" ]] || {
@@ -108,5 +114,5 @@ print("REAL GAME framebuffer sampled distinct colors:", colors)
 if colors < 5:
     raise SystemExit("REAL FAIL: game framebuffer is blank/flat")
 PY
-echo 'REAL PASS: original APK, translated/compiled native i686 engine, 900 SDL frames, nonblank frame'
+echo "REAL PASS: original APK, native i686 engine, $test_frames SDL frames, nonblank frame"
 echo 'This is a real runtime smoke test, NOT proof of fully playable gameplay.'
