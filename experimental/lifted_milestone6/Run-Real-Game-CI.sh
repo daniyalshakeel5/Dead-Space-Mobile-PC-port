@@ -67,11 +67,8 @@ if (( code != 0 )); then
     for pc in "${fault_pcs[@]}"; do
       echo "Actual fault PC: $pc"
       addr2line -e ./dspc_sdl -a -f -C -i "$pc" || true
-      nm -n ./dspc_sdl | awk -v pc="$pc" '
-        BEGIN { t=strtonum(pc) }
-        (NF >= 3 && $2 ~ /^[Tt]$/) { a=strtonum("0x"$1); if (a <= t && a >= best) { best=a; sym=$3; } }
-        END { if (sym != "") printf "Nearest compiled function: %s (0x%x + 0x%x)\n", sym,best,t-best; }
-      ' || true
+      # Use addr2line's actual DWARF function name and line. On Ubuntu,
+      # default mawk lacks strtonum(), so do not depend on an awk fallback.
     done
     for pc in "${backtrace_pcs[@]}"; do
       addr2line -e ./dspc_sdl -a -f -C "$pc" || true
