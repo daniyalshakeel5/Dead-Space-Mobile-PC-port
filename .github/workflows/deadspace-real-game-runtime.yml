@@ -56,7 +56,7 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/dspc-python"
           "$RUNNER_TEMP/dspc-python/bin/pip" install --disable-pip-version-check pyelftools Pillow
           echo "$RUNNER_TEMP/dspc-python/bin" >> "$GITHUB_PATH"
-      - name: Build and run REAL translated game (900 frames; no synthetic fixture)
+      - name: Build real translated game; auto-symbolize exact native crash PC from debug ELF
         shell: bash
         run: bash experimental/lifted_milestone6/Run-Real-Game-CI.sh
       - name: Report authentic runtime result
