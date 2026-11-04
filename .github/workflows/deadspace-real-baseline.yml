@@ -2,7 +2,7 @@ name: Real APK milestone 6 baseline comparison
 on:
   push:
     branches: [work/deadspace-real-baseline-2026-11-05]
-    paths: [.github/workflows/deadspace-real-baseline.yml]
+    paths: [.github/workflows/deadspace-real-baseline.yml, experimental/lifted_milestone6/tools/**]
   workflow_dispatch:
 permissions:
   contents: read
@@ -60,6 +60,7 @@ jobs:
         run: |
           set -euo pipefail
           cd "$DS_ROOT/tools"
+          export DS_TEXTUREPACK_DIAG=0
           export DS_SO="$DS_ROOT/apk/lib/armeabi/libDeadSpace.so"
           python3 gen_all.py > "$DS_ROOT/logs/generation.log" 2>&1
           cd out
@@ -67,13 +68,14 @@ jobs:
           file dspc_sdl | tee "$DS_ROOT/logs/executable.txt"
       - name: Run real first boot through difficulty and intro
         run: |
+          set +e
           set -uo pipefail
           cd "$DS_ROOT/tools/out"
           # Baseline uses the translated routines directly. No optional
           # buffered-reader replacement or null-model recovery is enabled.
           timeout --kill-after=20s 900s xvfb-run -a env \
             LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy \
-            DS_WINDOW=1 DS_NOVSYNC=1 DS_QUIET_JAVA=1 DS_WATCHDOG=45 \
+            DS_WINDOW=1 DS_NOVSYNC=1 DS_QUIET_JAVA=1 DS_WATCHDOG=45 DS_ASSET_TRACE=1 \
             DS_DATA="$DS_ROOT/apk/assets" DS_ASSETS="$DS_ROOT/apk/assets" \
             DS_STEPS=create,surface,frame DS_FRAMES=3600 \
             DS_CLICKS="120:640:360,300:1200:660,600:1200:660" \
@@ -97,6 +99,7 @@ jobs:
             grep -m1 'backtrace (use nm' "$root/logs/runtime.log" | grep -oE '0x[0-9a-fA-F]+' |
               xargs -r addr2line -a -f -C -e "$root/tools/out/dspc_sdl" > "$root/evidence/backtrace.txt" || true
           fi
+          cat "$root/evidence/runtime-tail.log" "$root/evidence/backtrace.txt" 2>/dev/null || true
           python3 - "$root" <<'PY'
           import pathlib, sys
           if not list((pathlib.Path(sys.argv[1]) / "shots").glob("*.ppm")):
