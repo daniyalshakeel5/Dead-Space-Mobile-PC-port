@@ -72,7 +72,7 @@ cat > "$stage/Run-DeadSpace-Mobile.sh" <<'LAUNCH'
 #!/usr/bin/env bash
 set -euo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-mkdir -p "$root/userdata"
+mkdir -p "$root/userdata/var" # Preserve first-run difficulty/cutscene progress for later launches
 export DS_ASSETS="$root/apk/assets"
 export DS_DATA="$root/userdata"
 export DS_WINDOW=1
@@ -91,4 +91,6 @@ echo "[5/5] Completing a fresh installation..."
 mv -- "$stage" "$dest"
 trap - EXIT
 echo "Installed native PC game to: $dest"
+echo "First launch should ask for difficulty, then play the opening cutscene and enter gameplay."
+echo "The main menu belongs to subsequent launches after the game has saved progress."
 echo "Launch using: $dest/Run-DeadSpace-Mobile.sh"
