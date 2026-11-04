@@ -20,5 +20,12 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq gcc-mingw-w64-i686-posix binutils-mingw-w64-i686 file
-      - name: Cross-compile the actual lifted host as native Win32 PE32
-        run: python3 tests/check_windows_lifted_host.py
+      - name: Download official SDL2 MinGW x86 development SDK
+        run: |
+          curl -fL --retry 3 -o /tmp/SDL2-devel-mingw.tar.gz \
+            https://www.libsdl.org/release/SDL2-devel-2.32.10-mingw.tar.gz
+          tar -xzf /tmp/SDL2-devel-mingw.tar.gz -C /tmp
+          test -f /tmp/SDL2-2.32.10/i686-w64-mingw32/include/SDL2/SDL.h
+          test -f /tmp/SDL2-2.32.10/i686-w64-mingw32/bin/SDL2.dll
+      - name: Cross-compile and link real SDL2/OpenGL lifted host as PE32
+        run: python3 tests/check_windows_lifted_host.py --sdl-root /tmp/SDL2-2.32.10
