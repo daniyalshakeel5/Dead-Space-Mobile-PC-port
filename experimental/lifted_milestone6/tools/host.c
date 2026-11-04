@@ -109,8 +109,37 @@ IMP(strdup)  { T(strdup);  RET(U(strdup(P(r0)))); }
 
 // ---- C++ runtime
 IMP(__aeabi_atexit) { T(__aeabi_atexit); RET(0); }
-IMP(__cxa_guard_acquire) { T(__cxa_guard_acquire); RET((*(u8*)P(r0) & 1) ? 0 : 1); }
-IMP(__cxa_guard_release) { T(__cxa_guard_release); *(u8*)P(r0) = 1; RET(0); }
+/* ARM C++ guard: bit 0 marks a completed initializer. Bit 8 is private
+ * pending state. Waiters must not initialize the same static twice. */
+static pthread_mutex_t ds_guard_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t ds_guard_changed = PTHREAD_COND_INITIALIZER;
+IMP(__cxa_guard_acquire) {
+    T(__cxa_guard_acquire);
+    u32* guard = P(r0);
+    pthread_mutex_lock(&ds_guard_lock);
+    while (__atomic_load_n(guard, __ATOMIC_ACQUIRE) & 0x100u)
+        pthread_cond_wait(&ds_guard_changed, &ds_guard_lock);
+    if (__atomic_load_n(guard, __ATOMIC_ACQUIRE) & 1u) {
+        pthread_mutex_unlock(&ds_guard_lock); RET(0);
+    }
+    __atomic_store_n(guard, 0x100u, __ATOMIC_RELEASE);
+    pthread_mutex_unlock(&ds_guard_lock);
+    RET(1);
+}
+IMP(__cxa_guard_release) {
+    T(__cxa_guard_release);
+    pthread_mutex_lock(&ds_guard_lock);
+    __atomic_store_n((u32*)P(r0), 1u, __ATOMIC_RELEASE);
+    pthread_cond_broadcast(&ds_guard_changed);
+    pthread_mutex_unlock(&ds_guard_lock); RET(0);
+}
+IMP(__cxa_guard_abort) {
+    T(__cxa_guard_abort);
+    pthread_mutex_lock(&ds_guard_lock);
+    __atomic_store_n((u32*)P(r0), 0u, __ATOMIC_RELEASE);
+    pthread_cond_broadcast(&ds_guard_changed);
+    pthread_mutex_unlock(&ds_guard_lock); RET(0);
+}
 IMP(__stack_chk_fail) { T(__stack_chk_fail); fprintf(stderr, "!! stack check failed\n"); exit(3); }
 IMP(abort)   { T(abort); fprintf(stderr, "!! guest called abort()\n"); exit(3); }
 

@@ -67,20 +67,27 @@ jobs:
           DS_BUILD_JOBS=3 SDL_CFLAGS="-I$SDL_PREFIX/usr/include/SDL2 -I$SDL_PREFIX/usr/include/i386-linux-gnu" SDL_LIBS="/usr/lib/i386-linux-gnu/libSDL2-2.0.so.0" bash build.sh > "$DS_ROOT/logs/build.log" 2>&1
           file dspc_sdl | tee "$DS_ROOT/logs/executable.txt"
       - name: Run real first boot through difficulty and intro
+        env:
+          SOURCE: ${{ matrix.source }}
         run: |
           set +e
           set -uo pipefail
           cd "$DS_ROOT/tools/out"
           # Baseline uses the translated routines directly. No optional
           # buffered-reader replacement or null-model recovery is enabled.
-          timeout --kill-after=20s 900s xvfb-run -a env \
+          affinity=()
+          if [[ "$SOURCE" == milestone6 ]]; then
+            cpu=$(python3 -c 'import os; print(min(os.sched_getaffinity(0)))')
+            affinity=(taskset -c "$cpu")
+          fi
+          timeout --kill-after=20s 900s "${affinity[@]}" xvfb-run -a env \
             LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy \
-            DS_WINDOW=1 DS_NOVSYNC=1 DS_QUIET_JAVA=1 DS_WATCHDOG=45 DS_ASSET_TRACE=1 \
+            DS_WINDOW=1 DS_NOVSYNC=1 DS_QUIET_JAVA=1 DS_WATCHDOG=45 \
             DS_DATA="$DS_ROOT/apk/assets" DS_ASSETS="$DS_ROOT/apk/assets" \
-            DS_STEPS=create,surface,frame DS_FRAMES=3600 \
-            DS_CLICKS="120:640:360,300:1200:660,600:1200:660" \
+            DS_STEPS=create,surface,frame DS_FRAMES=7200 \
+            DS_CLICKS="600:640:675,1500:1145:668,2400:1145:668" \
             DS_SHOT_EVERY=120 DS_SHOT_DIR="$DS_ROOT/shots" \
-            DS_SHOT="3590:$DS_ROOT/shots/final.ppm" \
+            DS_SHOT="7190:$DS_ROOT/shots/final.ppm" \
             ./dspc_sdl "$DS_ROOT/apk/lib/armeabi/libDeadSpace.so" > "$DS_ROOT/logs/runtime.log" 2>&1
           code=$?
           echo "$code" > "$DS_ROOT/logs/exit-code.txt"

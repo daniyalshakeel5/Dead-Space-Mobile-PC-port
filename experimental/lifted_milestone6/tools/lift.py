@@ -370,8 +370,9 @@ class FuncLifter:
             if (w & 0x0F8000F0) == 0x00800090: return self.mull(a, w), [], True
             if (w & 0x0FB00FF0) == 0x01000090:                              # swp / swpb
                 rn, rd, rm = (w >> 16) & 15, (w >> 12) & 15, w & 15
-                ld, st = ("LD8", "ST8") if (w >> 22) & 1 else ("LD32", "ST32")
-                return [f"{{ u32 t = {ld}({NAMES[rn]}); {st}({NAMES[rn]}, {NAMES[rm]}); {NAMES[rd]} = t; }}"], [], True
+                ty = "u8" if (w >> 22) & 1 else "u32"
+                # ARM SWP is indivisible even when used without a libc call.
+                return [f"{{ u32 t = __atomic_exchange_n(({ty}*)(uintptr_t){NAMES[rn]}, ({ty}){NAMES[rm]}, __ATOMIC_SEQ_CST); {NAMES[rd]} = t; }}"], [], True
             dsp = self.dsp(w)
             if dsp: return dsp, [], True
             if (w & 0xFFF000F0) == 0xE1200070: raise Unsupported("bkpt")
