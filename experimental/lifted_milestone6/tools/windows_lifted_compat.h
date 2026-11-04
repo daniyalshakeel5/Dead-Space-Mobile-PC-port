@@ -130,6 +130,18 @@ static LONG WINAPI ds_windows_crash_filter(EXCEPTION_POINTERS* ep) {
           (void*)(uintptr_t)ep->ExceptionRecord->ExceptionInformation[1]);
     fprintf(stderr, "   process image base=%p thread_id=%lu\n",
             (void*)GetModuleHandleA(NULL), (unsigned long)GetCurrentThreadId());
+#if defined(_M_IX86) || defined(__i386__)
+    if (ep && ep->ContextRecord) {
+        const CONTEXT* cx = ep->ContextRecord;
+        fprintf(stderr, "   x86 regs eax=%08lx ebx=%08lx ecx=%08lx edx=%08lx esi=%08lx edi=%08lx\n",
+                (unsigned long)cx->Eax, (unsigned long)cx->Ebx,
+                (unsigned long)cx->Ecx, (unsigned long)cx->Edx,
+                (unsigned long)cx->Esi, (unsigned long)cx->Edi);
+        fprintf(stderr, "   x86 regs esp=%08lx ebp=%08lx eip=%08lx eflags=%08lx\n",
+                (unsigned long)cx->Esp, (unsigned long)cx->Ebp,
+                (unsigned long)cx->Eip, (unsigned long)cx->EFlags);
+    }
+#endif
     fflush(stderr);
     return EXCEPTION_EXECUTE_HANDLER;
 }

@@ -26,6 +26,7 @@ try {
         'win32_missing_imports.c',
         'win32_missing_gles.c',
         'jni_vm.c',
+        'libc_files.c',
         'windows_lifted_compat.h'
     )
     foreach ($name in $patchFiles) {

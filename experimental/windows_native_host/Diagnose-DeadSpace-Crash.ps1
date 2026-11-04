@@ -89,6 +89,29 @@ try {
             foreach ($part in $details) { [void]$lines.Add([string]$part) }
         }
     }
+    # The executable and translated sources are private to this machine.
+    # Include only a small window from the mapped generated C function.
+    # This provides the actual dereference (not just the function name).
+    $sources = [regex]::Matches(($details -join "\n"), '([^\r\n]+[/\\]fn_[0-9]+\.c):(\d+)')
+    if ($sources.Count -gt 0) {
+        $src = $sources[0].Groups[1].Value
+        $srcLine = [int]$sources[0].Groups[2].Value
+        $baseName = [IO.Path]::GetFileName($src)
+        $localPath = Join-Path $InstallDir ('tools\out\' + $baseName)
+        if ((Test-Path -LiteralPath $localPath -PathType Leaf) -and $srcLine -gt 0) {
+            [void]$lines.Add('')
+            [void]$lines.Add(('Translated guest code around {0}:{1}:' -f $baseName, $srcLine))
+            $srcText = [IO.File]::ReadAllLines($localPath)
+            $lo = [Math]::Max(1, $srcLine - 20)
+            $hi = [Math]::Min($srcText.Length, $srcLine + 20)
+            for ($i = $lo; $i -le $hi; $i++) {
+                $marker = if ($i -eq $srcLine) { '>>' } else { '  ' }
+                [void]$lines.Add(('{0} {1,6}: {2}' -f $marker, $i, $srcText[$i - 1]))
+            }
+        } else {
+            [void]$lines.Add("Translated guest source not found: $localPath")
+        }
+    }
     [void]$lines.Add('')
     [void]$lines.Add('Last 24 run-log lines:')
     $tail = @($raw -split "\r?\n" | Select-Object -Last 24)

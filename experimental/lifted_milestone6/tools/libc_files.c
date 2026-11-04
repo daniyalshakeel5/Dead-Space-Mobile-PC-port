@@ -40,7 +40,10 @@ static void fill_stat(u32 buf, const struct stat* s) {
     *(u64*)(b + 64) = ((u64)s->st_size + 511u) / 512u;
 #else
     *(u64*)(b + 64) = (u64)s->st_blocks;
-#endif *(u32*)(b + 72) = (u32)s->st_atime; *(u32*)(b + 80) = (u32)s->st_mtime; *(u32*)(b + 88) = (u32)s->st_ctime;
+#endif
+    *(u32*)(b + 72) = (u32)s->st_atime;
+    *(u32*)(b + 80) = (u32)s->st_mtime;
+    *(u32*)(b + 88) = (u32)s->st_ctime;
     *(u64*)(b + 96) = (u64)s->st_ino;
 }
 IMP(stat)  { T(stat); const char* path = P(r0); struct stat s; int rc = stat(path, &s); int saved = errno;
@@ -48,10 +51,45 @@ IMP(stat)  { T(stat); const char* path = P(r0); struct stat s; int rc = stat(pat
     ds_asset_io_note("stat", path, rc == 0, saved); errno = saved; RET(rc); }
 IMP(fstat) { T(fstat); struct stat s; int rc = fstat((int)r0, &s); int saved = errno;
     if (!rc) fill_stat(r1, &s); else g_errno = saved; errno = saved; RET(rc); }
+/* Android Bionic ARM32 <fcntl.h> flags differ from MSVCRT/MinGW values.
+ * Previous Win32 code forwarded raw Android bits, causing O_CREAT (0x40)
+ * and O_APPEND (0x400) to be treated as unrelated Windows flags. In
+ * particular, first-run saves could never be created by guest open().
+ * Keep this adapter restricted to Win32; Linux already uses matching flags.
+ */
+#ifdef _WIN32
+#define DS_GUEST_O_CREAT   0x0040u
+#define DS_GUEST_O_EXCL    0x0080u
+#define DS_GUEST_O_TRUNC   0x0200u
+#define DS_GUEST_O_APPEND  0x0400u
+static int ds_win32_from_guest_openflags(u32 f) {
+    int result;
+    switch (f & 3u) {
+      case 0: result = O_RDONLY; break;
+      case 1: result = O_WRONLY; break;
+      case 2: result = O_RDWR; break;
+      default: return -1;
+    }
+    if (f & DS_GUEST_O_CREAT) result |= O_CREAT;
+    if (f & DS_GUEST_O_EXCL) result |= O_EXCL;
+    if (f & DS_GUEST_O_TRUNC) result |= O_TRUNC;
+    if (f & DS_GUEST_O_APPEND) result |= O_APPEND;
+    return result | O_BINARY;
+}
+#endif
 IMP(open)  { T(open); const char* path = P(r0);
 #ifdef _WIN32
-    /* Windows CRT defaults to text mode; Android resources are binary. */
-    int fd = open(path, (int)r1 | O_BINARY, (mode_t)r2);
+    int flags = ds_win32_from_guest_openflags(r1);
+    if (flags < 0) {
+        g_errno = errno = EINVAL;
+        ds_asset_io_note("open_invalid_flags", path, 0, errno);
+        RET(-1);
+    }
+    if (r1 & DS_GUEST_O_CREAT) {
+        fprintf(stderr, "[GUEST_SAVE_CREATE] flags=0x%x host_flags=0x%x path=%s\n",
+                (unsigned)r1, (unsigned)flags, path ? path : "(null)");
+    }
+    int fd = open(path, flags, (mode_t)r2);
 #else
     int fd = open(path, (int)r1, (mode_t)r2);
 #endif
