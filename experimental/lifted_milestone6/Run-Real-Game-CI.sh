@@ -75,6 +75,7 @@ python3 modelcache_node_probe.py --source out/fn_003.c --instrument
 python3 object3d_duplicate_probe.py --source out/fn_060.c --instrument
 python3 m3g_magic_probe.py --source out/fn_055.c --instrument
 python3 m3g_object_trace.py --source out/fn_055.c --instrument
+python3 eastl_char_insert_probe.py --source out/fn_055.c --instrument
 python3 native_datainput_read_trace.py --source out/fn_055.c --instrument
 python3 native_buffered_input.py --source out/fn_058.c --instrument
 python3 keyframe_native_guard.py --source out/fn_060.c --instrument
@@ -104,7 +105,7 @@ echo "REAL NATIVE TEST: assets=$assets save_data=$root/userdata"
 set +e
 timeout --kill-after=20s "${runtime_budget}s" xvfb-run -a env \
   LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy \
-  DS_WINDOW=1 DS_NOVSYNC=1 DS_ASSET_TRACE=1 DS_QUIET_JAVA=1 DS_M3G_TRACE=1 DS_M3G_SERIALIZE=1 DS_NATIVE_BUFFERED_IO=1 DS_MODELCACHE_NULL_SOURCE_RETURN=1 DS_WATCHDOG=45 \
+  DS_WINDOW=1 DS_NOVSYNC=1 DS_ASSET_TRACE=1 DS_QUIET_JAVA=1 DS_M3G_TRACE=1 DS_EASTL_CHAR_TRACE=1 DS_M3G_SERIALIZE=1 DS_NATIVE_BUFFERED_IO=1 DS_MODELCACHE_NULL_SOURCE_RETURN=1 DS_WATCHDOG=45 \
   DS_DATA="$root/userdata" DS_ASSETS="$assets" \
   DS_STEPS=create,surface,frame DS_FRAMES="$test_frames" \
   DS_CLICKS="60:640:360,180:640:360,300:640:360,510:640:360" \
@@ -140,6 +141,8 @@ if (( code != 0 )); then
     echo "Actual Object3D duplicate caller: $caller"
     addr2line -e ./dspc_sdl -a -f -C -i "$caller" || true
   done
+  echo '===== ORIGINAL EASTL VECTOR CHAR INSERTIONS BEFORE M3G CRASH ====='
+  grep -E 'REAL_M3G_CHAR_INSERT' "$root/logs/native-run.log" | tail -n 70 || true
   echo '===== ORIGINAL KEYFRAMESEQUENCE ARRAY ALLOCATIONS AND INDEX BOUNDS ====='
   grep -E 'REAL_M3G_KEYFRAME_' "$root/logs/native-run.log" | tail -n 48 || true
   echo '===== EARLIEST REAL M3G ASSET READS, PARSER AND JNI BUFFER TRANSFERS ====='
