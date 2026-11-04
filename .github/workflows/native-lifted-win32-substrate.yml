@@ -6,6 +6,8 @@ on:
     paths:
       - experimental/windows_native_host/**
       - .github/workflows/native-lifted-win32-substrate.yml
+      - tools/compare_gles_texture_trace.py
+      - tests/test_gles_texture_trace.py
   workflow_dispatch:
 permissions:
   contents: read
@@ -38,3 +40,9 @@ jobs:
           $machine = [BitConverter]::ToUInt16($bytes, $p+4)
           if ($machine -ne 0x014c) { throw ('Expected x86 machine 0x014c, got 0x{0:x4}' -f $machine) }
           Write-Host 'PASS: executed native Windows PE32 x86, not ARM or x64'
+  format-audit-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify GPU trace format classification (no game files)
+        run: python3 -m unittest discover -s tests -p 'test_gles_texture_trace.py' -v
