@@ -7,7 +7,10 @@ set -euo pipefail
 [[ -s "$DS_PRIVATE_GAME_APK" ]] || { echo 'REAL APK INPUT MISSING'; exit 40; }
 root="$RUNNER_TEMP/dspc-live"
 assets="$root/apk/assets"
-mkdir -p "$root/apk" "$root/data" "$root/logs"
+# Keep writable first-run progress separate from immutable APK resources.
+# The real game first asks for difficulty, plays the intro, and enters gameplay;
+# the menu is a subsequent-launch flow after progress has been saved.
+mkdir -p "$root/apk" "$root/data" "$root/logs" "$root/userdata/var"
 unzip -qq "$DS_PRIVATE_GAME_APK" -d "$root/apk"
 [[ -s "$root/apk/lib/armeabi/libDeadSpace.so" ]] || {
   echo 'REAL FAIL: APK does not contain lib/armeabi/libDeadSpace.so'; exit 41;
@@ -95,12 +98,14 @@ test_frames="${DS_REAL_TEST_FRAMES:-900}"
 shot_at=$((test_frames-10))
 runtime_budget=360
 if (( test_frames > 300 )); then runtime_budget=900; fi
+echo "REAL NATIVE TEST: first-install flow difficulty -> intro cutscene -> gameplay; main menu expected only after saved first-run progression"
 echo "REAL NATIVE TEST: frame target=$test_frames screenshot_at=$shot_at"
+echo "REAL NATIVE TEST: assets=$assets save_data=$root/userdata"
 set +e
 timeout --kill-after=20s "${runtime_budget}s" xvfb-run -a env \
   LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy \
   DS_WINDOW=1 DS_NOVSYNC=1 DS_ASSET_TRACE=1 DS_QUIET_JAVA=1 DS_M3G_TRACE=1 DS_M3G_SERIALIZE=1 DS_NATIVE_BUFFERED_IO=1 DS_MODELCACHE_NULL_SOURCE_RETURN=1 DS_WATCHDOG=45 \
-  DS_DATA="$assets" DS_ASSETS="$assets" \
+  DS_DATA="$root/userdata" DS_ASSETS="$assets" \
   DS_STEPS=create,surface,frame DS_FRAMES="$test_frames" \
   DS_CLICKS="60:640:360,180:640:360,300:640:360,510:640:360" \
   DS_SHOT="$shot_at:$root/logs/native-frame.ppm" \
@@ -169,4 +174,6 @@ source.save(out, format="PNG")
 print("REAL GAME visual capture:", out)
 PY
 echo "REAL PASS: original APK, native i686 engine, $test_frames SDL frames, nonblank frame"
-echo 'This is a real runtime smoke test, NOT proof of fully playable gameplay.'
+echo "REAL PROGRESS FILES: $(find "$root/userdata" -type f | wc -l) in isolated writable user data"
+find "$root/userdata" -type f -printf '[REAL_PROGRESS_FILE] %P (%s bytes)\n' | head -n 40
+echo 'This is a first-boot rendering smoke test, NOT evidence of difficulty selection, completed cutscene, gameplay, or subsequent-launch main menu.'
