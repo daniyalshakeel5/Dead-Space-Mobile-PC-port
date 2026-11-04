@@ -1,0 +1,67 @@
+name: Windows owner-only native game build kit
+on:
+  push:
+    branches: [work/deadspace-windows-lifted-host-2026-11-04]
+    paths:
+      - experimental/windows_native_host/Build-DeadSpace-Windows.ps1
+      - experimental/windows_native_host/Build-DeadSpace-Windows.cmd
+      - experimental/windows_native_host/README-TEST-WINDOWS.txt
+      - experimental/lifted_milestone6/tools/build_win32_lifted.sh
+      - experimental/lifted_milestone6/tools/windows_lifted_compat.h
+      - .github/workflows/windows-private-game-build-kit.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  powershell-check:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate one-click Windows PowerShell launcher syntax
+        shell: pwsh
+        run: |
+          $source = 'experimental/windows_native_host/Build-DeadSpace-Windows.ps1'
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path $source).Path, [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { throw ($errors | Out-String) }
+          Write-Host 'PASS: GUI build script parses correctly in native Windows PowerShell'
+  bash-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check WSL cross-build script and ensure local-only original data
+        run: |
+          bash -n experimental/lifted_milestone6/tools/build_win32_lifted.sh
+          grep -q 'DeadSpaceMobile-Win32.exe' experimental/lifted_milestone6/tools/build_win32_lifted.sh
+          grep -q 'tools/out' experimental/lifted_milestone6/tools/build_win32_lifted.sh
+  package-kit:
+    needs: [powershell-check, bash-check]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage no-game-assets Windows one-click kit
+        run: |
+          mkdir -p package/tools
+          src=experimental/lifted_milestone6/tools
+          cp "$src/host.c" "$src/jni_vm.c" "$src/threads.c" "$src/libc_files.c" package/tools/
+          cp "$src/gl_shim.c" "$src/front_sdl.c" "$src/gen_gl.py" package/tools/
+          cp "$src/windows_lifted_compat.h" "$src/build_win32_lifted.sh" package/tools/
+          cp experimental/windows_native_host/win32_substrate.c package/tools/
+          cp experimental/windows_native_host/win32_substrate.h package/tools/
+          cp experimental/windows_native_host/Build-DeadSpace-Windows.ps1 package/
+          cp experimental/windows_native_host/Build-DeadSpace-Windows.cmd package/
+          cp experimental/windows_native_host/README-TEST-WINDOWS.txt package/
+          if find package -type f | grep -E '\.(apk|so|m3g|ogg|dex|bin)$'; then
+            echo 'Refusing to publish original EA game data'; exit 1
+          fi
+          echo 'Packaging only native host source/GUI scripts. No generated fn_*.c.'
+          find package -type f -printf '%P\n' | sort
+      - name: Publish one-click native Windows test build kit
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeadSpaceMobile-Windows-x86-PrivateGame-Builder
+          path: package/
+          if-no-files-found: error
+          retention-days: 30
