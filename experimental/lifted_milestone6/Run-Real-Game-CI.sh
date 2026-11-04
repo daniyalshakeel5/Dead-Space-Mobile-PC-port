@@ -100,6 +100,8 @@ if (( code != 0 )); then
     echo "Actual Object3D duplicate caller: $caller"
     addr2line -e ./dspc_sdl -a -f -C -i "$caller" || true
   done
+  echo '===== ORIGINAL MODEL LOADER / JAVA STREAM FAILURE EVENTS ====='
+  grep -E 'REAL_MODEL_|REAL_OBJECT3D_|JAVA_STREAM_PARTIAL|JAVA_STREAM_SKIP_CLAMP|JNI_STREAM_SELFTEST' "$root/logs/native-run.log" | tail -n 80 || true
   echo '===== LAST REAL RESOURCE/M3G/OBJECT LOADING EVENTS ====='
   grep -E 'M3G_LOADER|TEXPACK_|FATAL:|GUEST_RESOURCE_(MISS|OK)|AssetManager.openFd|AssetManager.open\('     "$root/logs/native-run.log" | tail -n 65 || true
   echo '===== END ACTUAL RUNTIME SYMBOLS ====='
