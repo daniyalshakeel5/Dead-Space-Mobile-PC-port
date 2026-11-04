@@ -26,6 +26,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "win32_substrate.h"
+#ifndef PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
+#define PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP PTHREAD_RECURSIVE_MUTEX_INITIALIZER
+#endif
 
 #ifndef PROT_NONE
 #define PROT_NONE 0

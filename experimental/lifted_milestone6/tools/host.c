@@ -428,6 +428,7 @@ static void* watchdog(void* a) {                     // DS_WATCHDOG=<seconds>: d
     }
     return 0;
 }
+#endif
 // keyboard / gamepad keys use the Android key-code protocol the game was built for (KeyboardAndroid.NativeOnKeyDown/Up).
 // The Xperia Play mapping (KeyboardAndroidXperiaPlay::RawToStdKey): 23=Cross 99=Square 100=Triangle, 4(+alt)=Circle, 19-22=D-pad.
 static void host_key(int down, int keycode, int alt) {
@@ -440,7 +441,6 @@ static void host_key(int down, int keycode, int alt) {
     call_java_native(addr, kb_obj, "III", 3, a, g_sp0_for_input);
 }
 typedef struct { const char* so; } Args;
-#endif
 static void* run(void* p) {
     Args* a = p;
     load_image(a->so);
