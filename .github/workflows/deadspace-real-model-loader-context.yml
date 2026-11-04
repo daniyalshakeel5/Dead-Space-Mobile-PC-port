@@ -58,6 +58,22 @@ jobs:
                       for j in range(lo,hi):print(f"{j+1:6d}: {s[j]}")
                   else:
                       for j in range(i,min(i+1500,end)):print(f"{j+1:6d}: {s[j]}")
+          # Enumerate all genuine translated callers of Object3D::duplicate.
+          # These are original ARM-to-C call sites, not simulated behavior.
+          print("\n========= ORIGINAL Object3D::duplicate DIRECT CALLERS =========")
+          count=0
+          for p in d.glob("fn_*.c"):
+              lines=p.read_text().splitlines()
+              current="<none>"
+              for i,line in enumerate(lines):
+                  if line.startswith("u64 f_"):
+                      current=line[:line.index("{")].strip()
+                  if "f_00368efc(" in line and not line.startswith("u64 f_00368efc("):
+                      count+=1
+                      print(f"CALLER {p.name}:{i+1} {current}",flush=True)
+                      for j in range(max(0,i-20),min(len(lines),i+14)):
+                          print(f"{j+1:6d}: {lines[j]}")
+          print(f"Original direct duplicate call sites: {count}",flush=True)
           # Also show raw local neighborhood around the exact runtime SIGSEGV.
           p=d/"fn_003.c"
           if p.exists():
