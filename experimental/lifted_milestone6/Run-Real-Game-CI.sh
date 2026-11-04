@@ -29,6 +29,32 @@ fi
 }
 echo "REAL APK ASSETS: $(find "$assets/published" -type f | wc -l) published resource files"; find "$assets/published" -mindepth 1 -maxdepth 1 -printf 'asset-subtree: %f\n' | head -n 30
 echo "REAL ELF SHA-256: $(sha256sum "$root/apk/lib/armeabi/libDeadSpace.so" | cut -d' ' -f1)"
+# Inspect only original M3G section metadata (no generated test assets).
+python3 - "$assets/published/models" <<'PY'
+from pathlib import Path
+import sys, struct
+root=Path(sys.argv[1])
+for name in ("slasher.m3g","lurker.m3g","lurker_projectile.m3g"):
+    p=root/name
+    if not p.exists(): print("[REAL_M3G_FILE] missing original asset:",name); continue
+    data=p.read_bytes()
+    magic=data[:12]
+    print(f"[REAL_M3G_FILE] name={name} bytes={len(data)} "
+          f"magic={magic.hex(' ')}",flush=True)
+    pos=12
+    for n in range(8):
+        if pos + 9 > len(data): break
+        comp=data[pos]
+        total,uncomp=struct.unpack_from("<II",data,pos+1)
+        print(f"[REAL_M3G_SECTION] name={name} index={n} offset={pos} "
+              f"compression={comp} size={total} uncompressed={uncomp}",flush=True)
+        if total < 13 or pos+total > len(data):
+            print(f"[REAL_M3G_SECTION_INVALID] name={name} bad section bounds",flush=True)
+            break
+        pos+=total
+        if pos == len(data): break
+    print(f"[REAL_M3G_SECTION_END] name={name} scanned={pos}/{len(data)}",flush=True)
+PY
 src="$GITHUB_WORKSPACE/experimental/lifted_milestone6/tools"
 cp -a "$src" "$root/tools"
 cd "$root/tools"
