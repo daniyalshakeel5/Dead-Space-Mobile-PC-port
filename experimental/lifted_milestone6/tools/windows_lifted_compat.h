@@ -92,6 +92,25 @@ static inline char* ds_win32_guest_realpath(const char* src, char* dst) {
 #define O_BINARY _O_BINARY
 #endif
 
+/* Windows MSVCRT calls fsync "_commit"; preserve Bionic fsync semantics. */
+#define fsync _commit
+
+/* POSIX lrand48 48-bit LCG: MinGW CRT has no implementation. This is
+ * native x86 logic matching the standard algorithm, not an ARM emulator.
+ * Use InterlockedCompareExchange64 because guest threads load assets in parallel.
+ */
+static __declspec(align(8)) volatile LONGLONG ds_lrand48_state =
+    0x1234abcd330eLL;
+static inline long ds_win32_lrand48(void) {
+    LONGLONG prev, next;
+    do {
+        prev = InterlockedCompareExchange64(&ds_lrand48_state, 0, 0);
+        next = (prev * 0x5deece66dLL + 0xbLL) & 0xffffffffffffLL;
+    } while (InterlockedCompareExchange64(&ds_lrand48_state, next, prev) != prev);
+    return (long)((next >> 17) & 0x7fffffff);
+}
+#define lrand48 ds_win32_lrand48
+
 /* Guest Bionic open flags originate on ARM. The standard open shim already
  * forwards only these flags. O_BINARY must be added on the host side. */
 
