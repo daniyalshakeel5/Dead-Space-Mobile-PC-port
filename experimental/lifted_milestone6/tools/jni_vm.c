@@ -292,6 +292,86 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
 
 // ---- JNI function shims
 static const char* sname(void) { return stub_names[g_stub_idx]; }
+/* Real JNI stream shim regression, executed by the same game binary without
+ * starting a game. This tests file ownership only; actual game boot remains
+ * a separate required CI gate using the user's original APK. */
+static int ds_test_asset_streams(void) {
+    char root[]="/tmp/dspc-jni-stream-XXXXXX", path[256];
+    if (!mkdtemp(root)) { perror("mkdtemp"); return 2; }
+    snprintf(path, sizeof path, "%s/%s", root, "probe.dat");
+    FILE* seed=fopen(path, "wb");
+    if (!seed) { perror("fopen"); rmdir(root); return 2; }
+    fwrite("abcdefgh", 1, 8, seed); fclose(seed);
+    const char* previous_root=g_assets_root;
+    g_assets_root=root;
+    int handled=0, result=1;
+    Mid afd={0}, create={0}, read_m={0}, close_m={0}, skip_m={0}, available_m={0};
+    snprintf(afd.cls, sizeof afd.cls, "android/content/res/AssetManager");
+    snprintf(afd.name, sizeof afd.name, "openFd");
+    snprintf(afd.sig, sizeof afd.sig, "(Ljava/lang/String;)Landroid/content/res/AssetFileDescriptor;");
+    snprintf(create.cls, sizeof create.cls, "android/content/res/AssetFileDescriptor");
+    snprintf(create.name, sizeof create.name, "createInputStream");
+    snprintf(create.sig, sizeof create.sig, "()Ljava/io/InputStream;");
+    snprintf(read_m.cls, sizeof read_m.cls, "java/io/InputStream");
+    snprintf(read_m.name, sizeof read_m.name, "read");
+    snprintf(read_m.sig, sizeof read_m.sig, "([BII)I");
+    snprintf(close_m.cls, sizeof close_m.cls, "java/io/InputStream");
+    snprintf(close_m.name, sizeof close_m.name, "close");
+    snprintf(close_m.sig, sizeof close_m.sig, "()V");
+    snprintf(skip_m.cls, sizeof skip_m.cls, "java/io/InputStream");
+    snprintf(skip_m.name, sizeof skip_m.name, "skip");
+    snprintf(skip_m.sig, sizeof skip_m.sig, "(J)J");
+    snprintf(available_m.cls, sizeof available_m.cls, "java/io/InputStream");
+    snprintf(available_m.name, sizeof available_m.name, "available");
+    snprintf(available_m.sig, sizeof available_m.sig, "()I");
+    u32 path_obj=new_obj(K_STRING,"probe.dat",NULL,0);
+    JArg path_arg[1]={{.i=path_obj}};
+    u32 parent=(u32)java_invoke(&afd,0,"L",1,path_arg,0,&handled);
+    JArg nothing[1]={{.i=0}};
+    if (!parent) goto done;
+    u32 a=(u32)java_invoke(&create,parent,"",0,nothing,0,&handled);
+    u32 b=(u32)java_invoke(&create,parent,"",0,nothing,0,&handled);
+    if (!a || !b || a==b) goto done;
+    u32 abuf=new_obj(K_ARRAY,NULL,calloc(9,1),8);
+    u32 bbuf=new_obj(K_ARRAY,NULL,calloc(9,1),8);
+    OBJ(abuf)->esz=1;
+    OBJ(bbuf)->esz=1;
+    JArg ar[3]={{.i=abuf},{.i=0},{.i=3}};
+    JArg br[3]={{.i=bbuf},{.i=0},{.i=3}};
+    if ((u32)java_invoke(&read_m,a,"LII",3,ar,0,&handled)!=3) goto done;
+    if ((u32)java_invoke(&read_m,b,"LII",3,br,0,&handled)!=3) goto done;
+    if (memcmp(OBJ(abuf)->p,"abc",3) || memcmp(OBJ(bbuf)->p,"abc",3)) goto done;
+    ar[1].i=3;
+    if ((u32)java_invoke(&read_m,a,"LII",3,ar,0,&handled)!=3) goto done;
+    if (memcmp(OBJ(abuf)->p,"abcdef",6)) goto done;
+    java_invoke(&close_m,a,"",0,nothing,0,&handled);
+    br[1].i=3;
+    if ((u32)java_invoke(&read_m,b,"LII",3,br,0,&handled)!=3) goto done;
+    if (memcmp(OBJ(bbuf)->p,"abcdef",6)) goto done;
+    /* Closing the descriptor must not invalidate previously created streams. */
+    snprintf(close_m.cls,sizeof close_m.cls,"android/content/res/AssetFileDescriptor");
+    java_invoke(&close_m,parent,"",0,nothing,0,&handled);
+    br[1].i=6; br[2].i=2;
+    if ((u32)java_invoke(&read_m,b,"LII",3,br,0,&handled)!=2) goto done;
+    if (memcmp(OBJ(bbuf)->p,"abcdefgh",8)) goto done;
+    br[2].i=0;
+    if ((u32)java_invoke(&read_m,b,"LII",3,br,0,&handled)!=0) goto done;
+    br[2].i=1;
+    if ((s32)java_invoke(&read_m,b,"LII",3,br,0,&handled)!=-1) goto done;
+    if (java_invoke(&available_m,b,"",0,nothing,0,&handled)!=0) goto done;
+    JArg skip_arg[1]={{.j=99}};
+    if (java_invoke(&skip_m,b,"J",1,skip_arg,0,&handled)!=0) goto done;
+    snprintf(close_m.cls,sizeof close_m.cls,"java/io/InputStream");
+    java_invoke(&close_m,b,"",0,nothing,0,&handled);
+    result=0;
+done:
+    g_assets_root=previous_root;
+    unlink(path); rmdir(root);
+    if(result) fprintf(stderr,"[JNI_STREAM_SELFTEST] FAIL independent cursor/close/EOF semantics\n");
+    else fprintf(stderr,"[JNI_STREAM_SELFTEST] PASS independent cursor/close/EOF semantics\n");
+    return result;
+}
+
 static u64 jni_default(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
     const char* n = sname(); tr(n);
     static const char* seen[256]; static int ns;
