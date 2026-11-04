@@ -54,7 +54,12 @@ jobs:
             $stream = $e.Open(); try { $stream.WriteByte(1) } finally { $stream.Dispose() }
           } finally { $zip.Dispose() }
           $root = Join-Path $env:RUNNER_TEMP 'DeadSpaceFreshProject'
-          $installer = Join-Path $PWD 'experimental/windows_native_host/Install-DeadSpace-Fresh.ps1'
+          $kit = Join-Path $env:RUNNER_TEMP 'fresh-test-kit'
+          New-Item -ItemType Directory -Force (Join-Path $kit 'tools') | Out-Null
+          Copy-Item 'experimental/lifted_milestone6/tools/*' (Join-Path $kit 'tools') -Force
+          Copy-Item 'experimental/windows_native_host/win32_substrate.*' (Join-Path $kit 'tools') -Force
+          Copy-Item 'experimental/windows_native_host/Install-DeadSpace-Fresh.ps1' $kit -Force
+          $installer = Join-Path $kit 'Install-DeadSpace-Fresh.ps1'
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -ApkPath $fixture -InstallDir $root -PrepareOnly
           if ($LASTEXITCODE -ne 0) { throw "Fresh extraction installer failed ($LASTEXITCODE)" }
           foreach($path in @('apk/lib/armeabi/libDeadSpace.so','apk/assets/EAMCore.ini','apk/assets/var/settings.sb','tools/gen_all.py','tools/lift.py','tools/overrides.py','tools/texturepack_fault_guard.py','tools/host.c','tools/build_win32_lifted.sh','tools/windows_lifted_compat.h','original-elf-sha256.txt')) {
@@ -70,7 +75,7 @@ jobs:
         run: |
           Add-Type -AssemblyName System.IO.Compression
           Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $installer = Join-Path $PWD 'experimental/windows_native_host/Install-DeadSpace-Fresh.ps1'
+          $installer = Join-Path $env:RUNNER_TEMP 'fresh-test-kit/Install-DeadSpace-Fresh.ps1'
           foreach ($case in @('xperia','traversal')) {
             $file = Join-Path $env:RUNNER_TEMP ($case+'.apk')
             $zip = [IO.Compression.ZipFile]::Open($file,[IO.Compression.ZipArchiveMode]::Create)
