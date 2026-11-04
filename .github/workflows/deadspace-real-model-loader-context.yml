@@ -73,7 +73,7 @@ jobs:
           python3 - "$RUNNER_TEMP/generated" <<'PY'
           import pathlib,sys,re
           d=pathlib.Path(sys.argv[1])
-          for func in ("f_0032a4c4","f_00327a20","f_00324dd0"):
+          for func in ("f_00365168","f_00327bac","f_00327a20"):
               print("\n========= ACTUAL GENERATED SOURCE",func,"=========",flush=True)
               matches=[]
               for p in d.glob("fn_*.c"):
