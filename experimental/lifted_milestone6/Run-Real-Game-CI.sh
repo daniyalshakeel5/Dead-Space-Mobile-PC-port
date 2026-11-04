@@ -52,9 +52,11 @@ test_frames="${DS_REAL_TEST_FRAMES:-900}"
   echo 'REAL FAIL: DS_REAL_TEST_FRAMES must be 60..900'; exit 45;
 }
 if (( test_frames > 650 )); then shot_at=650; else shot_at=$((test_frames-10)); fi
+runtime_budget=360
+if (( test_frames > 300 )); then runtime_budget=900; fi
 echo "REAL NATIVE TEST: frame target=$test_frames screenshot_at=$shot_at"
 set +e
-timeout --kill-after=20s 360s xvfb-run -a env \
+timeout --kill-after=20s "${runtime_budget}s" xvfb-run -a env \
   LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy \
   DS_WINDOW=1 DS_NOVSYNC=1 DS_ASSET_TRACE=1 \
   DS_DATA="$assets" DS_ASSETS="$assets" \
