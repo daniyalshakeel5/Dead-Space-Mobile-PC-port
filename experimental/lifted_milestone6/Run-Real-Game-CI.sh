@@ -74,6 +74,7 @@ python3 m3g_magic_probe.py --source out/fn_055.c --instrument
 python3 m3g_object_trace.py --source out/fn_055.c --instrument
 python3 native_datainput_read_trace.py --source out/fn_055.c --instrument
 python3 native_buffered_input.py --source out/fn_058.c --instrument
+python3 keyframe_native_guard.py --source out/fn_060.c --instrument
 python3 m3g_loader_serialization.py --source out/fn_055.c --instrument
 cd out
 chmod +x build.sh
@@ -133,6 +134,8 @@ if (( code != 0 )); then
     echo "Actual Object3D duplicate caller: $caller"
     addr2line -e ./dspc_sdl -a -f -C -i "$caller" || true
   done
+  echo '===== ORIGINAL KEYFRAMESEQUENCE ARRAY ALLOCATIONS AND INDEX BOUNDS ====='
+  grep -E 'REAL_M3G_KEYFRAME_' "$root/logs/native-run.log" | tail -n 48 || true
   echo '===== EARLIEST REAL M3G ASSET READS, PARSER AND JNI BUFFER TRANSFERS ====='
   grep -E 'REAL_M3G_|JAVA_M3G_STREAM_POSITION|JNI_M3G_ARRAY_ELEMENTS|JAVA_REAL_M3G_READ|JNI_12_BYTE|REAL_MODEL_' "$root/logs/native-run.log" | head -n 90 || true
   echo '===== ORIGINAL MODEL LOADER / JAVA STREAM FAILURE EVENTS ====='
