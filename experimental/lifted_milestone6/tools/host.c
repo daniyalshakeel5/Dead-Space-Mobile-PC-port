@@ -506,6 +506,9 @@ static void* run(void* p) {
 }
 
 int main(int argc, char** argv) {
+    /* Real-APK trace runs avoid gigabytes of routine Java stdout. The
+     * real M3G/JNI byte read and model decoder events are always retained. */
+    if (getenv("DS_QUIET_JAVA")) g_log_java = 0;
     /* Runs against the actual JNI implementation; separate from real APK boot. */
     if (getenv("DS_JNI_STREAM_SELFTEST")) return ds_test_asset_streams();
     const char* so = argc > 1 ? argv[1] : "libDeadSpace.so";
