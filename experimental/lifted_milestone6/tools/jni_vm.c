@@ -110,7 +110,14 @@ static int ds_asset_name_compare(const void* aa, const void* bb) {
 static int stream_read(JObj* o, u8* dst, int len) {
     if (len == 0) return 0;
     if (len < 0 || !o || !o->p || !dst) return -1;
-    size_t n = fread(dst, 1, (size_t)len, (FILE*)o->p);
+    FILE* fp = (FILE*)o->p;
+    size_t n = fread(dst, 1, (size_t)len, fp);
+    if (getenv("DS_ASSET_TRACE") && n != (size_t)len) {
+        fprintf(stderr, "[JAVA_STREAM_PARTIAL] resource=%s request=%d got=%zu "
+                "position=%ld eof=%d error=%d\\n",
+                o->s ? o->s : "(unknown)", len, n,
+                ftell(fp), feof(fp), ferror(fp));
+    }
     return n ? (int)n : -1;
 }
 static int stream_byte_array_ok(JObj* b, s32 offset, s32 count) {
@@ -127,13 +134,21 @@ static u64 stream_skip(JObj* stream, u64 requested_raw) {
     s64 requested = (s64)requested_raw;
     if (requested <= 0) return 0;
     FILE* fp = (FILE*)stream->p;
+    flockfile(fp);
     long start = ftell(fp);
-    if (start < 0 || fseek(fp, 0, SEEK_END) != 0) { g_exception = 1; return 0; }
+    if (start < 0 || fseek(fp, 0, SEEK_END) != 0) {
+        g_exception = 1; funlockfile(fp); return 0;
+    }
     long end = ftell(fp);
-    if (end < 0 || fseek(fp, start, SEEK_SET) != 0) { g_exception = 1; return 0; }
+    if (end < 0 || fseek(fp, start, SEEK_SET) != 0) {
+        g_exception = 1; funlockfile(fp); return 0;
+    }
     u64 available = end > start ? (u64)(end - start) : 0;
     u64 actual = (u64)requested < available ? (u64)requested : available;
-    if (fseek(fp, start + (long)actual, SEEK_SET) != 0) { g_exception = 1; return 0; }
+    if (fseek(fp, start + (long)actual, SEEK_SET) != 0) {
+        g_exception = 1; funlockfile(fp); return 0;
+    }
+    funlockfile(fp);
     if (getenv("DS_ASSET_TRACE") && (u64)requested != actual)
         fprintf(stderr,
             "[JAVA_STREAM_SKIP_CLAMP] requested=%llu actual=%llu at=%ld file_size=%ld\n",
@@ -153,7 +168,7 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
             char path[1024]; JObj* s = OBJ(a[0].i); snprintf(path, sizeof path, "%s/%s", g_assets_root, s && s->s ? s->s : "");
             FILE* f = fopen(path, "rb");
             if (!f) { g_exception = 1; if (g_log_java) printf("   [java] AssetManager.open(%s) -> FileNotFoundException\n", path); return 0; }
-            return new_obj(K_STREAM, "java/io/InputStream", f, 0);
+            return new_obj(K_STREAM, path, f, 0);
         }
         if (!strcmp(nm, "openFd")) {
             char path[1024]; JObj* s = OBJ(a[0].i); snprintf(path, sizeof path, "%s/%s", g_assets_root, s && s->s ? s->s : "");
@@ -210,10 +225,17 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
         if (!strcmp(nm, "close")) { if (so->p) fclose((FILE*)so->p); so->p = 0; return 0; }
         if (!strcmp(nm, "available")) {
             if (!so->p) { g_exception = 1; return 0; }
-            FILE* fp = (FILE*)so->p; long cur = ftell(fp);
-            if (cur < 0 || fseek(fp, 0, SEEK_END) != 0) { g_exception = 1; return 0; }
+            FILE* fp = (FILE*)so->p;
+            flockfile(fp);
+            long cur = ftell(fp);
+            if (cur < 0 || fseek(fp, 0, SEEK_END) != 0) {
+                g_exception = 1; funlockfile(fp); return 0;
+            }
             long end = ftell(fp);
-            if (fseek(fp, cur, SEEK_SET) != 0 || end < 0) { g_exception = 1; return 0; }
+            if (fseek(fp, cur, SEEK_SET) != 0 || end < 0) {
+                g_exception = 1; funlockfile(fp); return 0;
+            }
+            funlockfile(fp);
             return end > cur ? (u32)(end - cur) : 0;
         }
         if (!strcmp(nm, "skip")) return stream_skip(so, a[0].j);
@@ -227,7 +249,7 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
             FILE* stream = so->p ? fopen((const char*)so->p, "rb") : NULL;
             pthread_mutex_unlock(&g_objlock);
             if (!stream) { g_exception = 1; return 0; }
-            return new_obj(K_STREAM, "java/io/InputStream", stream, 0);
+            return new_obj(K_STREAM, (const char*)so->p, stream, 0);
         }
         if (!strcmp(nm, "close")) {
             pthread_mutex_lock(&g_objlock);
