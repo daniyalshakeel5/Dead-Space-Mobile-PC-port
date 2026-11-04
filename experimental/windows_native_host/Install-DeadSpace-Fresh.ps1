@@ -7,6 +7,15 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$script:TranscriptStarted = $false
+$script:InstallLog = ""
+
+function StopInstallLog {
+    if ($script:TranscriptStarted) {
+        try { Stop-Transcript | Out-Null } catch {}
+        $script:TranscriptStarted = $false
+    }
+}
 
 function Notice([string]$Message,[bool]$IsError) {
     if ($PrepareOnly) { Write-Host $Message; return }
@@ -180,6 +189,10 @@ try {
         }
     }
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+    $script:InstallLog=Join-Path $InstallDir "install.log"
+    Start-Transcript -Path $script:InstallLog -Append | Out-Null
+    $script:TranscriptStarted=$true
+    Write-Host "[DS INSTALL] Installation report: $script:InstallLog"
     $apkDir=Join-Path $InstallDir "apk"
     $toolsDir=Join-Path $InstallDir "tools"
     New-Item -ItemType Directory -Path $apkDir,$toolsDir -Force | Out-Null
@@ -220,6 +233,7 @@ Game library and asset files remain local; never uploaded.
     Write-Host "[DS INSTALL] Installed complete ARM-to-C translator and Win32 host source."
     if ($PrepareOnly) {
         Write-Host "[DS INSTALL] PASS: fresh package prepared (no WSL or game compilation requested)."
+        StopInstallLog
         exit 0
     }
 
@@ -253,10 +267,15 @@ Game library and asset files remain local; never uploaded.
     if (!$NoLaunch) {
         Start-Process -FilePath $play -WorkingDirectory (Join-Path $InstallDir "windows-build")
     }
+    StopInstallLog
     exit 0
 } catch {
     $msg=$_.Exception.Message
     Write-Host "[DS INSTALL ERROR] $msg" -ForegroundColor Red
-    Notice $msg $true
+    if ($script:InstallLog) {
+        Write-Host "[DS INSTALL] Error log: $script:InstallLog"
+    }
+    StopInstallLog
+    Notice ($msg + $(if ($script:InstallLog) { "`nInstaller log: $script:InstallLog" } else { "" })) $true
     exit 1
 }
