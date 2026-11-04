@@ -192,6 +192,17 @@ try {
         !(Test-Path -LiteralPath $originalAssets -PathType Container)) {
         throw "APK extraction did not create the expected original library and assets."
     }
+    # Do not attempt to translate a different Android ABI or renamed game file.
+    # ARM ELF32 (EM_ARM=40) and little-endian layout are required by lift.py.
+    $header=New-Object byte[] 20
+    $elf=[IO.File]::OpenRead($originalSo)
+    try { $num=$elf.Read($header,0,$header.Length) } finally { $elf.Dispose() }
+    if ($num -lt 20 -or $header[0] -ne 127 -or $header[1] -ne 69 -or
+        $header[2] -ne 76 -or $header[3] -ne 70 -or
+        $header[4] -ne 1 -or $header[5] -ne 1 -or
+        [BitConverter]::ToUInt16($header,18) -ne 40) {
+        throw "The extracted libDeadSpace.so is not the expected ARM32 little-endian ELF. Select the original matching APK, not an Xperia Play or ARM64 version."
+    }
     $sha=(Get-FileHash -LiteralPath $originalSo -Algorithm SHA256).Hash.ToLowerInvariant()
     Set-Content -LiteralPath (Join-Path $InstallDir "original-elf-sha256.txt") -Value $sha
     Write-Host "[DS INSTALL] Original libDeadSpace.so SHA256: $sha"
