@@ -34,6 +34,10 @@ cp -a "$src" "$root/tools"
 cd "$root/tools"
 export DS_SO="$root/apk/lib/armeabi/libDeadSpace.so"
 python3 gen_all.py
+# Observe the exact original M3G vector before the proven null dereference.
+# This is derived from the live APK; it never suppresses a loader error or
+# substitutes an Object3D for a missing node.
+python3 modelcache_node_probe.py --source out/fn_003.c --instrument
 cd out
 chmod +x build.sh
 SDL_CFLAGS="-I/usr/include/SDL2" SDL_LIBS="-lSDL2" ./build.sh > "$root/logs/native-build.log" 2>&1 || {
