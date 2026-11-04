@@ -56,7 +56,7 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/dspc-python"
           "$RUNNER_TEMP/dspc-python/bin/pip" install --disable-pip-version-check pyelftools Pillow
           echo "$RUNNER_TEMP/dspc-python/bin" >> "$GITHUB_PATH"
-      - name: Real game boot: verify native M3G virtual-read bytes and JNI array ownership; 120 frames
+      - name: "Real game boot: verify native M3G virtual-read bytes, JNI array ownership and 120 real frames"
         shell: bash
         env:
           DS_REAL_TEST_FRAMES: "120"
