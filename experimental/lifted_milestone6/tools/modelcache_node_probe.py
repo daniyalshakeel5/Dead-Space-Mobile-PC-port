@@ -53,6 +53,26 @@ def patch(source: str) -> str:
     (unsigned)LD32(sp+36u), (unsigned)LD32(sp+40u),
     (unsigned)LD32(sp+52u), (unsigned)LD32(sp+56u),
     (unsigned)LD32(sp+60u));
+  /* Inspect actual M3G intrusive_ptr vector elements (no modification).
+   * A nonempty EASTL vector can still contain null Object3D entries. */
+  {
+    u32 ds_begin = LD32(sp+52u), ds_end = LD32(sp+56u);
+    if (ds_begin != 0u && ds_end >= ds_begin &&
+        (ds_end - ds_begin) % 4u == 0u &&
+        (ds_end - ds_begin) <= 65536u) {
+      u32 ds_count = (ds_end - ds_begin) / 4u;
+      u32 ds_null_count = 0u;
+      for (u32 ds_i = 0; ds_i < ds_count; ds_i++)
+        if (LD32(ds_begin + ds_i*4u) == 0u) ds_null_count++;
+      fprintf(stderr,
+         "[REAL_MODEL_NODE_CONTENTS] nodes=%u null=%u first=%08x "
+         "second=%08x third=%08x\n",
+         (unsigned)ds_count, (unsigned)ds_null_count,
+         (unsigned)(ds_count>0 ? LD32(ds_begin) : 0),
+         (unsigned)(ds_count>1 ? LD32(ds_begin+4u) : 0),
+         (unsigned)(ds_count>2 ? LD32(ds_begin+8u) : 0));
+    }
+  }
   fflush(stderr);
 '''
     part=part.replace(CALL,CALL+"\n"+src,1)
