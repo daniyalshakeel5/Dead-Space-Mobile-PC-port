@@ -73,7 +73,7 @@ jobs:
           python3 - "$RUNNER_TEMP/generated" <<'PY'
           import pathlib,sys,re
           d=pathlib.Path(sys.argv[1])
-          for func in ("f_00350930","f_00364cd4","f_00364d58","f_00364d48","f_0006223c","f_00062c38","f_000c4798"):
+          for func in ("f_00325b04","f_00326948","f_003283f8"):
               print("\n========= ACTUAL GENERATED SOURCE",func,"=========",flush=True)
               matches=[]
               for p in d.glob("fn_*.c"):
@@ -90,7 +90,10 @@ jobs:
                       lo=i;hi=min(end,i+1200)
                       for j in range(lo,hi):print(f"{j+1:6d}: {s[j]}")
                   else:
-                      for j in range(i,min(i+1500,end)):print(f"{j+1:6d}: {s[j]}")
+                      for j in range(i,min(i+900,end)):print(f"{j+1:6d}: {s[j]}")
+          # Stop after the exact original crashing function and both callers;
+          # these results drive a targeted corrective patch instead of guessing.
+          sys.exit(0)
           # Identify exact original ARM-to-C JNI/native input reader subroutines
           # rather than replacing valid model assets or guessing a byte stream.
           print("\n========= REAL APK INPUT STREAM BRIDGE FUNCTIONS =========")
