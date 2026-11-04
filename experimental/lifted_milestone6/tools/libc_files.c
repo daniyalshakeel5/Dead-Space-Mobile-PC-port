@@ -48,7 +48,14 @@ IMP(stat)  { T(stat); const char* path = P(r0); struct stat s; int rc = stat(pat
     ds_asset_io_note("stat", path, rc == 0, saved); errno = saved; RET(rc); }
 IMP(fstat) { T(fstat); struct stat s; int rc = fstat((int)r0, &s); int saved = errno;
     if (!rc) fill_stat(r1, &s); else g_errno = saved; errno = saved; RET(rc); }
-IMP(open)  { T(open); const char* path = P(r0); int fd = open(path, (int)r1, (mode_t)r2); int saved = errno;
+IMP(open)  { T(open); const char* path = P(r0);
+#ifdef _WIN32
+    /* Windows CRT defaults to text mode; Android resources are binary. */
+    int fd = open(path, (int)r1 | O_BINARY, (mode_t)r2);
+#else
+    int fd = open(path, (int)r1, (mode_t)r2);
+#endif
+    int saved = errno;
     if (fd < 0) g_errno = saved;
     ds_asset_io_note("open", path, fd >= 0, saved); errno = saved; RET(fd); }
 IMP(close) { T(close); int rc = close((int)r0); if (rc < 0) g_errno = errno; RET(rc); }
