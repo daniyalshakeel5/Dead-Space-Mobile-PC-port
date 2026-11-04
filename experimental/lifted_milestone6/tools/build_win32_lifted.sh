@@ -79,6 +79,12 @@ if [[ "${DS_MODEL_CACHE_EMPTY_RECOVERY:-1}" != "0" ]]; then
     python3 "$SRC/modelcache_empty_vector.py" --source "$GEN/fn_003.c" --instrument
 fi
 
+# The original game caller already handles duplicate() returning NULL; apply
+# that native error path for a missing subnode instead of dereferencing zero.
+[[ -s "$SRC/modelcache_null_duplicate_recovery.py" ]] ||
+    { echo '[ERROR] Missing genuine ModelCache null-result recovery'; exit 16; }
+python3 "$SRC/modelcache_null_duplicate_recovery.py" --source "$GEN/fn_003.c" --instrument
+
 # Stop at the newly confirmed original Object3D::duplicate NULL object site.
 # Produce the private source + direct-caller report to isolate upstream causes.
 # Only NULL objects log + fail closed; non-NULL game behavior is unchanged.
