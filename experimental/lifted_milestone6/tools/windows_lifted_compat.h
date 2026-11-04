@@ -128,6 +128,8 @@ static LONG WINAPI ds_windows_crash_filter(EXCEPTION_POINTERS* ep) {
         fprintf(stderr, "   access kind=%lu fault address=%p\n",
           (unsigned long)ep->ExceptionRecord->ExceptionInformation[0],
           (void*)(uintptr_t)ep->ExceptionRecord->ExceptionInformation[1]);
+    fprintf(stderr, "   process image base=%p thread_id=%lu\n",
+            (void*)GetModuleHandleA(NULL), (unsigned long)GetCurrentThreadId());
     fflush(stderr);
     return EXCEPTION_EXECUTE_HANDLER;
 }

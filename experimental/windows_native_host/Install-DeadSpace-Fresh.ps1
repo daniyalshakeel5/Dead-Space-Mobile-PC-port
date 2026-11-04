@@ -132,6 +132,8 @@ setlocal
 title Dead Space Mobile - Native Windows x86
 cd /d "%~dp0"
 if not exist logs mkdir logs
+if not exist "%~dp0..\apk\assets\var" mkdir "%~dp0..\apk\assets\var"
+if not exist "%~dp0..\apk\assets\var" echo [DS SAVE ERROR] Cannot create app var directory.
 set "DS_WINDOW=1"
 set "DS_STEPS=create,surface,frame"
 set "DS_FRAMES=0"
@@ -144,12 +146,18 @@ echo Launching Dead Space Mobile on native Windows x86...
 set "rc=%errorlevel%"
 echo Game exit code: %rc%
 if not "%rc%"=="0" (
- echo Please send windows-build\logs\windows-run.log
- start "" notepad "%~dp0logs\windows-run.log"
+ echo Please send windows-build\logs\windows-run.log and crash-symbolized.log
+ if exist "%~dp0Diagnose-DeadSpace-Crash.ps1" powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Diagnose-DeadSpace-Crash.ps1" -InstallDir "%~dp0.." -Quiet
+ if exist "%~dp0logs\crash-symbolized.log" (
+   start "" notepad "%~dp0logs\crash-symbolized.log"
+ ) else (
+   start "" notepad "%~dp0logs\windows-run.log"
+ )
  pause
 )
 '@
     Set-Content -LiteralPath $play -Value $source -Encoding Ascii
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "Diagnose-DeadSpace-Crash.ps1") -Destination (Join-Path $work "Diagnose-DeadSpace-Crash.ps1") -Force
     return $play
 }
 

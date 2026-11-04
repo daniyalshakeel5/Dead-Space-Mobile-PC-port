@@ -24,7 +24,9 @@ try {
         'build_win32_lifted.sh',
         'win32_import_bridge.h',
         'win32_missing_imports.c',
-        'win32_missing_gles.c'
+        'win32_missing_gles.c',
+        'jni_vm.c',
+        'windows_lifted_compat.h'
     )
     foreach ($name in $patchFiles) {
         if (!(Test-Path -LiteralPath (Join-Path $packageTools $name))) {
@@ -66,6 +68,8 @@ setlocal
 title Dead Space Mobile - Native Windows
 cd /d "%~dp0"
 if not exist logs mkdir logs
+if not exist "%~dp0..\apk\assets\var" mkdir "%~dp0..\apk\assets\var"
+if not exist "%~dp0..\apk\assets\var" echo [DS SAVE ERROR] Cannot create app var directory.
 set "DS_WINDOW=1"
 set "DS_STEPS=create,surface,frame"
 set "DS_FRAMES=0"
@@ -77,12 +81,21 @@ set "DS_MANUFACTURER=Sony Ericsson"
 set "rc=%errorlevel%"
 echo Game exit code: %rc%
 if not "%rc%"=="0" (
- echo Please send windows-build\logs\windows-run.log
- start "" notepad "%~dp0logs\windows-run.log"
+ echo Please send windows-build\logs\windows-run.log and crash-symbolized.log
+ if exist "%~dp0Diagnose-DeadSpace-Crash.ps1" powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Diagnose-DeadSpace-Crash.ps1" -InstallDir "%~dp0.." -Quiet
+ if exist "%~dp0logs\crash-symbolized.log" (
+   start "" notepad "%~dp0logs\crash-symbolized.log"
+ ) else (
+   start "" notepad "%~dp0logs\windows-run.log"
+ )
  pause
 )
 '@
     Set-Content -LiteralPath $launch -Value $launchText -Encoding Ascii
+    $diagnoser = Join-Path $PSScriptRoot 'Diagnose-DeadSpace-Crash.ps1'
+    if (Test-Path -LiteralPath $diagnoser) {
+        Copy-Item -LiteralPath $diagnoser -Destination (Join-Path $work 'Diagnose-DeadSpace-Crash.ps1') -Force
+    }
     Write-Host "[DS REPAIR] Native PE32 executable ready: $exe"
     Write-Host '[DS REPAIR] This confirms linking, not gameplay or startup success.'
     if ($transcript) { Stop-Transcript | Out-Null; $transcript = $false }
