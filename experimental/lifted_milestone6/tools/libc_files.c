@@ -30,7 +30,8 @@ static FILE* hostfile(u32 f) {
 static void fill_stat(u32 buf, const struct stat* s) {
     u8* b = P(buf); memset(b, 0, 104);
     *(u64*)(b + 0) = (u64)s->st_dev; *(u32*)(b + 12) = (u32)s->st_ino; *(u32*)(b + 16) = (u32)s->st_mode; *(u32*)(b + 20) = (u32)s->st_nlink;
-    *(u32*)(b + 24) = (u32)s->st_uid; *(u32*)(b + 28) = (u32)s->st_gid; *(u64*)(b + 48) = (u64)s->st_size; #ifdef _WIN32
+    *(u32*)(b + 24) = (u32)s->st_uid; *(u32*)(b + 28) = (u32)s->st_gid; *(u64*)(b + 48) = (u64)s->st_size;
+#ifdef _WIN32
     *(u32*)(b + 56) = 4096u;
 #else
     *(u32*)(b + 56) = (u32)s->st_blksize;
@@ -91,7 +92,8 @@ IMP(closedir) { T(closedir); int rc = closedir(P(r0)); if (rc < 0) g_errno = err
 static u8 g_dirent[280];
 IMP(readdir) {                                               // bionic struct dirent: ino(8) off(8) reclen(2) type(1) name[256]
     T(readdir); struct dirent* e = readdir(P(r0)); if (!e) RET(0);
-    memset(g_dirent, 0, sizeof g_dirent); *(u64*)(g_dirent + 0) = e->d_ino; *(u16*)(g_dirent + 16) = 280; #ifdef _WIN32
+    memset(g_dirent, 0, sizeof g_dirent); *(u64*)(g_dirent + 0) = e->d_ino; *(u16*)(g_dirent + 16) = 280;
+#ifdef _WIN32
     g_dirent[18] = 0; /* Win32 dirent does not expose d_type reliably. */
 #else
     g_dirent[18] = e->d_type;
