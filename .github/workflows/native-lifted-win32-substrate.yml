@@ -5,6 +5,7 @@ on:
       - work/deadspace-windows-lifted-host-2026-11-04
     paths:
       - experimental/windows_native_host/**
+      - experimental/lifted_milestone6/tools/win32_bionic_openflags.h
       - .github/workflows/native-lifted-win32-substrate.yml
       - tools/compare_gles_texture_trace.py
       - tests/test_gles_texture_trace.py
@@ -30,6 +31,17 @@ jobs:
           $cmd = 'call "' + $vcvars + '" x86 >nul && cl /nologo /O2 /W4 /TC /Fe:win32_substrate_test.exe "' + $dir + '\win32_substrate.c" "' + $dir + '\test_win32_substrate.c" && win32_substrate_test.exe'
           & cmd.exe /d /s /c $cmd
           if ($LASTEXITCODE -ne 0) { throw "x86 native Windows test/build failed with $LASTEXITCODE" }
+      - name: Test Android-Bionic file flags against actual Windows x86 filesystem
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vsRoot = (& $vswhere -latest -products '*' -property installationPath).Trim()
+          $vcvars = Join-Path $vsRoot 'VC\Auxiliary\Build\vcvarsall.bat'
+          $test = 'experimental\windows_native_host\test_win32_bionic_openflags.c'
+          $cmd = 'call "' + $vcvars + '" x86 >nul && cl /nologo /O2 /W4 /TC /Fe:win32_bionic_flags_test.exe "' + $test + '" && win32_bionic_flags_test.exe'
+          & cmd.exe /d /s /c $cmd
+          if ($LASTEXITCODE -ne 0) { throw "Bionic openflags Windows test failed with $LASTEXITCODE" }
       - name: Confirm executable is a real x86 Windows PE image
         shell: pwsh
         run: |
