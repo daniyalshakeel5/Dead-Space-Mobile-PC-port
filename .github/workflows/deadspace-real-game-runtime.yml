@@ -56,7 +56,7 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/dspc-python"
           "$RUNNER_TEMP/dspc-python/bin/pip" install --disable-pip-version-check pyelftools Pillow
           echo "$RUNNER_TEMP/dspc-python/bin" >> "$GITHUB_PATH"
-      - name: Real APK 120-frame boot with independently owned JNI streams and verified EOF
+      - name: Real APK native M3G boot, per-file cursor audit, 3-worker recompile and 120 real frames
         shell: bash
         env:
           DS_REAL_TEST_FRAMES: "120"
