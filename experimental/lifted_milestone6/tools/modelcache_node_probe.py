@@ -39,7 +39,7 @@ def patch(source: str) -> str:
     src = r'''
   /* DS_REAL_MODELCACHE_VECTOR_000629B4 */
   fprintf(stderr,
-    "[REAL_MODEL_M3G_DECODE] native_out=%08x begin=%08x end=%08x cap=%08x\\n",
+    "[REAL_MODEL_M3G_DECODE] native_out=%08x begin=%08x end=%08x cap=%08x\n",
     (unsigned)(sp+36u),
     (unsigned)LD32(sp+36u), (unsigned)LD32(sp+40u),
     (unsigned)LD32(sp+44u));
@@ -49,7 +49,7 @@ def patch(source: str) -> str:
   /* DS_REAL_MODELCACHE_VECTOR_000629B4 */
   fprintf(stderr,
     "[REAL_MODEL_NODE_COPY] native_out_begin=%08x native_out_end=%08x "
-    "copy_begin=%08x copy_end=%08x copy_cap=%08x\\n",
+    "copy_begin=%08x copy_end=%08x copy_cap=%08x\n",
     (unsigned)LD32(sp+36u), (unsigned)LD32(sp+40u),
     (unsigned)LD32(sp+52u), (unsigned)LD32(sp+56u),
     (unsigned)LD32(sp+60u));
