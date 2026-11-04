@@ -56,8 +56,10 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/dspc-python"
           "$RUNNER_TEMP/dspc-python/bin/pip" install --disable-pip-version-check pyelftools Pillow
           echo "$RUNNER_TEMP/dspc-python/bin" >> "$GITHUB_PATH"
-      - name: Real APK native game run with decoded model node inspection and Object3D null caller trace
+      - name: Real APK native game 120-frame boot test (ModelCache + Object3D)
         shell: bash
+        env:
+          DS_REAL_TEST_FRAMES: "120"
         run: bash experimental/lifted_milestone6/Run-Real-Game-CI.sh
       - name: Report authentic runtime result
         if: always()
