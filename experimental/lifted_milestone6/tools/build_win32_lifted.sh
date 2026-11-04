@@ -56,6 +56,18 @@ if [[ ! -f "$SDKROOT/include/SDL2/SDL.h" ||
 fi
 python3 "$SRC/gen_gl.py" "$OBJ/gl_gen.c"
 
+# The owner's reproduced Win32 splash crash occurs when ModelCache's
+# f_00061414 leaves a model-node vector empty. The original engine already
+# has a NULL-node failure/cleanup path. Enable that same branch only for an
+# empty vector, then recompile ONLY the touched original function chunk.
+if [[ "${DS_MODEL_CACHE_EMPTY_RECOVERY:-1}" != "0" ]]; then
+    [[ -s "$SRC/modelcache_empty_vector.py" ]] ||
+        { echo '[ERROR] Missing ModelCache first-boot repair script.'; exit 12; }
+    [[ -s "$GEN/fn_003.c" ]] ||
+        { echo '[ERROR] Original ModelCache C chunk missing.'; exit 13; }
+    python3 "$SRC/modelcache_empty_vector.py" --source "$GEN/fn_003.c" --instrument
+fi
+
 # Same lifted softfp model as the known Linux native build.
 CFLAGS=(
     -O1 -g -std=gnu11 -w -msse2 -mfpmath=sse -ffp-contract=off
