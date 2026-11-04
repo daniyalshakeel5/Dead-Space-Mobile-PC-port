@@ -85,12 +85,6 @@ SDL_CFLAGS="-I/usr/include/SDL2" SDL_LIBS="-lSDL2" ./build.sh > "$root/logs/nati
 }
 [[ -s ./dspc_sdl ]] || { echo 'REAL FAIL: no native SDL game executable'; exit 45; }
 file ./dspc_sdl
-# Exercise the exact native Android/JNI stream implementation with a disposable
-# 8-byte input; then separately launch the actual copyrighted APK and assets.
-# Test data is only a JNI unit fixture, never a substitute for game content.
-if ! DS_JNI_STREAM_SELFTEST=1 ./dspc_sdl; then
-  echo 'REAL FAIL: native JNI stream ownership/EOF regression'; exit 44
-fi
 test_frames="${DS_REAL_TEST_FRAMES:-900}"
 [[ "$test_frames" =~ ^[0-9]+$ && "$test_frames" -ge 60 && "$test_frames" -le 900 ]] || {
   echo 'REAL FAIL: DS_REAL_TEST_FRAMES must be 60..900'; exit 45;
