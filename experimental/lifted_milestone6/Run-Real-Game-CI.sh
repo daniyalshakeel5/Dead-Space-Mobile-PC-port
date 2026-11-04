@@ -54,6 +54,11 @@ for name in ("slasher.m3g","lurker.m3g","lurker_projectile.m3g"):
         pos+=total
         if pos == len(data): break
     print(f"[REAL_M3G_SECTION_END] name={name} scanned={pos}/{len(data)}",flush=True)
+    if name == "slasher.m3g":
+        for pat in ("33 32 11 33 2f ed 38 2f ed 2f 38 ed",
+                    "10 05 22 04 01 13 b8 07 f4 40 0a 14"):
+            at=data.find(bytes.fromhex(pat))
+            print(f"[REAL_M3G_HEADER_SAMPLE_SEARCH] pattern={pat} found_offset={at}",flush=True)
 PY
 src="$GITHUB_WORKSPACE/experimental/lifted_milestone6/tools"
 cp -a "$src" "$root/tools"
