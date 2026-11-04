@@ -1,0 +1,125 @@
+name: Dead Space Mobile - original ARM game code recovery
+
+on:
+  push:
+    branches:
+      - work/deadspace-remote-preflight-2026-11-01
+    paths:
+      - "tools/ghidra/**"
+      - ".github/workflows/deadspace-game-code.yml"
+      - "docs/native-code-recovery.trigger"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-game-control-flow:
+    name: Original ARM native-code inspection, not a viewer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Ghidra-compatible JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Download upstream user-owned APK and pinned Ghidra 12.1.4
+        env:
+          GHIDRA_ZIP_URL: https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.1.4_build/ghidra_12.1.4_PUBLIC_20260921.zip
+          GAME_APK_URL: https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes/releases/download/dead_space_mobile_fixes/Deas.Space.Mobile.Fixes.apk
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --retry-delay 2 --max-time 720 \
+            -o "$RUNNER_TEMP/original.apk" "$GAME_APK_URL"
+          test "$(wc -c < "$RUNNER_TEMP/original.apk" | tr -d ' ')" = "325769461"
+          curl -fsSL --retry 3 --retry-delay 2 --max-time 900 \
+            -o "$RUNNER_TEMP/ghidra.zip" "$GHIDRA_ZIP_URL"
+          echo "ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db  $RUNNER_TEMP/ghidra.zip" \
+            | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/ghidra"
+          unzip -q "$RUNNER_TEMP/ghidra.zip" -d "$RUNNER_TEMP/ghidra"
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import shutil
+          import os
+          apk = Path(os.environ["RUNNER_TEMP"]) / "original.apk"
+          target = Path(os.environ["RUNNER_TEMP"]) / "native_game.so"
+          with ZipFile(apk) as z:
+              matches = [i for i in z.infolist()
+                         if i.filename.startswith("lib/") and i.filename.endswith(".so")
+                         and not i.is_dir() and 1024 < i.file_size < 64*1024*1024]
+              if len(matches) != 1:
+                  raise RuntimeError("Expected exactly one bounded ARM library")
+              with z.open(matches[0]) as src, target.open("wb") as dst:
+                  shutil.copyfileobj(src, dst, 128*1024)
+          print("Original ELF staged for Ghidra; no proprietary code published.")
+          PY
+          rm -f "$RUNNER_TEMP/original.apk" "$RUNNER_TEMP/ghidra.zip"
+
+      - name: Recover ARM function boundaries and native update-loop candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          GHIDRA_ROOT=$(find "$RUNNER_TEMP/ghidra" -maxdepth 1 -type d -name 'ghidra_*' -print -quit)
+          test -n "$GHIDRA_ROOT"
+          mkdir -p "$RUNNER_TEMP/ghidra-project" report
+          "$GHIDRA_ROOT/support/analyzeHeadless" \
+            "$RUNNER_TEMP/ghidra-project" DeadSpaceMobile \
+            -import "$RUNNER_TEMP/native_game.so" \
+            -scriptPath "$GITHUB_WORKSPACE/tools/ghidra" \
+            -postScript GhidraGameCodeMap.java "$GITHUB_WORKSPACE/report/native-control-flow.json" \
+            -analysisTimeoutPerFile 850 -max-cpu 2 -deleteProject \
+            > "$RUNNER_TEMP/ghidra-analysis.log" 2>&1 || {
+              tail -n 65 "$RUNNER_TEMP/ghidra-analysis.log"
+              exit 1
+            }
+          "$GHIDRA_ROOT/support/analyzeHeadless" \
+            "$RUNNER_TEMP/ghidra-project" AllocatorTargets \
+            -import "$RUNNER_TEMP/native_game.so" \
+            -scriptPath "$GITHUB_WORKSPACE/tools/ghidra" \
+            -postScript GhidraAllocatorTargets.java "$GITHUB_WORKSPACE/report/allocator-targets.json" \
+            -analysisTimeoutPerFile 850 -max-cpu 2 -deleteProject \
+            > "$RUNNER_TEMP/allocator-analysis.log" 2>&1 || {
+              tail -n 65 "$RUNNER_TEMP/allocator-analysis.log"
+              exit 1
+            }
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("report/native-control-flow.json")
+          if not p.exists():
+              raise SystemExit("Ghidra did not produce a native-code report")
+          report = json.loads(p.read_text())
+          assert report["analyzed_functions"] > 0
+          assert report["kind"] == "arm32-native-game-code-reconstruction-map"
+          print("Recovered actual ARM function map and reachable public API boundaries.")
+          print(json.dumps(report, indent=2))
+          targets = json.loads(Path("report/allocator-targets.json").read_text())
+          assert targets["kind"] == "original-allocator-target-metadata"
+          assert targets["address_bias"] == 65536
+          assert len(targets["roots"]) == 5
+          print(json.dumps(targets, indent=2))
+          PY
+
+      - name: Erase original code, library and analysis workspace
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/original.apk" "$RUNNER_TEMP/native_game.so"
+          rm -f "$RUNNER_TEMP/ghidra-analysis.log" "$RUNNER_TEMP/allocator-analysis.log"
+          rm -rf "$RUNNER_TEMP/ghidra" "$RUNNER_TEMP/ghidra-project"
+
+      - name: Publish metadata only, never APK or decompiled game source
+        uses: actions/upload-artifact@v4
+        with:
+          name: deadspace-native-game-control-flow
+          path: |
+            report/native-control-flow.json
+            report/allocator-targets.json
+          if-no-files-found: error
+          retention-days: 7

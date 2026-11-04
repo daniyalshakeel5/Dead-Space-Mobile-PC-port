@@ -1,0 +1,276 @@
+#include "ds_port/im_menu_scene.hpp"
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstring>
+#include <limits>
+#include <new>
+#include <stdexcept>
+
+namespace ds_port {
+namespace {
+constexpr std::array<std::uint8_t,12> kMagic={
+    0xab,'I','M','-','M','3','G',0xbb,13,10,26,10
+};
+struct Chunk {std::uint8_t type; const std::uint8_t* p;std::size_t size;};
+std::uint32_t le32(const std::uint8_t* p) noexcept {
+    return std::uint32_t(p[0])|(std::uint32_t(p[1])<<8)|
+          (std::uint32_t(p[2])<<16)|(std::uint32_t(p[3])<<24);
+}
+std::uint16_t le16(const std::uint8_t* p) noexcept {
+    return std::uint16_t(p[0])|(std::uint16_t(p[1])<<8);
+}
+float fp32(const std::uint8_t* p) noexcept {
+    const std::uint32_t value=le32(p);
+    float f=0;std::memcpy(&f,&value,4);return f;
+}
+int int16(const std::uint8_t* p) noexcept {
+    const int x=le16(p);return x<32768?x:x-65536;
+}
+bool read_chunks(const std::uint8_t* bytes,std::size_t n,
+                 std::vector<Chunk>& chunks) {
+    if(!bytes||n<30||n>64u*1024u*1024u||
+       !std::equal(kMagic.begin(),kMagic.end(),bytes)||
+       bytes[12]!=0||le32(bytes+13)!=n-12)
+        return false;
+    const auto end=n-4;std::size_t at=21;
+    while(at<end&&chunks.size()<20000){
+        if(end-at<5)return false;
+        const auto type=bytes[at++];
+        const auto length=le32(bytes+at);at+=4;
+        if(length>end-at)return false;
+        chunks.push_back({type,bytes+at,length});
+        at+=length;
+    }
+    return at==end&&!chunks.empty()&&chunks[0].type==0;
+}
+const Chunk* ref(const std::vector<Chunk>& chunks,
+                 std::uint32_t id,std::uint8_t type) {
+    if(!id||id>chunks.size())return nullptr;
+    const auto& chunk=chunks[id-1];
+    return chunk.type==type?&chunk:nullptr;
+}
+bool array_valid(const Chunk* a,unsigned dimension,
+                 unsigned count) {
+    if(!a||a->size<17||a->p[12]!=2 ||
+       a->p[13]!=dimension||a->p[14]!=0)return false;
+    const auto n=le16(a->p+15);
+    return n==count && n!=0 &&
+           a->size==17+std::size_t(n)*dimension*2u;
+}
+} // namespace
+ImMenuGeometry decode_im_menu_geometry(const std::uint8_t* data,
+                                       std::size_t bytes) {
+    ImMenuGeometry out{};
+    auto fail=[&](const char* why) {
+        out.decoded=false;out.error=why;out.mesh_count=0;
+        out.vertices.clear();out.indices.clear();out.surfaces.clear();
+        out.mesh_bounds.clear();
+        out.original_object_type_counts.fill(0);
+        out.camera_object_indices.clear();
+        out.group_object_indices.clear();
+        out.scene_node_records.clear();
+        out.validated_group_children.clear();
+        out.possible_empty_group_indices.clear();
+        out.scene_reference_candidates.clear();
+        return out;
+    };
+    std::vector<Chunk> chunks;
+    if(!read_chunks(data,bytes,chunks))
+        return fail("malformed original menu IM-M3G framing");
+    try{
+        for(std::size_t i=0;i<chunks.size();++i) {
+            const auto type=chunks[i].type;
+            ++out.original_object_type_counts[type];
+            if(type==5 || type==9)out.scene_node_records.push_back({
+                static_cast<std::uint32_t>(i+1),type,
+                static_cast<std::uint32_t>(chunks[i].size)});
+            if(type==5)out.camera_object_indices.push_back(
+                static_cast<std::uint32_t>(i+1));
+            if(type==9)out.group_object_indices.push_back(
+                static_cast<std::uint32_t>(i+1));
+        }
+        // A genuine group tail contains a little-endian count followed
+        // by exactly count one-based node/mesh object references. The
+        // count can be unaligned because preceding names are variable size.
+        for(std::size_t i=0;i<chunks.size();++i) {
+            const auto& group=chunks[i];
+            if(group.type!=9)continue;
+            std::vector<std::uint32_t> accepted;
+            bool ambiguous=false;
+            for(std::size_t offset=0;offset+4<=group.size;++offset) {
+                const auto count=le32(group.p+offset);
+                if(count==0 || count>128 ||
+                   std::size_t(count)>(group.size-offset-4)/4 ||
+                   offset+4+std::size_t(count)*4!=group.size)continue;
+                std::vector<std::uint32_t> children;
+                bool valid=true;
+                for(std::uint32_t j=0;j<count;++j) {
+                    const auto child=le32(group.p+offset+4+4*j);
+                    if(!child || child>chunks.size() ||
+                       (chunks[child-1].type!=5 &&
+                        chunks[child-1].type!=9 &&
+                        chunks[child-1].type!=14) ||
+                       child==i+1) {valid=false;break;}
+                    children.push_back(child);
+                }
+                if(!valid)continue;
+                if(!accepted.empty()) {ambiguous=true;break;}
+                accepted=std::move(children);
+            }
+            // A valid empty group has a zero child count in its final
+            // four bytes. Unlike nonzero child arrays it has no references.
+            // This is a structural classification, not a fabricated node.
+            if(!ambiguous && !accepted.empty())
+                out.validated_group_children.push_back({
+                    static_cast<std::uint32_t>(i+1),std::move(accepted)});
+            else if(!ambiguous && accepted.empty() && group.size>=4 &&
+                    le32(group.p+group.size-4)==0)
+                out.possible_empty_group_indices.push_back(static_cast<std::uint32_t>(i+1));
+        }
+        // Inventory aligned raw index candidates only. This deliberately
+        // does not assert which bytes represent parent/child relationships.
+        for(const auto& node:out.scene_node_records) {
+            const auto& payload=chunks[node.object_index-1];
+            for(std::size_t off=0;off+4<=payload.size;off+=4) {
+                const auto id=le32(payload.p+off);
+                if(id>0 && id<=chunks.size() &&
+                   (chunks[id-1].type==5 || chunks[id-1].type==9 ||
+                    chunks[id-1].type==14)) {
+                    if(out.scene_reference_candidates.size()>=10000)
+                        return fail("scene candidate reference limit exceeded");
+                    out.scene_reference_candidates.push_back({
+                        node.object_index,static_cast<std::uint32_t>(off),id});
+                }
+            }
+        }
+        for(std::size_t i=0;i<chunks.size();++i){
+            const auto& mesh=chunks[i];
+            if(mesh.type!=14)continue;
+            if(mesh.size<30)
+                return fail("truncated original menu mesh");
+            const auto* vb=ref(chunks,le32(mesh.p+22),21);
+            if(!vb||vb->size!=68)
+                return fail("unsupported menu VertexBuffer layout");
+            const auto* pos=ref(chunks,le32(vb->p+16),20);
+            if(!pos||pos->size<17)
+                return fail("invalid menu position array");
+            const auto count=le16(pos->p+15);
+            if(!array_valid(pos,3,count) || le32(vb->p+44)!=1)
+                return fail("unverified menu position or UV-set layout");
+            const auto* uv=ref(chunks,le32(vb->p+48),20);
+            if(!array_valid(uv,2,count))
+                return fail("missing or invalid original menu UV array");
+            const float xyz_bias[3]={
+                fp32(vb->p+20),fp32(vb->p+24),fp32(vb->p+28)};
+            const float xyz_scale=fp32(vb->p+32);
+            const float uv_bias[2]={fp32(vb->p+52),fp32(vb->p+56)};
+            const float uv_scale=fp32(vb->p+64);
+            if(!std::isfinite(xyz_bias[0]) ||
+               !std::isfinite(xyz_bias[1]) ||
+               !std::isfinite(xyz_bias[2]) ||
+               !std::isfinite(xyz_scale) ||
+               !std::isfinite(uv_bias[0]) ||
+               !std::isfinite(uv_bias[1]) ||
+               !std::isfinite(uv_scale))
+                return fail("non-finite original menu transform");
+            const auto first=out.vertices.size();
+            if(first+count>1000000)
+                return fail("menu vertex limit exceeded");
+            for(std::size_t k=0;k<count;++k){
+                const auto* xyz=pos->p+17+k*6u;
+                const auto* st=uv->p+17+k*4u;
+                ImMenuVertex v{};
+                v.x=xyz_bias[0]+xyz_scale*float(int16(xyz));
+                v.y=xyz_bias[1]+xyz_scale*float(int16(xyz+2));
+                v.z=xyz_bias[2]+xyz_scale*float(int16(xyz+4));
+                v.u=uv_bias[0]+uv_scale*float(int16(st));
+                v.v=uv_bias[1]+uv_scale*float(int16(st+2));
+                if(!std::isfinite(v.x)||!std::isfinite(v.y)||
+                   !std::isfinite(v.z)||!std::isfinite(v.u)||
+                   !std::isfinite(v.v))
+                    return fail("non-finite decoded menu vertex");
+                out.vertices.push_back(v);
+            }
+            ImMenuMeshBounds bounds{};
+            bounds.mesh_object_index=static_cast<std::uint32_t>(i+1);
+            bounds.min_x=bounds.max_x=out.vertices[first].x;
+            bounds.min_y=bounds.max_y=out.vertices[first].y;
+            bounds.min_z=bounds.max_z=out.vertices[first].z;
+            for(std::size_t k=first+1;k<out.vertices.size();++k) {
+                const auto& v=out.vertices[k];
+                bounds.min_x=std::min(bounds.min_x,v.x);
+                bounds.min_y=std::min(bounds.min_y,v.y);
+                bounds.min_z=std::min(bounds.min_z,v.z);
+                bounds.max_x=std::max(bounds.max_x,v.x);
+                bounds.max_y=std::max(bounds.max_y,v.y);
+                bounds.max_z=std::max(bounds.max_z,v.z);
+            }
+            out.mesh_bounds.push_back(bounds);
+            const auto part_count=le32(mesh.p+26);
+            if(part_count>(mesh.size-30)/4u ||
+               mesh.size!=30+std::size_t(part_count)*4u)
+                return fail("invalid original mesh submesh references");
+            for(std::size_t p=0;p<part_count;++p){
+                const auto ib_id=le32(mesh.p+30+p*4u);
+                const auto* ib=ref(chunks,ib_id,100);
+                if(!ib||ib->size<20)
+                    return fail("invalid menu index buffer");
+                std::size_t at=12;
+                const auto flag=le32(ib->p+8);
+                if(flag==1){
+                    if(ib->size-at<8)return fail("bad named menu index buffer");
+                    at+=4;const auto name_len=le32(ib->p+at);at+=4;
+                    if(name_len>ib->size-at)return fail("bad index name length");
+                    at+=name_len;
+                }else if(flag!=0)return fail("unsupported menu index buffer");
+                if(ib->size-at!=8)
+                    return fail("invalid menu index buffer references");
+                const auto* strip=ref(chunks,le32(ib->p+at),11);
+                const auto appearance=le32(ib->p+at+4);
+                if(!strip||!ref(chunks,appearance,3)||strip->size<21)
+                    return fail("missing original menu appearance or strip");
+                const auto width=strip->p[12]==0x81?1u:
+                                 strip->p[12]==0x82?2u:0u;
+                if(!width)return fail("unrecognized menu index width");
+                const auto num=le32(strip->p+13);
+                if(num> (strip->size-21)/width || num%3u)
+                    return fail("invalid menu strip index count");
+                const auto edge=17+std::size_t(num)*width;
+                if(edge>strip->size-4)
+                    return fail("truncated menu strip table");
+                const auto strips=le32(strip->p+edge);
+                if(strips!=num/3u ||
+                   strips>(strip->size-edge-4)/4u ||
+                   strip->size!=edge+4+strips*4u)
+                    return fail("invalid menu strip lengths");
+                for(std::size_t j=0;j<strips;++j)
+                    if(le32(strip->p+edge+4+j*4u)!=3)
+                        return fail("unsupported non-triangle strip");
+                ImMenuSurface surface{};
+                surface.mesh_object_index=static_cast<std::uint32_t>(i+1);
+                surface.original_appearance_index=appearance;
+                surface.first_index=static_cast<std::uint32_t>(out.indices.size());
+                surface.triangle_count=strips;
+                for(std::size_t j=0;j<num;++j){
+                    const auto index_at=strip->p+17+j*width;
+                    const auto idx=width==1?std::uint32_t(index_at[0]):
+                                              std::uint32_t(le16(index_at));
+                    if(idx>=count)return fail("out of bounds menu index");
+                    out.indices.push_back(
+                        static_cast<std::uint32_t>(first+idx));
+                }
+                out.surfaces.push_back(surface);
+            }
+            ++out.mesh_count;
+        }
+    }catch(const std::bad_alloc&){
+        return fail("menu allocation failed");
+    }catch(const std::length_error&){
+        return fail("menu size exceeded");
+    }
+    if(!out.mesh_count||out.surfaces.empty()||out.vertices.empty())
+        return fail("no original menu mesh geometry");
+    out.decoded=true;return out;
+}
+} // namespace ds_port

@@ -1,0 +1,282 @@
+name: Original Dead Space splash boot (native headless smoke)
+on:
+  push:
+    branches:
+      - work/deadspace-remote-preflight-2026-11-01
+    paths:
+      - "apps/deadspace_native.cpp"
+      - "tools/research_original_scene_records.py"
+      - "tools/research_four_native_subsystems.py"
+      - "tools/research_menu_particle_checksum.py"
+      - "tools/probe_menu_animation_ui.py"
+      - "tools/probe_ui_atlas_layout.py"
+      - "tools/probe_ui_sbin_blocks.py"
+      - "tools/probe_ui_sbin_sprite_records.py"
+      - "tools/probe_ui_menu_resources.py"
+      - "tools/probe_original_ui_layout.py"
+      - "tools/probe_ui_layout_objects.py"
+      - "src/original_splash_host.cpp"
+      - "src/im_ui_image.cpp"
+      - "src/original_ui_sbin.cpp"
+      - "src/original_ui_layout.cpp"
+      - "src/original_ui_interaction.cpp"
+      - "apps/original_ui_interactive_smoke.cpp"
+      - "src/im_menu_scene.cpp"
+      - "src/native_menu_input.cpp"
+      - "src/original_menu_gl.cpp"
+      - "src/original_ui_interaction.cpp"
+      - "src/original_m3g_scene.cpp"
+      - "src/original_menu_animation.cpp"
+      - "apps/original_menu_animation_probe.cpp"
+      - "tests/original_splash_orientation_tests.cpp"
+      - "tests/original_menu_animation_tests.cpp"
+      - "include/ds_port/original_m3g_scene.hpp"
+      - "include/ds_port/im_ui_image.hpp"
+      - "include/ds_port/original_splash_host.hpp"
+      - "CMakeLists.txt"
+      - ".github/workflows/original-splash-boot.yml"
+  pull_request:
+    paths:
+      - "apps/deadspace_native.cpp"
+      - "src/original_splash_host.cpp"
+      - "src/im_ui_image.cpp"
+      - "include/ds_port/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/original-splash-boot.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-splashes-native:
+    if: github.repository == 'daniyalshakeel5/Dead-Space-Mobile-PC-port'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SDL2 for actual native splash rendering
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libgl-dev zlib1g-dev xvfb libgl1-mesa-dri
+      - name: Configure original splash-capable game executable
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          -DDS_BUILD_BOOT_SPLASH=ON -DDS_BUILD_INPUT_PROBE=ON
+          -DDS_BUILD_ASSET_INSTALLER=ON
+      - name: Compile native game executable and test UI decoder
+        run: cmake --build build --target deadspace_native ds_im_ui_image_tests ds_original_ui_sbin_tests ds_original_ui_layout_tests ds_original_ui_layout_compose_tests ds_original_ui_layout_probe ds_original_ui_interactive_smoke ds_original_ui_interaction_tests ds_original_menu_animation_tests ds_im_menu_scene_tests ds_original_menu_draw_stream_tests ds_original_menu_gl_tests ds_original_menu_scene_graph_tests ds_original_m3g_scene_tests ds_original_m3g_scene_texture_tests ds_original_m3g_scene_probe ds_original_menu_animation_probe ds_original_splash_orientation_tests ds_native_menu_input_tests ds_native_menu_jni_end_to_end_tests ds_im_menu_scene_probe --parallel 2
+      - name: Verify synthetic IM-M3G Image2D cases
+        run: ctest --test-dir build --output-on-failure -R "ds_original_im_m3g_(splash_ui_decoder|menu_uv_geometry)|ds_original_frontend_sbin_sprite_schema|ds_original_compiled_menu_widget_layout|ds_original_ui_layout_button_compose|ds_original_ui_pointer_hit_dispatch|ds_original_menu_native_keyframe_timeline|ds_original_splash_upright_rgba_rows|ds_original_menu_native_draw_batches|ds_original_menu_gl_scene_contract|ds_original_menu_scene_hierarchy|ds_original_m3g_camera_textures_and_nodes|ds_original_menu_external_rgb_rgba_texture|ds_original_jni_menu_input|ds_original_jni_menu_end_to_end_dispatch"
+      - name: Fetch original APK only into private ephemeral runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 3 --max-time 720 \
+            --max-filesize 400000000 \
+            --output "$RUNNER_TEMP/deadspace.apk" \
+            https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes/releases/download/dead_space_mobile_fixes/Deas.Space.Mobile.Fixes.apk
+          test "$(wc -c < "$RUNNER_TEMP/deadspace.apk" | tr -d ' ')" = 325769461
+      - name: Recover original UI entity and vertex object types
+        run: python tools/probe_ui_layout_objects.py "$RUNNER_TEMP/deadspace.apk"
+      - name: Recover original compiled UI layout hierarchy and widget metadata
+        run: python tools/probe_original_ui_layout.py "$RUNNER_TEMP/deadspace.apk"
+      - name: Discover original menu UI scripts and layout resources
+        run: python tools/probe_ui_menu_resources.py "$RUNNER_TEMP/deadspace.apk"
+      - name: Decode original frontend SBIN sprite rectangle references
+        run: python tools/probe_ui_sbin_sprite_records.py "$RUNNER_TEMP/deadspace.apk"
+      - name: Decode original frontend SBIN field and data section grammar
+        run: python tools/probe_ui_sbin_blocks.py "$RUNNER_TEMP/deadspace.apk"
+      - name: Decode original frontend atlas sprite layout metadata
+        run: python tools/probe_ui_atlas_layout.py "$RUNNER_TEMP/deadspace.apk"
+      - name: Recover original menu animation and frontend metadata
+        run: python tools/probe_menu_animation_ui.py "$RUNNER_TEMP/deadspace.apk"
+      - name: Analyze all four original engine subsystems in parallel
+        shell: bash
+        run: |
+          set -euo pipefail
+          declare -a pids=()
+          for area in transforms materials animation input_audio; do
+            python tools/research_four_native_subsystems.py \
+              "$RUNNER_TEMP/deadspace.apk" "$area" > "$RUNNER_TEMP/research-$area.log" 2>&1 &
+            pids+=("$!")
+          done
+          status=0
+          for pid in "${pids[@]}"; do
+            wait "$pid" || status=1
+          done
+          for area in transforms materials animation input_audio; do
+            test -s "$RUNNER_TEMP/research-$area.log"
+            cat "$RUNNER_TEMP/research-$area.log"
+          done
+          test "$status" = 0
+          grep -F "TRANSFORMS_CAMERA" "$RUNNER_TEMP/research-transforms.log"
+          grep -F "MATERIALS appearances" "$RUNNER_TEMP/research-materials.log"
+          grep -F "ANIMATION tracks" "$RUNNER_TEMP/research-animation.log"
+          grep -F "INPUT_AUDIO native ELF" "$RUNNER_TEMP/research-input_audio.log"
+      - name: Publish four-way native research evidence (metadata only)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deadspace-native-recovery-evidence
+          path: ${{ runner.temp }}/research-*.log
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Check original uncompressed particle texture section checksums
+        shell: bash
+        run: python tools/research_menu_particle_checksum.py "$RUNNER_TEMP/deadspace.apk"
+      - name: Stage original splash screens and main-menu resources
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import os
+          root=Path(os.environ["RUNNER_TEMP"])/"boot-assets"/"assets"
+          with ZipFile(Path(os.environ["RUNNER_TEMP"])/"deadspace.apk") as source:
+              for name in ("published/texturepacks_ui/splash_ea.m3g",
+                           "published/texturepacks_ui/splash_deadspace.m3g",
+                           "published/models/main_menu.m3g",
+                           "published/layoutdata/layouts.xml.sb",
+                           "published/texturepacks_ui/ui_frontend.m3g",
+                           "published/textures/texture_env_main_menu_objects_02.m3g",
+                           "published/textures/texture_env_sprawl_starfield_01.m3g",
+                           "published/textures/texture_FX_HoloBackPanel.m3g",
+                           "published/textures/texture_FX_InteractDoorBacking.m3g",
+                           "published/textures/texture_FX_Dash.m3g",
+                           "published/textures/texture_FX_D_logo_Grey.m3g",
+                           "published/textures/texture_FX_GenBorder.m3g",
+                           "published/textures/texture_env_generic_fog_01.m3g",
+                           "published/textures/texture_floor_shadow.m3g",
+                           "published/textures/texture_env_main_menu_01.m3g",
+                           "published/textures/texture_env_main_menu_starfield.m3g",
+                           "published/textures/texture_env_main_menu_objects.m3g",
+                           "published/textures_uncompressed/texture_env_generic_uv_particle.m3g"):
+                  source_name="assets/"+name
+                  info=source.getinfo(source_name)
+                  if info.file_size>32*1024*1024:raise RuntimeError("boot resource oversized")
+                  dst=root/name
+                  dst.parent.mkdir(parents=True,exist_ok=True)
+                  dst.write_bytes(source.read(source_name))
+          PY
+      - name: Decode real main-menu entity positions and sub-layouts
+        run: |
+          build/ds_original_ui_layout_probe "$RUNNER_TEMP/boot-assets/assets/published/layoutdata/layouts.xml.sb" | tee "$RUNNER_TEMP/original-menu-layouts.txt"
+          grep -F "Original UI layout UI_MAIN entities" "$RUNNER_TEMP/original-menu-layouts.txt"
+      - name: Verify native original menu button clicks and submenu composition
+        shell: bash
+        run: |
+          build/ds_original_ui_interactive_smoke \
+            "$RUNNER_TEMP/boot-assets/assets/published/layoutdata/layouts.xml.sb" \
+            "$RUNNER_TEMP/boot-assets/assets/published/texturepacks_ui/ui_frontend.m3g" | tee "$RUNNER_TEMP/original-menu-clicks.txt"
+          grep -F "Original APK native menu click mapping verified:" "$RUNNER_TEMP/original-menu-clicks.txt"
+      - name: Recover original scene record structure in private runner
+        shell: bash
+        run: python tools/research_original_scene_records.py "$RUNNER_TEMP/boot-assets/assets/published/models/main_menu.m3g"
+      - name: Inventory original 3D menu scene objects (no game data exported)
+        shell: bash
+        run: |
+          build/ds_im_menu_scene_probe \
+            "$RUNNER_TEMP/boot-assets/assets/published/models/main_menu.m3g" > "$RUNNER_TEMP/menu-inventory.json"
+          python - "$RUNNER_TEMP/menu-inventory.json" <<'PY'
+          import json
+          import sys
+          with open(sys.argv[1], encoding="utf-8") as stream:
+              inventory=json.load(stream)
+          assert inventory["decoded"] is True
+          assert inventory["meshes"]==52
+          assert inventory["triangles"]==9750
+          assert inventory["object_types"]["5"]==1
+          assert inventory["object_types"]["9"]==57
+          assert len(inventory["camera_object_ids"])==1
+          assert inventory["group_count"]==57
+          assert inventory["verified_group_tables"]>=56
+          assert inventory["verified_group_child_links"]>=56
+          assert isinstance(inventory["candidate_reference_count"], int)
+          assert isinstance(inventory["candidate_offsets"], dict)
+          assert len(inventory["scene_node_payload_sizes"])==58
+          assert sum(1 for item in inventory["scene_node_payload_sizes"] if item[1]==5)==1
+          assert sum(1 for item in inventory["scene_node_payload_sizes"] if item[1]==9)==57
+          print("Original camera/group payload sizes:", sorted(set((x[1],x[2]) for x in inventory["scene_node_payload_sizes"])))
+          print("Original camera and group IDs retained in native decoder")
+          PY
+      - name: Decode original camera, hierarchy and textures from real APK
+        shell: bash
+        run: |
+          build/ds_original_m3g_scene_probe \
+            "$RUNNER_TEMP/boot-assets/assets/published/models/main_menu.m3g" \
+            | tee "$RUNNER_TEMP/original-scene-decoded.txt"
+          grep -F "Original groups: 57" "$RUNNER_TEMP/original-scene-decoded.txt"
+          grep -F "Original camera node: 478" "$RUNNER_TEMP/original-scene-decoded.txt"
+      - name: Decode original M3G native animation tracks and controllers
+        run: |
+          build/ds_original_menu_animation_probe "$RUNNER_TEMP/boot-assets/assets/published/models/main_menu.m3g" | tee "$RUNNER_TEMP/original-animation-probe.txt"
+          grep -F "Original menu motion: 32 sequences, 32 controllers, 32 scene node tracks" "$RUNNER_TEMP/original-animation-probe.txt"
+          grep -F "Original serialized M3G controller windows: active at 0 ms=" "$RUNNER_TEMP/original-animation-probe.txt"
+          grep -F "Original runtime-gated menu scene nodes changed after 1000 ms:" "$RUNNER_TEMP/original-animation-probe.txt"
+          # Real-APK proof 41433880581: 32 original controllers
+          # inactive at boot. Forced-preview moved five scene nodes,
+          # production interval-gating moves zero.
+          grep -F "Original serialized M3G controller windows: active at 0 ms=0, at 1000 ms=0, total=32" "$RUNNER_TEMP/original-animation-probe.txt"
+          grep -F "Original runtime-gated menu scene nodes changed after 1000 ms: 0" "$RUNNER_TEMP/original-animation-probe.txt"
+      - name: Execute both ORIGINAL splash screens through SDL2 software renderer
+        shell: bash
+        run: |
+          set +e
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+          SDL_RENDER_DRIVER=software timeout 20s \
+            build/deadspace_native --boot-splash \
+            --assets-dir "$RUNNER_TEMP/boot-assets" \
+            > "$RUNNER_TEMP/native-splash-exit.txt" 2>&1
+          actual_exit=$?
+          set -e
+          cat "$RUNNER_TEMP/native-splash-exit.txt"
+          # Exit 20 is intentional: original menu code is NOT ready.
+          test "$actual_exit" = 20
+          grep -F "Original menu stage resource load:" \
+            "$RUNNER_TEMP/native-splash-exit.txt"
+          grep -F "Original EA and Dead Space splash images displayed." \
+            "$RUNNER_TEMP/native-splash-exit.txt"
+          grep -F "Native main-menu renderer still incomplete." \
+            "$RUNNER_TEMP/native-splash-exit.txt"
+      - name: Verify authentic 3D and 2D frontend both render in software OpenGL
+        shell: bash
+        run: |
+          set +e
+          DS_NATIVE_MENU_SMOKE_FRAMES=1 LIBGL_ALWAYS_SOFTWARE=1 \
+            SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=dummy \
+            SDL_RENDER_DRIVER=software \
+            timeout 35s xvfb-run -a -s "-screen 0 1280x720x24" \
+            build/deadspace_native --boot-splash \
+            --assets-dir "$RUNNER_TEMP/boot-assets" \
+            > "$RUNNER_TEMP/native-gl-menu.txt" 2>&1
+          code=$?
+          set -e
+          cat "$RUNNER_TEMP/native-gl-menu.txt"
+          test "$code" = 20
+          grep -F "Original 3D menu GPU frame:" "$RUNNER_TEMP/native-gl-menu.txt"
+          grep -F "Original 2D frontend GPU overlay:" "$RUNNER_TEMP/native-gl-menu.txt"
+          grep -E "changed pixels [1-9][0-9]*" "$RUNNER_TEMP/native-gl-menu.txt"
+          grep -F "GL error 0" "$RUNNER_TEMP/native-gl-menu.txt"
+      - name: Test one-command user APK install and native boot (no bundled assets)
+        shell: bash
+        run: |
+          set +e
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+          SDL_RENDER_DRIVER=software timeout 75s \
+            build/deadspace_native --boot-apk \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --assets-dir "$RUNNER_TEMP/native-installed" \
+            > "$RUNNER_TEMP/native-boot-apk.txt" 2>&1
+          actual_exit=$?
+          set -e
+          cat "$RUNNER_TEMP/native-boot-apk.txt"
+          # Original gameplay engine not yet recovered: no false success.
+          test "$actual_exit" = 20
+          grep -F "user-owned APK assets. Entering native boot." \
+            "$RUNNER_TEMP/native-boot-apk.txt"
+          grep -F "Original menu stage resource load:" \
+            "$RUNNER_TEMP/native-boot-apk.txt"
+      - name: Remove original game bytes from runner
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP"/research-*.log
+          rm -f "$RUNNER_TEMP/original-scene-decoded.txt"
+          rm -rf "$RUNNER_TEMP/native-installed" "$RUNNER_TEMP/native-boot-apk.txt" "$RUNNER_TEMP/boot-assets" "$RUNNER_TEMP/deadspace.apk" "$RUNNER_TEMP/native-splash-exit.txt" "$RUNNER_TEMP/menu-inventory.json"

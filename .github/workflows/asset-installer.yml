@@ -1,0 +1,128 @@
+name: Dead Space Mobile - native asset installer
+
+on:
+  push:
+    branches:
+      - work/deadspace-remote-preflight-2026-11-01
+    paths:
+      - "CMakeLists.txt"
+      - "src/apk_probe.cpp"
+      - "include/ds_port/apk_probe.hpp"
+      - "src/asset_install.cpp"
+      - "src/deadspace_paths.cpp"
+      - "include/ds_port/deadspace_paths.hpp"
+      - "tests/deadspace_paths_tests.cpp"
+      - "include/ds_port/asset_install.hpp"
+      - "apps/asset_install.cpp"
+      - "tests/asset_install_tests.cpp"
+      - "src/m3g_container.cpp"
+      - "include/ds_port/m3g_container.hpp"
+      - "tests/m3g_container_tests.cpp"
+      - "include/ds_port/etc1.hpp"
+      - "src/etc1.cpp"
+      - "tests/etc1_tests.cpp"
+      - "src/im_mesh.cpp"
+      - "include/ds_port/im_mesh.hpp"
+      - "apps/im_mesh_extract.cpp"
+      - "tests/im_mesh_tests.cpp"
+      - "apps/m3g_texture_extract.cpp"
+      - ".github/workflows/asset-installer.yml"
+  pull_request:
+    paths:
+      - "CMakeLists.txt"
+      - "src/apk_probe.cpp"
+      - "include/ds_port/apk_probe.hpp"
+      - "src/asset_install.cpp"
+      - "include/ds_port/asset_install.hpp"
+      - "apps/asset_install.cpp"
+      - "tests/asset_install_tests.cpp"
+      - "src/m3g_container.cpp"
+      - "include/ds_port/m3g_container.hpp"
+      - "tests/m3g_container_tests.cpp"
+      - "include/ds_port/etc1.hpp"
+      - "src/etc1.cpp"
+      - "tests/etc1_tests.cpp"
+      - "src/im_mesh.cpp"
+      - "include/ds_port/im_mesh.hpp"
+      - "apps/im_mesh_extract.cpp"
+      - "tests/im_mesh_tests.cpp"
+      - "apps/m3g_texture_extract.cpp"
+      - ".github/workflows/asset-installer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    name: APK asset installer / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install zlib development package (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y zlib1g-dev
+
+      - name: Install native zlib static library (Windows/vcpkg)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { "C:\vcpkg" }
+          & "$vcpkgRoot\vcpkg.exe" install zlib:x64-windows-static-md
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Configure Linux build (zlib, no SDL dependency)
+        if: runner.os == 'Linux'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=OFF -DDS_BUILD_ASSET_INSTALLER=ON -DDS_BUILD_M3G_READER=ON -DDS_BUILD_IM_MESH_READER=ON
+
+      - name: Configure Windows build (static zlib)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { "C:\vcpkg" }
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=OFF -DDS_BUILD_ASSET_INSTALLER=ON -DDS_BUILD_M3G_READER=ON -DDS_BUILD_IM_MESH_READER=ON -DVCPKG_TARGET_TRIPLET=x64-windows-static-md "-DCMAKE_TOOLCHAIN_FILE=$vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build native test/installer
+        run: cmake --build build --config Release --parallel 2
+
+      - name: Run synthetic asset installation tests
+        run: ctest --test-dir build --build-config Release --output-on-failure
+
+      - name: Stage Linux native installer
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp build/ds_asset_install dist/
+          cp build/deadspace_native dist/
+          cp build/ds_apk_probe dist/
+          cp build/ds_m3g_probe dist/
+          cp build/ds_m3g_texture_extract dist/
+          cp build/ds_im_mesh_extract dist/
+
+      - name: Stage Windows native installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item build/Release/ds_asset_install.exe dist/
+          Copy-Item build/Release/deadspace_native.exe dist/
+          Copy-Item build/Release/ds_apk_probe.exe dist/
+          Copy-Item build/Release/ds_m3g_probe.exe dist/
+          Copy-Item build/Release/ds_m3g_texture_extract.exe dist/
+          Copy-Item build/Release/ds_im_mesh_extract.exe dist/
+
+      - name: Upload new-code-only executables (no game data)
+        uses: actions/upload-artifact@v4
+        with:
+          name: deadspace-owned-apk-installer-${{ runner.os }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7

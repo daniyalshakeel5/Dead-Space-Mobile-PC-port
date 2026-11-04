@@ -1,0 +1,32 @@
+name: ARM callgraph probe regression
+on:
+  push:
+    branches:
+      - work/deadspace-remote-preflight-2026-11-01
+    paths:
+      - "tools/deadspace_arm_callgraph_probe.py"
+      - "tests/test_arm_callgraph_probe.py"
+      - ".github/workflows/arm-callgraph-probe.yml"
+  pull_request:
+    paths:
+      - "tools/deadspace_arm_callgraph_probe.py"
+      - "tests/test_arm_callgraph_probe.py"
+      - ".github/workflows/arm-callgraph-probe.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-arm-instructions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install research-only dependencies
+        run: python -m pip install "capstone==5.0.6" "pyelftools==0.32"
+      - name: Check syntax
+        run: python -m py_compile tools/deadspace_arm_callgraph_probe.py
+      - name: Validate branch and call classifications
+        run: python -m unittest discover -s tests -p test_arm_callgraph_probe.py -v

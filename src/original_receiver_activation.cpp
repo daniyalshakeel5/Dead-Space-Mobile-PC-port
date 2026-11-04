@@ -1,0 +1,134 @@
+#include "ds_port/original_receiver_activation.hpp"
+#include "ds_port/original_embedded_provider.hpp"
+
+namespace ds_port::original_runtime {
+namespace {
+std::uint32_t read32(const std::uint8_t* p) noexcept {
+    return std::uint32_t(p[0])|(std::uint32_t(p[1])<<8)|
+           (std::uint32_t(p[2])<<16)|(std::uint32_t(p[3])<<24);
+}
+void store32(std::uint8_t* p,std::uint32_t v) noexcept {
+    for(unsigned k=0;k<4;++k)p[k]=std::uint8_t(v>>(k*8u));
+}
+}
+OriginalReceiverActivationResult0x278e58
+original_execute_receiver_activation_0x278e58(
+    const OriginalReceiverActivationInputs0x278e58& in) noexcept {
+    using S=OriginalReceiverActivationStatus0x278e58;
+    auto fail=[](S s,std::uint32_t root=0,
+                 std::uint32_t provider=0) noexcept {
+        return OriginalReceiverActivationResult0x278e58{s,root,provider};
+    };
+    if(!in.mapped_owner||!in.owner_arm_va||
+       in.owner_arm_va>0xfffff72bu||in.owner_bytes<0x8d4u)
+        return fail(S::InvalidOwner);
+    auto* owner=static_cast<std::uint8_t*>(in.mapped_owner);
+    const std::uint32_t root=read32(owner+0x8c8u);
+    const std::uint32_t provider=read32(owner+0x8acu);
+    // ARM 0x278E74..0x278E7C: BL 0x273570(owner+0x8BC,root).
+    // For an empty original tree the destructor has no node releases.
+    if(root) {
+        if(!in.release_existing_tree)
+            return fail(S::MissingOriginalTreeDestructor,root,provider);
+        if(!in.release_existing_tree(in.owner_arm_va+0x8bcu,
+                                     root,in.context))
+            return fail(S::OriginalTreeReleaseRefused,root,provider);
+    }
+    // ARM 0x278E80..0x278EA4 resets the original tree and two
+    // bookkeeping words before provider dispatch. Preserve exact
+    // original ARM32 pointer provenance, not host addresses.
+    if(in.owner_arm_va>0xffffffffu-0x8c0u)
+        return fail(S::InvalidOwner,root,provider);
+    const auto sentinel=in.owner_arm_va+0x8c0u;
+    store32(owner+0x8c4u,sentinel);
+    owner[0x8b6u]=0u;
+    store32(owner+0x8c0u,sentinel);
+    store32(owner+0x8c8u,0u);
+    owner[0x8ccu]=0u;
+    store32(owner+0x8d0u,0u);
+    // ARM 0x278EA8 BEQ 0x2790E0 for a null provider. The r0
+    // return is not a demonstrated engine-ready result; only
+    // the state stores and branch are considered reconstructed.
+    if(!provider)
+        return fail(S::CompletedEmptyProviderReset,root,provider);
+    // Original 0x278EAC..0x278EBC invokes provider virtual +0x14,
+    // then compares the returned mode against the incoming r1.
+    // Missing native provider methods NEVER imply loaded resources.
+    const bool is_embedded_provider=
+        (provider==in.owner_arm_va+0x804u);
+    // The original owner constructs a concrete embedded provider
+    // at owner+0x804 with real vtable 0x004896F8. Its +0x14 is
+    // machine-verified 0x26C3C4 (just load word +0x90), so no
+    // callback or host stand-in is needed for that precise case.
+    auto original_provider_mode=[&](std::uint32_t* original_r0) noexcept {
+        if(is_embedded_provider) {
+            const auto native=original_embedded_provider_mode_0x26c3c4(
+                owner+0x804u,in.owner_bytes-0x804u);
+            if(native.status!=OriginalEmbeddedProviderStatus::Completed)
+                return false;
+            *original_r0=native.original_r0;
+            return true;
+        }
+        return in.query_provider_mode_0x14 &&
+               in.query_provider_mode_0x14(
+                   provider,0x14u,in.context,original_r0);
+    };
+    if(!in.query_provider_mode_0x14 && !is_embedded_provider)
+        return fail(S::UnreconstructedProviderActivation,root,provider);
+    std::uint32_t original_mode=0;
+    if(!original_provider_mode(&original_mode))
+        return fail(S::ProviderModeQueryRefused,root,provider);
+    if(original_mode==in.requested_mode) {
+        // ARM 0x278EE0..0x278F08 executes THREE constructors
+        // 0x27541C at stack offsets +0xAA0, +0x888, +0x670.
+        // Only proceed when caller provides a real mapped original
+        // scratch region and an independently initialized allocator.
+        if(!in.native_scratch)
+            return fail(S::ReachedUnreconstructedStreamInitialization,
+                        root,provider);
+        const auto& stack=*in.native_scratch;
+        if(!stack.mapped_stack ||
+           !stack.original_stack_arm_va ||
+           stack.original_stack_arm_va>0xffffffffu-0xcd4u ||
+           stack.accessible_bytes<0xcd4u ||
+           !stack.native_allocator_pool)
+            return fail(S::OriginalStringConstructionBlocked,root,provider);
+        constexpr std::uint32_t kStringOffsets[]={0xaa0u,0x888u,0x670u};
+        auto* mapped=static_cast<std::uint8_t*>(stack.mapped_stack);
+        for(const auto offset:kStringOffsets) {
+            const OriginalReceiverStringInputs0x27541c string{
+                stack.original_stack_arm_va+offset,
+                mapped+offset,stack.accessible_bytes-offset,
+                stack.native_allocator_pool
+            };
+            const auto constructed=original_construct_receiver_string_0x27541c(
+                string);
+            if(constructed.status!=OriginalReceiverStringStatus0x27541c::Completed)
+                return fail(S::OriginalStringConstructionBlocked,root,provider);
+        }
+        // The next original methods are provider vtable +0x2C,
+        // provider +0x28, and owner +0x70 (0x276D18).
+        // They must be genuinely rebuilt before activation succeeds.
+        return fail(S::ConstructedThreeStringsAwaitingProviderStreams,
+                    root,provider);
+    }
+
+    // ARM 0x278EC4..0x278ED4 invokes owner vtable +0x24,
+    // resolved in the APK to 0x2733E8. Its fast rejection path is
+    // instruction-verified: it queries provider +0x14 a SECOND time,
+    // accepts direct equality or the special (request=1,mode=3)
+    // case only after owner vtable+0x60, then checks whether the
+    // provider is the owner's embedded object (owner+0x804).
+    // For an external provider with a persistently mismatched
+    // mode, 0x273478 returns r0=0, and 0x278EDC returns r0=0.
+    std::uint32_t retry_mode=0;
+    if(!original_provider_mode(&retry_mode))
+        return fail(S::ProviderModeQueryRefused,root,provider);
+    const std::uint32_t owner_embedded=in.owner_arm_va+0x804u;
+    const bool special_mode=(in.requested_mode==1u && retry_mode==3u);
+    if(retry_mode==in.requested_mode || special_mode ||
+       provider==owner_embedded)
+        return fail(S::UnreconstructedOwnerApproval,root,provider);
+    return fail(S::CompletedProviderRejected,root,provider);
+}
+} // namespace ds_port::original_runtime

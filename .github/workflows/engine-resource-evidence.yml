@@ -1,0 +1,317 @@
+name: Original APK resource-factory evidence
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/engine-resource-evidence.yml"
+      - "tools/deadspace_original_code_window.py"
+      - "tools/deadspace_seek_table_probe.py"
+      - "tools/deadspace_boot_asset_manifest.py"
+      - "tools/deadspace_boot_native_verify.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-resource-factory:
+    if: github.repository == 'daniyalshakeel5/Dead-Space-Mobile-PC-port' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'work/deadspace-remote-preflight-2026-11-01'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install ELF decoder on remote runner only
+        run: python -m pip install --disable-pip-version-check capstone==5.0.6
+      - name: Recover original resource-factory instructions
+        shell: bash
+        run: |
+          set -euo pipefail
+          # User confirmed public upstream APK is identical to their owned APK.
+          curl --fail --silent --show-error --location --retry 3 --max-time 720 \
+            --max-filesize 400000000 \
+            --output "$RUNNER_TEMP/deadspace.apk" \
+            https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes/releases/download/dead_space_mobile_fixes/Deas.Space.Mobile.Fixes.apk
+          test "$(wc -c < "$RUNNER_TEMP/deadspace.apk" | tr -d ' ')" = 325769461
+          python tools/deadspace_boot_asset_manifest.py --apk "$RUNNER_TEMP/deadspace.apk"
+          cmake -S . -B "$RUNNER_TEMP/boot-probe-build" \
+            -DDS_BUILD_INPUT_PROBE=OFF -DDS_ENABLE_TESTS=OFF \
+            -DDS_BUILD_ASSET_INSTALLER=OFF -DDS_BUILD_M3G_READER=ON -DDS_BUILD_IM_MESH_READER=ON
+          cmake --build "$RUNNER_TEMP/boot-probe-build" \
+            --target ds_m3g_probe ds_im_mesh_extract ds_im_ui_probe ds_im_menu_scene_probe --parallel 2
+          python tools/deadspace_boot_native_verify.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --probe "$RUNNER_TEMP/boot-probe-build/ds_m3g_probe" \
+            --im-probe "$RUNNER_TEMP/boot-probe-build/ds_im_mesh_extract" \
+            --ui-probe "$RUNNER_TEMP/boot-probe-build/ds_im_ui_probe" \
+            --menu-probe "$RUNNER_TEMP/boot-probe-build/ds_im_menu_scene_probe"
+          python tools/deadspace_original_code_window.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output "$RUNNER_TEMP/full-instruction-windows.json"
+          python -m tools.deadspace_seek_table_probe \
+            --apk "$RUNNER_TEMP/deadspace.apk"
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          raw=json.loads((Path(os.environ["RUNNER_TEMP"])/"full-instruction-windows.json").read_text())
+          names=("post_setup_direct_callee_0x2803e4",
+                 "resource_lookup_0x28b3a4",
+                 "resource_factory_mode1_0x28a718",
+                 "resource_factory_parse_0x28aab4",
+                 "resource_factory_copy_0x28b1e8",
+                 "resource_factory_string_0x1a76d0",
+                 "resource_lookup_0x28a5f4",
+                 "resource_lookup_0x28a4f8",
+                 "resource_lookup_0x283cb4",
+                 "resource_lookup_0x286918",
+                 "resource_parser_0x2863ec",
+                 "resource_parser_owner_init_0x27a768",
+                 "resource_owner_embedded_init_0x27a4f0",
+                 "resource_owner_default_pool_0x271914",
+                 "resource_parser_receiver_0x278018",
+                 "resource_receiver_activation_0x278e58",
+                 "resource_owner_activation_check_0x2733e8",
+                 "resource_owner_virtual60_0x26c4cc",
+                 "resource_owner_stream_begin_0x276d18",
+                 "resource_owner_line_read_0x276fe4",
+                 "resource_embedded_provider_mode_0x26c3c4",
+                 "resource_embedded_provider_position_0x271794",
+                 "resource_embedded_provider_query_0x2763ac",
+                 "resource_embedded_provider_seek_0x273034",
+                 "resource_embedded_provider_read_0x2716f8",
+                 "resource_embedded_native_read_wrapper_0x35554",
+                 "resource_embedded_native_seek_wrapper_0x35350",
+                 "resource_embedded_memory_read_0x2714c4",
+                 "resource_embedded_read_state_init_0x26c26c",
+                 "resource_embedded_read_state_end_0x26c2f4",
+                 "resource_owner_byte_assign_0x275c20",
+                 "resource_owner_byte_length_0x26e648",
+                 "resource_owner_byte_find_0x26d5fc",
+                 "resource_owner_byte_append_0x276eac",
+                 "resource_owner_stream_alt_0x276958",
+                 "resource_receiver_activation_tree_clear_0x273570",
+                 "resource_receiver_activation_tail_0x279038",
+                 "resource_receiver_tree_lookup_0x2710a8",
+                 "resource_receiver_utf16_compare_0x26e670",
+                 "resource_receiver_copy_0x276694",
+                 "resource_receiver_string_init_0x27541c",
+                 "resource_parser_receiver_tail_0x278318",
+                 "resource_parser_receiver_tail_0x278618",
+                 "resource_parser_owner_mode_0x26c410",
+                 "resource_parser_owner_bind_0x278778",
+                 "resource_parser_owner_bind_tail_0x278a78",
+                 "resource_owner_bind_finalize_0x278978",
+                 "resource_activation_return_0x2790d8",
+                 "resource_parser_tail_0x2866ec",
+                 "resource_copy_0x285918",
+                 "resource_string_pair_0x2857a0",
+                 "resource_string_tree_0x285238",
+                 "resource_string_destroy_0x284e84",
+                 "resource_token_match_0x285630",
+                 "resource_token_tree_find_0x2854b8",
+                 "resource_token_compare_0x35674",
+                 "resource_token_object_0x285590",
+                 "resource_record_build_0x28611c",
+                 "resource_utf16_transform_0x28cc88",
+                 "resource_record_insert_0x2862e8",
+                 "resource_loader_tree_begin_0x283408",
+                 "resource_loader_tree_next_0x2933ec",
+                 "resource_lookup_0x284d38",
+                 "resource_lookup_0x284df8",
+                 "resource_lookup_0x28a644",
+                 "resource_cleanup_0x284f00")
+          windows={}
+          for name in names:
+              item=raw["windows"][name]
+              windows[name]={"address":item["address"],
+                             "instructions":item["instructions"],
+                             "complete_arm_decode":item["complete_arm_decode"]}
+              print("RESOURCE_FUNC",name,json.dumps(windows[name],separators=(",",":")))
+          # Exact original factory vtable: LDR LR,[PC,#0x10c] at
+          # 0x28B3A8, ADD LR,PC,LR at 0x28B3B4, ADD LR,LR,#8.
+          import struct
+          from zipfile import ZipFile
+          from tools.deadspace_original_code_window import (
+              elf32_executable_sections,bounded_virtual_read)
+          with ZipFile(Path(os.environ["RUNNER_TEMP"])/"deadspace.apk") as apk:
+              libs=[i for i in apk.infolist() if i.filename.startswith("lib/")
+                    and i.filename.endswith(".so") and 1024<i.file_size<=64*1024*1024]
+              if len(libs)!=1:
+                  raise ValueError("Expected exactly one original ARM ELF")
+              elf=apk.read(libs[0])
+          displacement=struct.unpack("<i",bounded_virtual_read(
+              elf,elf32_executable_sections(elf),0x28b4bc,4))[0]
+          vtable=(0x28b3b4+8+displacement+8)&0xffffffff
+          print("ORIGINAL_FACTORY_VTABLE",hex(vtable))
+          # Original 0x28A4F8 cleanup vtable via 0x28A4FC LDR,
+          # 0x28A508 ADD PC and 0x28A50C ADD #8.
+          cleanup_displacement=struct.unpack("<i",bounded_virtual_read(
+              elf,elf32_executable_sections(elf),0x28a53c,4))[0]
+          cleanup_vtable=(0x28a508+8+cleanup_displacement+8)&0xffffffff
+          print("ORIGINAL_UNREADY_CLEANUP_VTABLE",hex(cleanup_vtable))
+          # Extract only numeric UTF-8 validation-table ranges; do not
+          # publish any proprietary ELF bytes or text.
+          try:
+              from tools.deadspace_original_code_window import elf32_load_ranges
+              mapped=elf32_load_ranges(elf)
+              read=lambda va,n: bounded_virtual_read(elf,mapped,va,n)
+              d8=struct.unpack("<i",read(0x28cdb4,4))[0]
+              ds=struct.unpack("<i",read(0x28cdb8,4))[0]
+              count_base=(0x28cca0+d8-0x6e8)&0xffffffff
+              limit_base=(0x28cca4+ds)&0xffffffff
+              prefix_counts=list(read(count_base+0xc0,64))
+              limit_rows=[]
+              for i in range(1,7):
+                  base=limit_base+i*4
+                  limits=[struct.unpack("<I",read(base+v,4))[0]
+                          for v in (0x98,0xac,0xc0)]
+                  limit_rows.append({"n":i,"min":limits[0],
+                                     "max_exclusive":limits[1],
+                                     "fallback":limits[2]})
+              print("ORIGINAL_UTF8_TABLE_METADATA",json.dumps({
+                  "counts_c0_ff":prefix_counts,"limit_rows":limit_rows},
+                  separators=(",",":")))
+          except (ValueError,IndexError,struct.error) as exc:
+              print("ORIGINAL_UTF8_TABLE_UNAVAILABLE",type(exc).__name__,str(exc)[:160])
+          # Independent UTF-8-to-wide routine 0x26D5FC, used by
+          # the original mode-8 owner line reader 0x276D18.
+          # Emit numeric validation widths/ranges only.
+          try:
+              from tools.deadspace_original_code_window import elf32_load_ranges
+              lookup_ranges=elf32_load_ranges(elf)
+              lookup_read=lambda va,n: bounded_virtual_read(
+                  elf,lookup_ranges,va,n)
+              width_rel=struct.unpack("<i",lookup_read(0x26d724,4))[0]
+              range_rel=struct.unpack("<i",lookup_read(0x26d728,4))[0]
+              width_base=(0x26d614+width_rel)&0xffffffff
+              range_base=(0x26d618+range_rel)&0xffffffff
+              rows=[]
+              for n in range(1,7):
+                  base=range_base+n*4
+                  rows.append({
+                    "width":n,
+                    "offset":struct.unpack("<I",lookup_read(base+0x100,4))[0],
+                    "min":struct.unpack("<I",lookup_read(base+0x114,4))[0],
+                    "max_exclusive":struct.unpack("<I",lookup_read(base+0x128,4))[0]})
+              print("ORIGINAL_OWNER_STREAM_UTF8_TABLE",json.dumps({
+                  "width_counts_c0_ff":list(lookup_read(width_base+0xc0,64)),
+                  "rows":rows},separators=(",",":")))
+          except (ValueError,IndexError,struct.error) as exc:
+              print("ORIGINAL_OWNER_STREAM_UTF8_TABLE_UNAVAILABLE",
+                    type(exc).__name__,str(exc)[:160])
+          # Real parser owner from original 0x27A768: LDR at +0x0
+          # from 0x27A85C, ADD at 0x27A770, ADD #0x188 at 0x27A774.
+          # Capture numeric original vtable +0x58 target only, not game
+          # ELF bytes. The runner must fail if the mapping is invalid.
+          from tools.deadspace_original_code_window import elf32_load_ranges
+          owner_disp=struct.unpack("<i",bounded_virtual_read(
+              elf,elf32_executable_sections(elf),0x27a85c,4))[0]
+          owner_vtable=(0x27a770+8+owner_disp+0x188)&0xffffffff
+          original_segments=elf32_load_ranges(elf)
+          method58=struct.unpack("<I",bounded_virtual_read(
+              elf,original_segments,owner_vtable+0x58,4))[0]
+          print("ORIGINAL_PARSER_OWNER_VTABLE",hex(owner_vtable),
+                "SLOT_0x58",hex(method58))
+          owner_slots={}
+          for offset in (0x24,0x28,0x60,0x64,0x68,0x6c,0x70):
+              owner_slots[hex(offset)]=hex(struct.unpack("<I",
+                  bounded_virtual_read(elf,original_segments,
+                                       owner_vtable+offset,4))[0])
+          print("ORIGINAL_RECEIVER_OWNER_VIRTUALS",
+                json.dumps(owner_slots,separators=(",",":")))
+          # Original constructor 0x27A4F0: PC-relative embedded
+          # vtable literal at 0x27A5D8, plus #0x210, and allocator
+          # singleton pointer-slot literal at 0x27A5DC.
+          embedded_disp=struct.unpack("<i",bounded_virtual_read(
+              elf,elf32_executable_sections(elf),0x27a5d8,4))[0]
+          embedded_vtable=(0x27a4f8+8+embedded_disp+0x210)&0xffffffff
+          allocator_disp=struct.unpack("<i",bounded_virtual_read(
+              elf,elf32_executable_sections(elf),0x27a5dc,4))[0]
+          allocator_global_slot=(0x27a518+8+allocator_disp)&0xffffffff
+          print("ORIGINAL_RECEIVER_EMBEDDED_VTABLE",hex(embedded_vtable),
+                "ALLOCATOR_SLOT",hex(allocator_global_slot))
+          embedded_methods={}
+          for method_slot in (0x14,0x18,0x1c,0x20,0x24,0x28,0x2c,0x30,0x34):
+              embedded_methods[hex(method_slot)]=hex(struct.unpack(
+                  "<I",bounded_virtual_read(
+                      elf,original_segments,embedded_vtable+method_slot,4))[0])
+          print("ORIGINAL_EMBEDDED_PROVIDER_METHODS",
+                json.dumps(embedded_methods,separators=(",",":")))
+          # Recover ARM PLT dynamic-symbol names without publishing
+          # proprietary code or APK bytes. ELF32 .rel.plt and .dynsym
+          # permit mapping original 0x35350 / 0x35554 to host ABI.
+          e_shoff=struct.unpack_from("<I",elf,32)[0]
+          shentsize,shcount,shstridx=struct.unpack_from("<HHH",elf,46)
+          sections=[]
+          for i in range(shcount):
+              off=e_shoff+i*shentsize
+              sections.append(struct.unpack_from("<IIIIIIIIII",elf,off))
+          shstrings=sections[shstridx]
+          shstr=elf[shstrings[4]:shstrings[4]+shstrings[5]]
+          def sectname(s):
+              j=s[0];k=shstr.find(b"\x00",j)
+              return shstr[j:k].decode("ascii","replace")
+          named={sectname(s):s for s in sections}
+          print("ORIGINAL_ELF_IO_IMPORT_SECTION_NAMES",sorted(
+              n for n in named if n.startswith((".plt",".rel",".rela",".dyn"))))
+          plt=named.get(".plt")
+          rel=named.get(".rel.plt")
+          dynsym=named.get(".dynsym")
+          dynstr=named.get(".dynstr")
+          if all((plt,rel,dynsym,dynstr)):
+              symbols=elf[dynstr[4]:dynstr[4]+dynstr[5]]
+              relocation_names=[]
+              for offset in range(rel[4],rel[4]+rel[5],8):
+                  info=struct.unpack_from("<I",elf,offset+4)[0]
+                  sym=info>>8
+                  nameoffset=struct.unpack_from("<I",elf,dynsym[4]+sym*16)[0]
+                  end=symbols.find(b"\x00",nameoffset)
+                  relocation_names.append(symbols[nameoffset:end].decode(
+                      "utf-8","replace"))
+              # ARM PLT0 is 20 bytes, each subsequent entry 12.
+              mapping={}
+              for target in (0x35350,0x35554):
+                  candidate=(target-(plt[3]+20))//12
+                  mapping[hex(target)]={
+                      "plt_section":hex(plt[3]),
+                      "candidate_index":candidate,
+                      "nearby_symbols":[
+                          {"index":i,"name":relocation_names[i]}
+                          for i in range(max(0,candidate-2),
+                                         min(len(relocation_names),candidate+3))
+                      ]}
+              print("ORIGINAL_EMBEDDED_PROVIDER_IO_PLT",
+                    json.dumps(mapping,separators=(",",":")))
+
+          # 0x271914 default pool accessor: LDR r4,[PC,#0x1c]
+          # at 0x271918 loads signed literal from 0x27193c,
+          # ADD r4,PC,r4 at 0x27191c resolves original global slot.
+          pool_relative=struct.unpack("<i",bounded_virtual_read(
+              elf,elf32_executable_sections(elf),0x27193c,4))[0]
+          pool_slot=(0x27191c+8+pool_relative)&0xffffffff
+          print("ORIGINAL_DEFAULT_POOL_SLOT_0x271914",hex(pool_slot))
+          # Original 0x27541C wide-string constructor obtains its
+          # allocator via LDR r5, [PC,#0x4C] at 0x275420 and
+          # ADD r5, PC, r5 at 0x27542C. Resolve original GOT VA.
+          string_relative=struct.unpack("<i",bounded_virtual_read(
+              elf,elf32_executable_sections(elf),0x275474,4))[0]
+          string_slot=(0x27542c+8+string_relative)&0xffffffff
+          print("ORIGINAL_RECEIVER_STRING_SLOT_0x27541C",hex(string_slot))
+          outfile=Path(os.environ["RUNNER_TEMP"])/"resource-instructions.json"
+          outfile.write_text(json.dumps({"schema":2,
+               "factory_mode1_vtable_arm_va":hex(vtable),
+               "unready_cleanup_vtable_arm_va":hex(cleanup_vtable),
+               "windows":windows},indent=2)+"\n")
+          PY
+      - name: Publish ARM instruction metadata only
+        uses: actions/upload-artifact@v4
+        with:
+          name: deadspace-resource-instruction-metadata
+          path: ${{ runner.temp }}/resource-instructions.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Delete temporary copyrighted APK
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/deadspace.apk" "$RUNNER_TEMP/full-instruction-windows.json"

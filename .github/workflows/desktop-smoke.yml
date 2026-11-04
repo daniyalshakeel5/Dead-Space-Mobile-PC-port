@@ -1,0 +1,107 @@
+name: Dead Space Mobile - Windows Linux desktop foundation
+
+on:
+  push:
+    branches:
+      - work/deadspace-remote-preflight-2026-11-01
+    paths:
+      - "CMakeLists.txt"
+      - "include/**"
+      - "src/**"
+      - "apps/**"
+      - "tests/input_tests.cpp"
+      - "tests/timing_tests.cpp"
+      - "tests/apk_probe_tests.cpp"
+      - ".github/workflows/desktop-smoke.yml"
+  pull_request:
+    paths:
+      - "CMakeLists.txt"
+      - "include/**"
+      - "src/**"
+      - "apps/**"
+      - "tests/input_tests.cpp"
+      - "tests/timing_tests.cpp"
+      - "tests/apk_probe_tests.cpp"
+      - ".github/workflows/desktop-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-core:
+    name: Core + CTest / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure dependency-free native core
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=OFF
+      - name: Build
+        run: cmake --build build --config Release --parallel 2
+      - name: Run deterministic input tests
+        run: ctest --test-dir build --build-config Release --output-on-failure
+
+  sdl2-probe:
+    name: Optional SDL2 input diagnostics / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install system SDL2 (Linux only)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev
+      - name: Prepare SDL2 on Windows using GitHub-hosted setup-sdl
+        if: runner.os == 'Windows'
+        id: sdl
+        uses: libsdl-org/setup-sdl@afd98199e97f9c2aa739474be7e0886d149a5e47
+        with:
+          version: 2.30.12
+          build-type: Release
+      - name: Configure on Linux with system SDL2
+        if: runner.os == 'Linux'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=ON -DDS_FETCH_SDL2=OFF
+      - name: Configure on Windows with setup-sdl's package
+        if: runner.os == 'Windows'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=ON -DDS_FETCH_SDL2=OFF "-DCMAKE_PREFIX_PATH=${{ steps.sdl.outputs.prefix }}"
+      - name: Build native diagnostics AND the input tests
+        run: cmake --build build --config Release --parallel 2
+      - name: Stage Windows SDL2 runtime before native CTest
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem -Path "${{ steps.sdl.outputs.prefix }}" -Filter SDL2.dll -File -Recurse | Select-Object -First 1
+          if (-not $dll) { throw "setup-sdl did not provide SDL2.dll" }
+          Copy-Item $dll.FullName build/Release/SDL2.dll
+      - name: Run input unit tests
+        run: ctest --test-dir build --build-config Release --output-on-failure
+      - name: Stage Linux input diagnostic
+        if: runner.os == 'Linux'
+        shell: bash
+        run: mkdir -p dist && cp build/deadspace_native build/ds_input_probe build/ds_apk_probe dist/
+      - name: Stage Windows input diagnostic
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item build/Release/deadspace_native.exe dist/
+          Copy-Item build/Release/ds_input_probe.exe dist/
+          Copy-Item build/Release/ds_apk_probe.exe dist/
+          # Package SDL2.dll only if the setup-sdl package linked dynamically.
+          $dll = Get-ChildItem -Path "${{ steps.sdl.outputs.prefix }}" -Filter SDL2.dll -File -Recurse | Select-Object -First 1
+          if ($dll) { Copy-Item $dll.FullName dist/ }
+      - name: Upload diagnostic only - NO GAME CONTENT
+        uses: actions/upload-artifact@v4
+        with:
+          name: deadspace-native-splash-stage-${{ runner.os }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7

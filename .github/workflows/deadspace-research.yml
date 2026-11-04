@@ -1,0 +1,542 @@
+name: Dead Space Mobile - remote port research
+
+on:
+  push:
+    branches:
+      - work/deadspace-remote-preflight-2026-11-01
+    paths:
+      - "tools/research_menu_texture_refs.py"
+      - "tools/deadspace_audit.py"
+      - "tools/deadspace_native_enum_recover.py"
+      - "tools/deadspace_native_leaf_recover.py"
+      - "tools/deadspace_original_code_window.py"
+      - "tools/deadspace_seek_table_probe.py"
+      - "tests/test_deadspace_seek_table_probe.py"
+      - "tools/deadspace_startup_registration_trace.py"
+      - "tools/deadspace_plt_import.py"
+      - "tests/test_deadspace_plt_import.py"
+      - "tools/deadspace_vita_abi_compare.py"
+      - "tests/test_deadspace_vita_abi_compare.py"
+      - "tests/test_deadspace_original_code_window.py"
+      - "tests/test_deadspace_native_leaf_recover.py"
+      - "src/original_jni_exports.cpp"
+      - "include/ds_port/original_jni_exports.hpp"
+      - "tests/original_jni_exports_tests.cpp"
+      - "tests/test_deadspace_native_enum_recover.py"
+      - "tests/test_deadspace_audit.py"
+      - "tools/deadspace_asset_recon.py"
+      - "tests/test_deadspace_asset_recon.py"
+      - "tools/deadspace_public_report.py"
+      - "tests/test_deadspace_public_report.py"
+      - "tools/deadspace_m3g_preflight.py"
+      - "tests/test_deadspace_m3g_preflight.py"
+      - "tools/deadspace_m3g_native_verify.py"
+      - "tools/deadspace_format116_probe.py"
+      - "tests/test_deadspace_format116_probe.py"
+      - "tools/deadspace_ironmonkey_probe.py"
+      - "tests/test_deadspace_ironmonkey_probe.py"
+      - "tools/deadspace_im_geometry_probe.py"
+      - "tests/test_deadspace_im_geometry_probe.py"
+      - "tools/deadspace_im_topology_probe.py"
+      - "tests/test_deadspace_im_topology_probe.py"
+      - "tools/deadspace_im_numeric_probe.py"
+      - "tests/test_deadspace_im_numeric_probe.py"
+      - "tools/deadspace_im_native_verify.py"
+      - "src/original_m3g_scene.cpp"
+      - "src/original_menu_gl.cpp"
+      - "apps/original_m3g_scene_probe.cpp"
+      - "src/im_mesh.cpp"
+      - "include/ds_port/im_mesh.hpp"
+      - "apps/im_mesh_extract.cpp"
+      - "tests/im_mesh_tests.cpp"
+      - "include/ds_port/m3g_container.hpp"
+      - "src/m3g_container.cpp"
+      - "apps/m3g_probe.cpp"
+      - "apps/m3g_texture_extract.cpp"
+      - "tests/m3g_container_tests.cpp"
+      - "include/ds_port/etc1.hpp"
+      - "src/etc1.cpp"
+      - "tests/etc1_tests.cpp"
+      - "docs/private-apk-analysis.trigger"
+      - ".github/workflows/deadspace-research.yml"
+  pull_request:
+    paths:
+      - "tools/deadspace_audit.py"
+      - "tools/deadspace_native_enum_recover.py"
+      - "tools/deadspace_native_leaf_recover.py"
+      - "tools/deadspace_original_code_window.py"
+      - "tools/deadspace_plt_import.py"
+      - "tests/test_deadspace_plt_import.py"
+      - "tests/test_deadspace_original_code_window.py"
+      - "tests/test_deadspace_native_leaf_recover.py"
+      - "src/original_jni_exports.cpp"
+      - "include/ds_port/original_jni_exports.hpp"
+      - "tests/original_jni_exports_tests.cpp"
+      - "tests/test_deadspace_native_enum_recover.py"
+      - "tests/test_deadspace_audit.py"
+      - "tools/deadspace_asset_recon.py"
+      - "tests/test_deadspace_asset_recon.py"
+      - "tools/deadspace_public_report.py"
+      - "tests/test_deadspace_public_report.py"
+      - "tools/deadspace_m3g_preflight.py"
+      - "tests/test_deadspace_m3g_preflight.py"
+      - "tools/deadspace_m3g_native_verify.py"
+      - "tools/deadspace_format116_probe.py"
+      - "tests/test_deadspace_format116_probe.py"
+      - "tools/deadspace_ironmonkey_probe.py"
+      - "tests/test_deadspace_ironmonkey_probe.py"
+      - "tools/deadspace_im_geometry_probe.py"
+      - "tests/test_deadspace_im_geometry_probe.py"
+      - "tools/deadspace_im_topology_probe.py"
+      - "tests/test_deadspace_im_topology_probe.py"
+      - "tools/deadspace_im_numeric_probe.py"
+      - "tests/test_deadspace_im_numeric_probe.py"
+      - "tools/deadspace_im_native_verify.py"
+      - "src/im_mesh.cpp"
+      - "include/ds_port/im_mesh.hpp"
+      - "apps/im_mesh_extract.cpp"
+      - "tests/im_mesh_tests.cpp"
+      - "include/ds_port/m3g_container.hpp"
+      - "src/m3g_container.cpp"
+      - "apps/m3g_probe.cpp"
+      - "apps/m3g_texture_extract.cpp"
+      - "tests/m3g_container_tests.cpp"
+      - "include/ds_port/etc1.hpp"
+      - "src/etc1.cpp"
+      - "tests/etc1_tests.cpp"
+      - "docs/private-apk-analysis.trigger"
+      - ".github/workflows/deadspace-research.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-audit:
+    name: Research on GitHub runner (not local VM)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned ARM instruction decoder on ephemeral runner
+        run: python -m pip install --disable-pip-version-check capstone==5.0.6
+
+      - name: Compile-check all Python research tools
+        run: python -m compileall -q tools tests
+
+      - name: Run fixture tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Validate native camera and material decoding against original APK on same-repo PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'rm -f "$RUNNER_TEMP/apk-m3g-test.apk" "$RUNNER_TEMP/original-main-menu.m3g" "$RUNNER_TEMP/original-native-m3g-probe"' EXIT
+          curl --fail --silent --show-error --location --retry 3 --max-time 720 \
+            --max-filesize 400000000 --output "$RUNNER_TEMP/apk-m3g-test.apk" \
+            https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes/releases/download/dead_space_mobile_fixes/Deas.Space.Mobile.Fixes.apk
+          test "$(wc -c < "$RUNNER_TEMP/apk-m3g-test.apk" | tr -d ' ')" = 325769461
+          python - <<'PY'
+          import os,zipfile
+          from pathlib import Path
+          with zipfile.ZipFile(os.environ["RUNNER_TEMP"]+"/apk-m3g-test.apk") as apk:
+              name="assets/published/models/main_menu.m3g"
+              record=apk.getinfo(name)
+              assert 0<record.file_size<32*1024*1024
+              Path(os.environ["RUNNER_TEMP"]+"/original-main-menu.m3g").write_bytes(apk.read(name))
+          PY
+          g++ -std=c++17 -O2 -Wall -Wextra -I include \
+            src/original_m3g_scene.cpp apps/original_m3g_scene_probe.cpp \
+            -o "$RUNNER_TEMP/original-native-m3g-probe"
+          "$RUNNER_TEMP/original-native-m3g-probe" "$RUNNER_TEMP/original-main-menu.m3g"
+          python tools/research_menu_texture_refs.py "$RUNNER_TEMP/original-main-menu.m3g"
+          # Exercise the actual native executable through the recovered
+          # camera, transforms and renderer contract (headless only).
+          sudo apt-get update -qq >/dev/null
+          sudo apt-get install -y -qq libsdl2-dev libgl-dev >/dev/null
+          cmake -S . -B "$RUNNER_TEMP/native-scene-boot" \
+            -DCMAKE_BUILD_TYPE=Release -DDS_BUILD_INPUT_PROBE=OFF \
+            -DDS_BUILD_BOOT_SPLASH=ON >/dev/null
+          cmake --build "$RUNNER_TEMP/native-scene-boot" \
+            --target deadspace_native --parallel 2 >/dev/null
+          python - <<'PY'
+          import os,zipfile
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])/"native-scene-assets"/"assets"
+          with zipfile.ZipFile(os.environ["RUNNER_TEMP"]+"/apk-m3g-test.apk") as apk:
+              for name in ("published/texturepacks_ui/splash_ea.m3g",
+                           "published/texturepacks_ui/splash_deadspace.m3g",
+                           "published/models/main_menu.m3g",
+                           "published/texturepacks_ui/ui_frontend.m3g",
+                           "published/layoutdata/layouts.xml.sb"):
+                  item=apk.getinfo("assets/"+name)
+                  assert 0<item.file_size<32*1024*1024
+                  dst=root/name
+                  dst.parent.mkdir(parents=True,exist_ok=True)
+                  dst.write_bytes(apk.read("assets/"+name))
+              # Original main_menu.m3g parameter-900 texture dependencies.
+              # Fixture names came from the real APK; the runtime resolves
+              # these dynamically from user parameters, not this list.
+              for name in (
+                  "published/textures/texture_env_main_menu_objects_02.m3g",
+                  "published/textures/texture_env_sprawl_starfield_01.m3g",
+                  "published/textures/texture_FX_HoloBackPanel.m3g",
+                  "published/textures/texture_FX_InteractDoorBacking.m3g",
+                  "published/textures/texture_FX_Dash.m3g",
+                  "published/textures/texture_FX_D_logo_Grey.m3g",
+                  "published/textures/texture_FX_GenBorder.m3g",
+                  "published/textures/texture_env_generic_fog_01.m3g",
+                  "published/textures/texture_floor_shadow.m3g",
+                  "published/textures/texture_env_main_menu_01.m3g",
+                  "published/textures/texture_env_main_menu_starfield.m3g",
+                  "published/textures/texture_env_main_menu_objects.m3g",
+                  "published/textures_uncompressed/texture_env_generic_uv_particle.m3g",
+              ):
+                  item=apk.getinfo("assets/"+name)
+                  assert 0<item.file_size<64*1024*1024
+                  dst=root/name
+                  dst.parent.mkdir(parents=True,exist_ok=True)
+                  dst.write_bytes(apk.read("assets/"+name))
+          PY
+          set +e
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software \
+            timeout 35s "$RUNNER_TEMP/native-scene-boot/deadspace_native" \
+            --boot-splash --assets-dir "$RUNNER_TEMP/native-scene-assets" \
+            > "$RUNNER_TEMP/native-scene-boot.log" 2>&1
+          boot_exit=$?
+          set -e
+          cat "$RUNNER_TEMP/native-scene-boot.log"
+          test "$boot_exit" = 20
+          grep -F "Original menu camera 478" "$RUNNER_TEMP/native-scene-boot.log"
+          # Render an actual OpenGL frame with Mesa's software rasterizer
+          # under virtual X11, then verify that geometry produced pixels.
+          # No copyrighted screenshot is exported.
+          sudo apt-get install -y -qq xvfb libgl1-mesa-dri >/dev/null
+          set +e
+          LIBGL_ALWAYS_SOFTWARE=1 SDL_AUDIODRIVER=dummy \
+            DS_NATIVE_MENU_SMOKE_FRAMES=1 \
+            xvfb-run -a timeout 55s \
+            "$RUNNER_TEMP/native-scene-boot/deadspace_native" \
+            --boot-splash --assets-dir "$RUNNER_TEMP/native-scene-assets" \
+            > "$RUNNER_TEMP/native-scene-gpu.log" 2>&1
+          gpu_exit=$?
+          set -e
+          cat "$RUNNER_TEMP/native-scene-gpu.log"
+          test "$gpu_exit" = 20
+          grep -E "Original 3D menu GPU frame: .*nonblack pixels [1-9][0-9]*" \
+            "$RUNNER_TEMP/native-scene-gpu.log"
+          grep -E "Original UI_MAIN: [1-9][0-9]* source-layout draw/hit commands" \
+            "$RUNNER_TEMP/native-scene-gpu.log"
+
+
+      - name: Inventory repository on pull requests (no private APK)
+        if: github.event_name == 'pull_request'
+        run: |
+          python tools/deadspace_audit.py --root . --output "$RUNNER_TEMP/private-audit.json"
+          python -m tools.deadspace_public_report --audit "$RUNNER_TEMP/private-audit.json" --output report/deadspace-public-evidence.json
+
+      - name: Inspect upstream release APK on GitHub runner (owner push or manual)
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          DS_APK_URL: ${{ secrets.DS_APK_URL }}
+          UPSTREAM_APK_URL: https://github.com/RAFALAMAO/Dead-Space-Mobile-Fixes/releases/download/dead_space_mobile_fixes/Deas.Space.Mobile.Fixes.apk
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'rm -f "$RUNNER_TEMP/deadspace.apk" "$RUNNER_TEMP/private-audit.json" "$RUNNER_TEMP/private-resource-recon.json"' EXIT
+          # This is an already-published upstream asset, not an APK committed or
+          # redistributed by this port. Asset ID 158932873, 325769461 bytes.
+          if [[ -n "${DS_APK_URL:-}" ]]; then
+            source_url="$DS_APK_URL"
+            echo "Using privately configured APK source."
+          else
+            source_url="$UPSTREAM_APK_URL"
+            echo "Using original upstream GitHub release asset 158932873."
+          fi
+          curl --fail --silent --show-error --location --retry 3 \
+            --retry-delay 3 --max-time 720 --max-filesize 1073741824 \
+            --output "$RUNNER_TEMP/deadspace.apk" "$source_url"
+          unset source_url
+          actual_size=$(wc -c < "$RUNNER_TEMP/deadspace.apk" | tr -d ' ')
+          if [[ "$actual_size" != "325769461" ]]; then
+            echo "::error::APK size mismatch (expected 325769461, received $actual_size); refusing analysis."
+            exit 1
+          fi
+          echo "Release size matches private Library asset metadata: $actual_size bytes. SHA-256 equivalence unverified."
+          # Verify the recovered native camera/hierarchy/material decoder with
+          # actual copyrighted bytes only inside the ephemeral runner.
+          python - <<'PY'
+          import os,zipfile
+          from pathlib import Path
+          with zipfile.ZipFile(os.environ["RUNNER_TEMP"]+"/deadspace.apk") as apk:
+              name="assets/published/models/main_menu.m3g"
+              record=apk.getinfo(name)
+              assert 0<record.file_size<32*1024*1024
+              Path(os.environ["RUNNER_TEMP"]+"/original-main-menu.m3g").write_bytes(apk.read(name))
+          PY
+          g++ -std=c++17 -O2 -Wall -Wextra -I include \
+            src/original_m3g_scene.cpp apps/original_m3g_scene_probe.cpp \
+            -o "$RUNNER_TEMP/original-native-m3g-probe"
+          "$RUNNER_TEMP/original-native-m3g-probe" \
+            "$RUNNER_TEMP/original-main-menu.m3g"
+          rm -f "$RUNNER_TEMP/original-main-menu.m3g" "$RUNNER_TEMP/original-native-m3g-probe"
+
+          # Never emit original file contents, ZIP member names, game-library
+          # symbols, private URLs or raw report JSON to public CI logs/artifacts.
+          python tools/deadspace_audit.py --root . \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output "$RUNNER_TEMP/private-audit.json"
+          python tools/deadspace_asset_recon.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output "$RUNNER_TEMP/private-resource-recon.json"
+          python -m tools.deadspace_public_report \
+            --audit "$RUNNER_TEMP/private-audit.json" \
+            --recon "$RUNNER_TEMP/private-resource-recon.json" \
+            --output report/deadspace-public-evidence.json
+          python tools/deadspace_native_enum_recover.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-native-enums.json
+          python tools/deadspace_native_leaf_recover.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-original-jni-noops.json
+          python tools/deadspace_original_code_window.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-original-instruction-window.json
+          python -m tools.deadspace_startup_registration_trace \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --instruction-report report/deadspace-original-instruction-window.json \
+            --output report/deadspace-original-startup-registrations.json
+          python -m tools.deadspace_vita_abi_compare \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-vita-abi-comparison.json
+          python -m tools.deadspace_plt_import \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-input-plt-import.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path("report/deadspace-original-instruction-window.json").read_text())
+          for name in ("stage_zero_owner_provider_0x27e930",
+                       "record_allocator_virtual_call_0x281d54"):
+              print("ARM_ALLOCATOR_CHAIN",name,
+                    json.dumps(report["windows"][name]["instructions"][:32],
+                               separators=(",",":")))
+          print("ENGINE_REGISTER_0x27FD7C_FULL",
+                json.dumps(report["windows"]["post_setup_direct_callee_0x27fd7c"]["instructions"][:180],separators=(",",":")))
+          print("ENGINE_RESOURCE_0x2803E4_FULL",
+                json.dumps(report["windows"]["post_setup_direct_callee_0x2803e4"]["instructions"][:120],separators=(",",":")))
+          for name in ("startup_global_direct_service_0x36fd38",
+                       "startup_global_direct_service_target_0x37000c",
+                       "startup_registration_helper_first_0x2839c8"):
+              print("ORIGINAL_ENGINE_DIRECT_DETAIL",name,
+                    json.dumps(report["windows"][name]["instructions"][:40],separators=(",",":")))
+          print("ORIGINAL_STAGE_ZERO_GLOBAL_SERVICE_CONSTANTS",
+                json.dumps(report["original_startup_global_service_0x37000c"],sort_keys=True))
+          print("ORIGINAL_REGISTRATION_CHARACTER_MAP",
+                json.dumps(report["original_registration_character_map"],sort_keys=True))
+          for name in ("startup_registration_helper_first_0x2839c8",
+                       "startup_registration_insert_0x2837b4",
+                       "startup_registration_match_action_0x283f5c",
+                       "startup_registration_string_copy_0x281df4"):
+              print("ORIGINAL_RESOURCE_DEPENDENCY",name,
+                    json.dumps(report["windows"][name]["instructions"][:192],separators=(",",":")))
+          for name in ("resource_lookup_0x28b3a4","resource_lookup_0x28a5f4",
+                       "resource_lookup_0x28a4f8","resource_lookup_0x283cb4",
+                       "resource_lookup_0x286918","resource_lookup_0x284d38",
+                       "resource_lookup_0x284df8","resource_lookup_0x28a644",
+                       "resource_cleanup_0x284f00"):
+              print("ORIGINAL_RESOURCE_LOOKUP_FUNCTION",name,
+                    json.dumps(report["windows"][name]["instructions"][:70],separators=(",",":")))
+          print("ORIGINAL_ENGINE_REGISTER_HELPER",
+                json.dumps(report["windows"]["repeated_initializer_callee_0x284178"]["instructions"][:192],separators=(",",":")))
+          for name in ("post_setup_direct_callee_0x27fd7c",
+                       "post_setup_direct_callee_0x2803e4"):
+              print("ORIGINAL_ENGINE_INIT_CALL",
+                    name,
+                    json.dumps(report["windows"][name]["instructions"][:44],separators=(",",":")))
+          print("ORIGINAL_SINGLETON_0x27E560",
+                json.dumps(report["windows"]["startup_allocator_object_init_0x27e560"]["instructions"][:42],separators=(",",":")))
+          print("ORIGINAL_SINGLETON_EVIDENCE",
+                json.dumps(report.get("original_singleton_0x27e560",{}),sort_keys=True))
+          print("ORIGINAL_STAGE_ZERO_OWNER_CONSTRUCTION",
+                json.dumps(report["windows"][
+                    "stage_zero_owner_construction_tail_0x27f7e0"]["instructions"][:44],
+                           separators=(",",":")))
+          for method_name in (
+              "verified_vtable_object34_slot0c_0x2876d0",
+              "verified_vtable_object58_slot24_0x281b40",
+              "verified_vtable_secondary_slot0c_0x2828e4",
+              "verified_vtable_embedded_slot18_0x2800e0"):
+              print("ORIGINAL_CONCRETE_VIRTUAL_METHOD",method_name,
+                    json.dumps(report["windows"][method_name]["instructions"][:44],
+                               separators=(",",":")))
+          print("ORIGINAL_STARTUP_VTABLE_METHOD_TARGETS",
+                json.dumps(report.get("original_stage_zero_concrete_method_targets",{}),
+                           sort_keys=True))
+          print("ORIGINAL_ARM_OWNER_PROVIDER",
+                json.dumps(report["stage_zero_0x27e930_registry_query"],
+                           sort_keys=True))
+          print("ORIGINAL_ARM_ALLOCATOR_ABI",
+                json.dumps(report["stage_zero_0x281d54_allocator_abi"],
+                           sort_keys=True))
+          print("ORIGINAL_ARM_ALLOCATED_RECORD_GLOBAL_SLOT",
+                report["stage_zero_0x281d54_record_global_slot"])
+          print("ORIGINAL_ARM_TYPE2_FLOAT_EVIDENCE",
+                json.dumps(report["stage_zero_type2_runtime_float_evidence"],
+                           sort_keys=True))
+          for name in ("stage_zero_setup_type2_branch_0x28cad8",):
+              item=report["windows"][name]
+              print("Original type-2 ARM branch",name,
+                    json.dumps(item["instructions"][:24], separators=(",",":")))
+          for name in ("stage_zero_setup_target_0x28ca24",
+                       "stage_zero_followup_target_0x281d54",
+                       "stage_zero_followup_target_0x2833f4"):
+              item=report["windows"][name]
+              print("Original startup target",name,
+                    json.dumps(item["instructions"][:40], separators=(",",":")))
+          for name in ("frame_stage_zero_first_callee",
+                       "frame_stage_zero_second_callee",
+                       "frame_state_one_zero_result_tail"):
+              item=report["windows"][name]
+              print("Targeted original ARM instructions", name,
+                    json.dumps(item["instructions"][:32], separators=(",",":")))
+          PY
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path("report/deadspace-original-instruction-window.json").read_text())
+          print("ORIGINAL_GLOBAL_STATE_PROOF",
+                json.dumps(report["frame_transition_global_address_proof"],sort_keys=True))
+          for key in ("original_time_pair_source","native_frame_state_dispatch","frame_stage_zero_second_callee",
+                      "frame_stage_zero_first_callee","frame_state_one_zero_result_tail"):
+              sample=report["windows"][key]
+              print("ORIGINAL_ARM_WINDOW",key,json.dumps({
+                  "address":sample["address"],
+                  "instructions":sample["instructions"][:24]
+              },sort_keys=True))
+          print("ORIGINAL_FRAME_NONZERO_BRANCH",json.dumps(
+              report["windows"]["native_frame_state_dispatch"]["instructions"][24:40],
+              sort_keys=True))
+          print("ORIGINAL_NONZERO_FRAME_WINDOW",json.dumps(
+              report["windows"]["frame_state_one_nonzero_continuation"]["instructions"][:20],
+              sort_keys=True))
+          print("ORIGINAL_TRANSITION_CONTINUATION",json.dumps(
+              report["windows"]["frame_state_one_zero_result_tail"]["instructions"][24:36],
+              sort_keys=True))
+          PY
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          info=json.loads(Path("report/deadspace-native-enums.json").read_text())
+          original=info.get("constants",{})
+          selected={k.split("_")[-1]:v for k,v in original.items()
+                    if "NativeGetRawPointer" in k}
+          print("Verified ARM/Thumb JNI integer functions:",
+                info["proven_constant_functions"])
+          print("Instruction-proven raw pointer event constants:",
+                json.dumps(selected,sort_keys=True))
+          # JNI exports are public ABI metadata; only instruction-proven constants.
+          print("Verified JNI native return implementations:",
+                json.dumps(original,sort_keys=True))
+          import re
+          code=Path("src/original_jni_exports.cpp").read_text()
+          pattern=r'extern "C" DS_ORIGINAL_JNI_EXPORT std::int32_t (Java_com_ea_[A-Za-z0-9_]+)\(void\*, void\*\) noexcept \{\s*return (\d+);\s*\}'
+          matches=re.findall(pattern,code)
+          constructed={name:int(value) for name,value in matches}
+          if len(matches)!=29 or constructed!=original:
+              raise SystemExit("Native C++ JNI bodies differ from the original instruction-proven values")
+          print("Independent real-APK C++ source equivalence: 29/29 original JNI exports match")
+
+          PY
+          python tools/deadspace_m3g_preflight.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-m3g-evidence.json
+          cmake -S . -B "$RUNNER_TEMP/m3g-build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DDS_BUILD_INPUT_PROBE=OFF -DDS_BUILD_M3G_READER=ON -DDS_BUILD_IM_MESH_READER=ON \
+            -DDS_ENABLE_TESTS=OFF
+          cmake --build "$RUNNER_TEMP/m3g-build" \
+            --config Release --target ds_m3g_probe ds_m3g_texture_extract ds_im_mesh_extract --parallel 2
+          python tools/deadspace_m3g_native_verify.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --native-probe "$RUNNER_TEMP/m3g-build/ds_m3g_probe" \
+            --texture-exporter "$RUNNER_TEMP/m3g-build/ds_m3g_texture_extract" \
+            --output report/deadspace-m3g-native-evidence.json
+          python tools/deadspace_format116_probe.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-format116-evidence.json
+          python tools/deadspace_ironmonkey_probe.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-ironmonkey-evidence.json
+          python tools/deadspace_im_geometry_probe.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-im-geometry-evidence.json
+          python tools/deadspace_im_topology_probe.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-im-topology-evidence.json
+          python tools/deadspace_im_numeric_probe.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --output report/deadspace-im-numeric-evidence.json
+          python tools/deadspace_im_native_verify.py \
+            --apk "$RUNNER_TEMP/deadspace.apk" \
+            --native-mesh "$RUNNER_TEMP/m3g-build/ds_im_mesh_extract" \
+            --output report/deadspace-im-native-evidence.json
+          python -c 'import json; d=json.load(open("report/deadspace-public-evidence.json",encoding="utf-8")); assert d.get("real_apk_analyzed") and d.get("resources",{}).get("valid_zip"); print("Real upstream release analyzed; redacted aggregate report ready.")'
+          echo "::group::Sanitized original-APK evidence (public metadata only)"
+          python -m json.tool report/deadspace-public-evidence.json
+          echo "::endgroup::"
+          echo "::group::JSR-184 real APK header validation (aggregate only)"
+          python -m json.tool report/deadspace-m3g-evidence.json
+          echo "::endgroup::"
+          echo "::group::Native JSR-184 complete container evidence (aggregate only)"
+          python -m json.tool report/deadspace-m3g-native-evidence.json
+          echo "::endgroup::"
+          echo "::group::Proprietary format-116 block-size hypotheses (aggregate only)"
+          python -m json.tool report/deadspace-format116-evidence.json
+          echo "::endgroup::"
+          echo "::group::IronMonkey model chunk framing evidence (aggregate only)"
+          python -m json.tool report/deadspace-ironmonkey-evidence.json
+          echo "::endgroup::"
+          echo "::group::IronMonkey mesh/vertex array reference evidence (aggregate only)"
+          python -m json.tool report/deadspace-im-geometry-evidence.json
+          echo "::endgroup::"
+          echo "::group::IronMonkey triangle strip/index topology evidence (aggregate only)"
+          python -m json.tool report/deadspace-im-topology-evidence.json
+          echo "::endgroup::"
+          echo "::group::IronMonkey position and vertex-index bounds (aggregate only)"
+          python -m json.tool report/deadspace-im-numeric-evidence.json
+          echo "::endgroup::"
+          echo "::group::Instruction-proven original ARM JNI constant returns"
+          python -m json.tool report/deadspace-native-enums.json
+          echo "::endgroup::"
+          echo "::group::Native IronMonkey OBJ mesh reconstruction (aggregate only)"
+          python -m json.tool report/deadspace-im-native-evidence.json
+          echo "::endgroup::"
+
+      - name: Upload metadata report only
+        uses: actions/upload-artifact@v4
+        with:
+          name: deadspace-port-audit
+          path: |
+            report/deadspace-public-evidence.json
+            report/deadspace-vita-abi-comparison.json
+            report/deadspace-input-plt-import.json
+            report/deadspace-native-enums.json
+            report/deadspace-original-jni-noops.json
+            report/deadspace-original-instruction-window.json
+            report/deadspace-original-startup-registrations.json
+            report/deadspace-m3g-evidence.json
+            report/deadspace-m3g-native-evidence.json
+            report/deadspace-format116-evidence.json
+            report/deadspace-ironmonkey-evidence.json
+            report/deadspace-im-geometry-evidence.json
+            report/deadspace-im-topology-evidence.json
+            report/deadspace-im-numeric-evidence.json
+            report/deadspace-im-native-evidence.json
+          if-no-files-found: error
+          retention-days: 7

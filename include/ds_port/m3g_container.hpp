@@ -1,0 +1,82 @@
+#pragma once
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <vector>
+
+namespace ds_port {
+
+// JSR-184 M3G v1.0 container/object-chunk inspection ONLY.
+// Does not interpret model geometry, textures, animations or references.
+// Input bytes come from the user's own APK at runtime; no game data shipped.
+enum class M3gScanMode {
+    StrictJsr184,
+    DiagnosticOpaqueVariant // Structural evidence only. NOT gameplay decoding.
+};
+
+struct M3gContainerReport {
+    bool valid = false;
+    std::string error;
+    std::uint32_t section_count = 0;
+    std::uint32_t object_count = 0;
+    std::uint32_t compressed_sections = 0;
+    bool has_external_references = false;
+    bool diagnostic_mode = false;
+    std::uint32_t nonstandard_header_objects = 0;
+    std::uint32_t reserved_type_objects = 0;
+    // JSR-184 Image2D payload subparser evidence, never raw pixel bytes.
+    std::uint32_t image2d_objects = 0;
+    std::uint32_t image2d_standard_payloads = 0;
+    std::uint32_t image2d_unrecognized_payloads = 0;
+    std::uint32_t image2d_max_width = 0;
+    std::uint32_t image2d_max_height = 0;
+    std::uint64_t image2d_validated_pixel_bytes = 0;
+    std::array<std::uint32_t, 5> image2d_format_counts{}; // format 96..100
+    // 0=unknown; 1=superclass; 2=metadata short; 3=format/flag;
+    // 4=dimensions; 5=stored field bounds; 6=pixel representation;
+    // 7=trailing bytes. Opaque categories, no original payload bytes.
+    std::array<std::uint32_t, 9> image2d_failure_stage_counts{};
+    // 3=unknown Image2D format, 8=non-boolean mutability flag.
+    std::array<std::uint32_t, 256> image2d_unknown_format_counts{};
+
+    std::array<std::uint32_t, 256> object_type_count{};
+};
+
+// Bounds-limited in-memory parser. All integers are LE per JSR-184.
+// Section Adler32 and zlib compression scheme 1 validated when present.
+// Use at most one file at a time; do NOT pass an entire APK into memory.
+M3gContainerReport scan_m3g_container(const std::uint8_t* data,
+                                     std::size_t size,
+                                     std::size_t max_section_bytes = 64u * 1024u * 1024u,
+                                     M3gScanMode mode = M3gScanMode::StrictJsr184);
+// Supported subset: verified JSR-184 Image2D immutable non-paletted RGBA
+// in a structurally validated two-section Dead Space texture resource.
+// Caller owns the APK; decoded pixels remain in caller memory.
+struct M3gRgbaImage {
+    bool decoded = false;
+    std::string error;
+    std::uint32_t width = 0;
+    std::uint32_t height = 0;
+    std::vector<std::uint8_t> pixels_rgba;
+};
+M3gRgbaImage decode_m3g_rgba_image(const std::uint8_t* data, std::size_t size);
+
+// IronMonkey Image2D code 116, only when bytes exactly match a complete
+// ETC1 mip pyramid. Decodes BASE LEVEL RGB to RGBA8 in memory; mip levels
+// are validated but not exposed. Visual orientation is unverified.
+// Validated JSR-184 texture pack reader for the game's external
+// scene Image2D objects. Accepts a single immutable RGB/RGBA
+// Image2D across structurally checked sections, including zlib sections;
+// unlike the narrow two-section RGBA reader this does not presume the
+// pack contains exactly three objects.
+// IronMonkey single-section uncompressed texture variant verified against
+// original APK: declared raw size equals section total, and checksum field
+// is zero. This never weakens checksum validation for standard M3G sections.
+M3gRgbaImage decode_m3g_ironmonkey_uncompressed_image(
+    const std::uint8_t* data,std::size_t size);
+M3gRgbaImage decode_m3g_scene_texture_image(
+    const std::uint8_t* data,std::size_t size);
+M3gRgbaImage decode_m3g_etc1_image(const std::uint8_t* data, std::size_t size);
+
+}  // namespace ds_port
