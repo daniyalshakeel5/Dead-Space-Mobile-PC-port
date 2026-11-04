@@ -446,7 +446,18 @@ static u64 jni_NewArray(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
     const char* n = sname(); tr(n); int esz = esz_of(n);
     u32 h = new_obj(K_ARRAY, 0, calloc(r1 ? r1 : 1, esz), r1); OBJ(h)->esz = (u8)esz; RET(h);
 }
-static u64 jni_ArrayElements(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr(sname()); JObj* o = OBJ(r1); if (r2) *(u8*)P(r2) = 0; RET(o ? U(o->p) : 0); }
+static u64 jni_ArrayElements(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
+    const char* n = sname(); tr(n); JObj* o = OBJ(r1);
+    int esz = esz_of(n);
+    if (!o || o->kind != K_ARRAY || o->esz != esz || !o->p) {
+        g_exception = 1;
+        if (getenv("DS_ASSET_TRACE"))
+            fprintf(stderr, "[JNI_ARRAY_ELEMENTS_BAD] method=%s handle=%08x\n", n, r1);
+        RET(0);
+    }
+    if (r2) *(u8*)P(r2) = 0; /* array is pinned, no copied storage */
+    RET(U(o->p));
+}
 static u64 jni_ArrayRegionGet(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
     const char* n = sname(); tr(n); JObj* o = OBJ(r1); int esz = esz_of(n); u32 buf = *(u32*)P(sp);
     if (!o || o->kind != K_ARRAY || o->esz != esz || !o->p ||
@@ -468,8 +479,26 @@ static u64 jni_ArrayRegionGet(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
     RET(0);
 }
 static u64 jni_ArrayRegionSet(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
-    const char* n = sname(); tr(n); JObj* o = OBJ(r1); int esz = esz_of(n); u32 buf = *(u32*)P(sp);
-    if (o) memcpy((u8*)o->p + (size_t)r2 * esz, P(buf), (size_t)r3 * esz); RET(0);
+    const char* n = sname(); tr(n);
+    JObj* o = OBJ(r1); int esz = esz_of(n); u32 buf = *(u32*)P(sp);
+    if (!o || o->kind != K_ARRAY || o->esz != esz || !o->p ||
+        r2 > o->n || r3 > o->n - r2 || (r3 && !buf)) {
+        g_exception=1;
+        if (getenv("DS_ASSET_TRACE"))
+            fprintf(stderr,
+                "[JNI_ARRAY_REGION_SET_BAD] method=%s handle=%08x offset=%u len=%u arraylen=%u buffer=%08x\n",
+                n,r1,r2,r3,o ? o->n : 0,buf);
+        RET(0);
+    }
+    if (r3) memcpy((u8*)o->p + (size_t)r2 * esz, P(buf), (size_t)r3 * esz);
+    if (getenv("DS_ASSET_TRACE") && esz==1 && r3==12) {
+        const u8* d=(const u8*)o->p + (size_t)r2;
+        fprintf(stderr,"[JNI_12_BYTE_SET] tid=%lu array=%08x off=%u bytes=",
+            (unsigned long)pthread_self(),r1,r2);
+        for(int i=0;i<12;i++) fprintf(stderr,"%02x ",(unsigned)d[i]);
+        fprintf(stderr,"\n");
+    }
+    RET(0);
 }
 static u64 jni_NewObjectArray(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr("JNI:NewObjectArray"); u32* arr = calloc(r1 + 1, 4); RET(new_obj(K_OBJARR, "[Ljava/lang/Object;", arr, r1)); }
 static u64 jni_GetObjectArrayElement(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr("JNI:GetObjectArrayElement"); JObj* o = OBJ(r1); RET(o && r2 < o->n ? ((u32*)o->p)[r2] : 0); }
