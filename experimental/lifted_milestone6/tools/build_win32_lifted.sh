@@ -56,6 +56,17 @@ if [[ ! -f "$SDKROOT/include/SDL2/SDL.h" ||
 fi
 python3 "$SRC/gen_gl.py" "$OBJ/gl_gen.c"
 
+# Same original M3G input repair that passed 120-frame real-APK native Linux boot.
+# It reconstructs native BufferedInputStream cache/refill from the ARM code and
+# serializes loader calls without inventing game data or patching resource bytes.
+for patch in native_buffered_input.py m3g_loader_serialization.py; do
+    [[ -s "$SRC/$patch" ]] || { echo "[ERROR] Missing real M3G boot patch: $patch"; exit 12; }
+done
+[[ -s "$GEN/fn_058.c" && -s "$GEN/fn_055.c" ]] ||
+    { echo '[ERROR] Original input/loader generated code missing'; exit 13; }
+python3 "$SRC/native_buffered_input.py" --source "$GEN/fn_058.c" --instrument
+python3 "$SRC/m3g_loader_serialization.py" --source "$GEN/fn_055.c" --instrument
+
 # The owner's reproduced Win32 splash crash occurs when ModelCache's
 # f_00061414 leaves a model-node vector empty. The original engine already
 # has a NULL-node failure/cleanup path. Enable that same branch only for an
