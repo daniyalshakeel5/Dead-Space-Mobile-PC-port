@@ -92,7 +92,35 @@ static u64 call_java_native(u32 addr, u32 self, const char* kinds, int n, JArg* 
 }
 
 // ---- the Java methods the game expects from Android
-static int stream_read(JObj* o, u8* dst, int len) { if (!o->p) return -1; size_t n = fread(dst, 1, len, (FILE*)o->p); return n == 0 && len > 0 ? -1 : (int)n; }
+/* Keep Android InputStream's EOF and bounds semantics. A negative count
+ * must never be cast into a huge size_t before fread. */
+static int stream_read(JObj* o, u8* dst, int len) {
+    if (!o || !o->p || !dst || len < 0) { g_exception = 1; return -1; }
+    if (!len) return 0;
+    size_t n = fread(dst, 1, (size_t)len, (FILE*)o->p);
+    if (n == 0 && ferror((FILE*)o->p)) { g_exception = 1; return -1; }
+    return n == 0 ? -1 : (int)n;
+}
+static int stream_array_ok(JObj* b, s32 offset, s32 count) {
+    return b && b->kind == K_ARRAY && b->esz == 1 && b->p &&
+        offset >= 0 && count >= 0 &&
+        (u32)offset <= b->n && (u32)count <= b->n - (u32)offset;
+}
+/* Android AssetInputStream.skip clamps to EOF. Desktop fseek alone can
+ * move past EOF and report bytes never consumed, corrupting M3G decoding. */
+static u64 stream_skip(JObj* o, s64 requested) {
+    if (!o || !o->p) { g_exception = 1; return 0; }
+    if (requested <= 0) return 0;
+    FILE* f = (FILE*)o->p;
+    long start = ftell(f);
+    if (start < 0 || fseek(f, 0, SEEK_END)) { g_exception = 1; return 0; }
+    long end = ftell(f);
+    if (end < 0 || fseek(f, start, SEEK_SET)) { g_exception = 1; return 0; }
+    u64 remaining = end > start ? (u64)(end-start) : 0;
+    u64 amount = (u64)requested < remaining ? (u64)requested : remaining;
+    if (fseek(f, start + (long)amount, SEEK_SET)) { g_exception = 1; return 0; }
+    return amount;
+}
 static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a, u32 sp, int* handled) {
     *handled = 1;
     JObj* so = OBJ(self);
@@ -114,7 +142,10 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
             if (g_log_java) printf("   [java] AssetManager.openFd(%s) -> %s\n", path, f ? "ok" : "FileNotFound");
             if (!f) { g_exception = 1; return 0; }
             fseek(f, 0, SEEK_END); u32 len = (u32)ftell(f); fseek(f, 0, SEEK_SET);
-            u32 h = new_obj(K_AFD, "android/content/res/AssetFileDescriptor", f, len); return h;
+            /* A descriptor stores the resource path, not a shared FILE pointer.
+             * createInputStream opens an independently owned stream each time. */
+            fclose(f);
+            u32 h = new_obj(K_AFD, "android/content/res/AssetFileDescriptor", strdup(path), len); return h;
         }
         if (!strcmp(nm, "list")) {
             char path[1024]; JObj* s = OBJ(a[0].i); snprintf(path, sizeof path, "%s/%s", g_assets_root, s && s->s ? s->s : "");
@@ -135,18 +166,39 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
         }
     }
     if (!strcmp(c, "java/io/InputStream") && so && so->kind == K_STREAM) {
-        if (!strcmp(nm, "read") && !strcmp(m->sig, "([BII)I")) { JObj* b = OBJ(a[0].i); return (u32)stream_read(so, (u8*)b->p + a[1].i, (int)a[2].i); }
-        if (!strcmp(nm, "read") && !strcmp(m->sig, "([B)I")) { JObj* b = OBJ(a[0].i); return (u32)stream_read(so, (u8*)b->p, (int)b->n); }
-        if (!strcmp(nm, "read") && !strcmp(m->sig, "()I")) { u8 ch; return stream_read(so, &ch, 1) < 0 ? (u32)-1 : ch; }
+        if (!strcmp(nm, "read") && !strcmp(m->sig, "([BII)I")) {
+            JObj* b = OBJ(a[0].i);
+            if (!stream_array_ok(b, (s32)a[1].i, (s32)a[2].i)) { g_exception = 1; return (u32)-1; }
+            return (u32)stream_read(so, (u8*)b->p + a[1].i, (int)a[2].i);
+        }
+        if (!strcmp(nm, "read") && !strcmp(m->sig, "([B)I")) {
+            JObj* b = OBJ(a[0].i);
+            if (!b || !stream_array_ok(b, 0, (s32)b->n)) { g_exception = 1; return (u32)-1; }
+            return (u32)stream_read(so, (u8*)b->p, (int)b->n);
+        }
+        if (!strcmp(nm, "read") && !strcmp(m->sig, "()I")) { u8 ch=0; return stream_read(so, &ch, 1) < 0 ? (u32)-1 : ch; }
         if (!strcmp(nm, "close")) { if (so->p) fclose((FILE*)so->p); so->p = 0; return 0; }
-        if (!strcmp(nm, "available")) { long cur = ftell((FILE*)so->p); fseek((FILE*)so->p, 0, SEEK_END); long end = ftell((FILE*)so->p); fseek((FILE*)so->p, cur, SEEK_SET); return (u32)(end - cur); }
-        if (!strcmp(nm, "skip")) { long cur = ftell((FILE*)so->p); fseek((FILE*)so->p, (long)a[0].j, SEEK_CUR); return (u32)(ftell((FILE*)so->p) - cur); }
+        if (!strcmp(nm, "available")) {
+            if (!so->p) { g_exception = 1; return 0; }
+            FILE* f=(FILE*)so->p;
+            long cur=ftell(f);
+            if (cur<0 || fseek(f,0,SEEK_END)) { g_exception=1; return 0; }
+            long end=ftell(f);
+            if (end<0 || fseek(f,cur,SEEK_SET)) { g_exception=1; return 0; }
+            return end>cur ? (u32)(end-cur) : 0;
+        }
+        if (!strcmp(nm, "skip")) return stream_skip(so, (s64)a[0].j);
     }
     if (!strcmp(c, "android/content/res/AssetFileDescriptor") && so && so->kind == K_AFD) {
         if (!strcmp(nm, "getStartOffset")) return 0;
         if (!strcmp(nm, "getLength") || !strcmp(nm, "getDeclaredLength")) return so->n;
-        if (!strcmp(nm, "createInputStream")) return new_obj(K_STREAM, "java/io/InputStream", so->p, 0);
-        if (!strcmp(nm, "close")) return 0;
+        if (!strcmp(nm, "createInputStream")) {
+            if (!so->p) { g_exception = 1; return 0; }
+            FILE* f = fopen((const char*)so->p, "rb");
+            if (!f) { g_exception = 1; return 0; }
+            return new_obj(K_STREAM, "java/io/InputStream", f, 0);
+        }
+        if (!strcmp(nm, "close")) { free(so->p); so->p = 0; return 0; }
     }
     if (!strcmp(c, "com/ea/blast/MainActivity")) {
         if (!strcmp(nm, "getInstance") || !strcmp(nm, "GetInstance")) return g_activity;
