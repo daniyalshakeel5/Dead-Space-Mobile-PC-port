@@ -92,7 +92,7 @@ try {
     # The executable and translated sources are private to this machine.
     # Include only a small window from the mapped generated C function.
     # This provides the actual dereference (not just the function name).
-    $sources = [regex]::Matches(($details -join "\n"), '([^\r\n]+[/\\]fn_[0-9]+\.c):(\d+)')
+    $sources = [regex]::Matches(($details -join "`n"), '([^\r\n]+[/\\]fn_[0-9]+\.c):(\d+)')
     if ($sources.Count -gt 0) {
         $src = $sources[0].Groups[1].Value
         $srcLine = [int]$sources[0].Groups[2].Value
@@ -102,6 +102,12 @@ try {
             [void]$lines.Add('')
             [void]$lines.Add(('Translated guest code around {0}:{1}:' -f $baseName, $srcLine))
             $srcText = [IO.File]::ReadAllLines($localPath)
+            for ($j = [Math]::Min($srcLine - 1, $srcText.Length - 1); $j -ge 0; $j--) {
+                if ($srcText[$j] -match '^u64 f_[0-9a-fA-F]{8}\(') {
+                    [void]$lines.Add(('Containing function header at {0}: {1}' -f ($j + 1), $srcText[$j]))
+                    break
+                }
+            }
             $lo = [Math]::Max(1, $srcLine - 20)
             $hi = [Math]::Min($srcText.Length, $srcLine + 20)
             for ($i = $lo; $i -le $hi; $i++) {

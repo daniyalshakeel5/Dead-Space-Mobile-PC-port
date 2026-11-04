@@ -77,9 +77,38 @@ static int ds_win32_from_guest_openflags(u32 f) {
     return result | O_BINARY;
 }
 #endif
+#ifdef _WIN32
+/* Android exposes /proc/cpuinfo as a readable text file. Win32 doesn't.
+ * Supply a conservative ARMv7 device profile for its legacy feature probe.
+ * Do not depend on host CPU features: the lifted game is native x86 now. */
+static FILE* ds_win32_cpuinfo(void) {
+    FILE* f = tmpfile();
+    if (!f) return NULL;
+    static const char info[] =
+        "Processor\t: ARMv7 Processor rev 2 (v7l)\n"
+        "BogoMIPS\t: 1000.00\n"
+        "Features\t: swp half thumb fastmult vfp edsp tls\n"
+        "CPU architecture: 7\n"
+        "Hardware\t: Qualcomm MSM8255\n";
+    fwrite(info, 1, sizeof info - 1, f);
+    rewind(f);
+    return f;
+}
+#endif
 IMP(open)  { T(open); const char* path = P(r0);
 #ifdef _WIN32
     int flags = ds_win32_from_guest_openflags(r1);
+    if (path && strcmp(path, "/proc/cpuinfo") == 0 &&
+        (r1 & 3u) == 0 && !(r1 & DS_GUEST_O_CREAT)) {
+        FILE* ps = ds_win32_cpuinfo();
+        if (!ps) { g_errno = errno; RET(-1); }
+        int pseudo_fd = dup(fileno(ps));
+        int saved_errno = errno;
+        fclose(ps);
+        if (pseudo_fd < 0) { g_errno = saved_errno; RET(-1); }
+        fprintf(stderr, "[GUEST_ANDROID_PROC] /proc/cpuinfo supplied (open)\n");
+        RET(pseudo_fd);
+    }
     if (flags < 0) {
         g_errno = errno = EINVAL;
         ds_asset_io_note("open_invalid_flags", path, 0, errno);
@@ -112,7 +141,17 @@ IMP(chdir)  { T(chdir); int rc = chdir(P(r0)); if (rc < 0) g_errno = errno; RET(
 IMP(chmod)  { T(chmod); int rc = chmod(P(r0), (mode_t)r1); if (rc < 0) g_errno = errno; RET(rc); }
 IMP(getcwd) { T(getcwd); char* rc = getcwd(P(r0), r1); if (!rc) g_errno = errno; RET(U(rc)); }
 
-IMP(fopen)   { T(fopen); const char* path = P(r0); FILE* fp = fopen(path, P(r1)); int saved = errno;
+IMP(fopen)   { T(fopen); const char* path = P(r0);
+#ifdef _WIN32
+    if (path && strcmp(path, "/proc/cpuinfo") == 0 && r1 &&
+        *(char*)P(r1) == 'r') {
+        FILE* pseudo = ds_win32_cpuinfo();
+        if (!pseudo) { g_errno = errno; RET(0); }
+        fprintf(stderr, "[GUEST_ANDROID_PROC] /proc/cpuinfo supplied (fopen)\n");
+        RET(U(pseudo));
+    }
+#endif
+    FILE* fp = fopen(path, P(r1)); int saved = errno;
     if (!fp) g_errno = saved;
     ds_asset_io_note("fopen", path, fp != NULL, saved); errno = saved; RET(U(fp)); }
 IMP(fclose)  { T(fclose); int rc = fclose(hostfile(r0)); if (rc == EOF) g_errno = errno; RET(rc); }

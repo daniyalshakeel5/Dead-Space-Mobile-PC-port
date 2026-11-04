@@ -80,3 +80,17 @@ function and line (resolved through the locally installed MinGW addr2line).
 windows-run.log without requiring another game run; an older host log lacks
 the loaded PE base, so the address mapping assumes the PE preferred base.
 Please send only crash-symbolized.log and windows-run.log, not the APK or EXE.
+
+FIRST-RUN FILE FLAGS FIX (2026-11-04):
+The real Windows game crashed after the splash at translated function
+f_000629b4 (fn_003.c:17449). The full private C code was not uploaded.
+The host had been passing ARM Bionic open() flags directly to the Windows
+CRT. Android O_CREAT=0x40, O_EXCL=0x80 and O_APPEND=0x400 differ from
+Win32; new builds translate these instead of corrupting save creation.
+A separate malformed #endif previously skipped Bionic stat timestamp
+fields; this is repaired as well. /proc/cpuinfo now has a conservative
+in-memory read-only Android CPU info response on Windows, because
+the earlier log showed repeated ENOENT from that Android system path.
+No original game functions or asset files have been changed.
+On a repeat crash, the diagnostic report now includes x86 registers and
+a 41-line excerpt from the exact private generated C function.
