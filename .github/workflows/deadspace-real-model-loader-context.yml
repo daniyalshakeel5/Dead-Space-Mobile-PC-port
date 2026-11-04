@@ -91,6 +91,19 @@ jobs:
                       for j in range(lo,hi):print(f"{j+1:6d}: {s[j]}")
                   else:
                       for j in range(i,min(i+1500,end)):print(f"{j+1:6d}: {s[j]}")
+          # Identify exact original ARM-to-C JNI/native input reader subroutines
+          # rather than replacing valid model assets or guessing a byte stream.
+          print("\n========= REAL APK INPUT STREAM BRIDGE FUNCTIONS =========")
+          for p in d.glob("fn_*.c"):
+              src=p.read_text().splitlines()
+              for i,line in enumerate(src):
+                  if line.startswith("u64 f_") and "/*" in line:
+                      desc=line.split("/*",1)[1].lower()
+                      if ("inputstream" in desc and ("read" in desc or "android" in desc)) or ("fileinputstream" in desc and "read" in desc):
+                          end=next((j for j in range(i+1,len(src)) if src[j].startswith("u64 f_")),len(src))
+                          print("STREAM_BRIDGE",p.name,i+1,src[i],flush=True)
+                          for j in range(i,min(end,i+350)):
+                              print(f"{j+1:6d}: {src[j]}",flush=True)
           # M3G native parser's exact object 100 branch and failure paths.
           print("\n========== ORIGINAL REAL M3G OBJECT DECODER BRANCHES ==========")
           for path in d.glob("fn_*.c"):
