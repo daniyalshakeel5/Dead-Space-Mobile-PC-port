@@ -19,7 +19,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $vswhere = Join-Path '${env:ProgramFiles(x86)}' 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
           if (!(Test-Path $vswhere)) { throw "vswhere missing on Windows runner" }
           $vsRoot = (& $vswhere -latest -products '*' -property installationPath).Trim()
           $vcvars = Join-Path $vsRoot 'VC\Auxiliary\Build\vcvarsall.bat'
