@@ -436,7 +436,9 @@ static u64 jni_default(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
      * the already-recursive Java object/cache mutex. */
     pthread_mutex_lock(&g_objlock);
     int dup = 0; for (int i = 0; i < ns; i++) if (seen[i] == n) dup = 1;
-    if (!dup && ns < 256) { seen[ns++] = n; if (g_log_java) printf("   [jni] UNIMPLEMENTED %s (r1=%#x r2=%#x r3=%#x)\n", n, r1, r2, r3); }
+    if (!dup && ns < 256) { seen[ns++] = n;
+        fprintf(stderr,"[JNI_UNIMPLEMENTED_REAL] method=%s arg1=%08x arg2=%08x arg3=%08x\n", n,r1,r2,r3);
+    }
     pthread_mutex_unlock(&g_objlock);
     return 0;
 }
@@ -488,6 +490,28 @@ static u64 jni_ArrayElements(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
         }
     }
     RET(U(o->p));
+}
+/* Primitive JNI arrays are pinned in stable allocations. GetCritical may
+ * return a direct view; ReleaseCritical must not free that storage. */
+static u64 jni_GetPrimitiveArrayCritical(u32 r0,u32 r1,u32 r2,u32 r3,u32 sp) {
+    tr("JNI:GetPrimitiveArrayCritical");
+    JObj* o=OBJ(r1);
+    if (!o || o->kind!=K_ARRAY || !o->p) {
+        g_exception=1;
+        fprintf(stderr,"[JNI_CRITICAL_ARRAY_BAD] handle=%08x\n",r1);
+        RET(0);
+    }
+    if(r2) ST8(r2,0);
+    RET(U(o->p));
+}
+static u64 jni_ReleasePrimitiveArrayCritical(u32 r0,u32 r1,u32 r2,u32 r3,u32 sp) {
+    tr("JNI:ReleasePrimitiveArrayCritical");
+    JObj* o=OBJ(r1);
+    if (!o || o->kind!=K_ARRAY || !o->p || U(o->p)!=r2) {
+        g_exception=1;
+        fprintf(stderr,"[JNI_CRITICAL_ARRAY_RELEASE_BAD] handle=%08x bytes=%08x\n",r1,r2);
+    }
+    RET(0);
 }
 static u64 jni_ArrayRegionGet(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
     const char* n = sname(); tr(n); JObj* o = OBJ(r1); int esz = esz_of(n); u32 buf = *(u32*)P(sp);
@@ -634,6 +658,8 @@ static void build_jni(void) {
         else if (!strcmp(n, "ReleaseStringUTFChars")) f = jni_noop;
         else if (!strcmp(n, "GetStringUTFLength")) f = jni_GetStringUTFLength;
         else if (!strcmp(n, "GetArrayLength")) f = jni_GetArrayLength;
+        else if (!strcmp(n, "GetPrimitiveArrayCritical")) f = jni_GetPrimitiveArrayCritical;
+        else if (!strcmp(n, "ReleasePrimitiveArrayCritical")) f = jni_ReleasePrimitiveArrayCritical;
         else if (!strcmp(n, "NewObjectArray")) f = jni_NewObjectArray;
         else if (!strcmp(n, "GetObjectArrayElement")) f = jni_GetObjectArrayElement;
         else if (!strcmp(n, "SetObjectArrayElement")) f = jni_SetObjectArrayElement;
