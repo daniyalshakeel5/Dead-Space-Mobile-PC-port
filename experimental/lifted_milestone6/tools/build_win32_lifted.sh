@@ -68,6 +68,19 @@ if [[ "${DS_MODEL_CACHE_EMPTY_RECOVERY:-1}" != "0" ]]; then
     python3 "$SRC/modelcache_empty_vector.py" --source "$GEN/fn_003.c" --instrument
 fi
 
+# Stop at the newly confirmed original Object3D::duplicate NULL object site.
+# Produce the private source + direct-caller report to isolate upstream causes.
+# Only NULL objects log + fail closed; non-NULL game behavior is unchanged.
+if [[ "${DS_OBJECT3D_DUP_PROBE:-1}" != "0" ]]; then
+    [[ -s "$SRC/object3d_duplicate_probe.py" ]] ||
+        { echo '[ERROR] Missing Object3D duplicate native probe script.'; exit 14; }
+    [[ -s "$GEN/fn_060.c" ]] ||
+        { echo '[ERROR] Original Object3D C chunk missing.'; exit 15; }
+    mkdir -p "$WORK/logs"
+    python3 "$SRC/object3d_duplicate_probe.py" --source "$GEN/fn_060.c" \
+        --report "$WORK/logs/object3d-duplicate-source.txt" --instrument
+fi
+
 # Same lifted softfp model as the known Linux native build.
 CFLAGS=(
     -O1 -g -std=gnu11 -w -msse2 -mfpmath=sse -ffp-contract=off

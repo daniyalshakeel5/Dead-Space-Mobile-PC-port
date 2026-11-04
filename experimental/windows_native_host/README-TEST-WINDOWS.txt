@@ -112,3 +112,22 @@ crashing function, its immediately preceding helper f_0027e644 and relevant
 stack references, keeping other game code out. The report is never
 uploaded to GitHub or the build service.
 Send modelcache-source-context.txt privately in chat for a source-level patch.
+
+OBJECT3D DUPLICATE SOURCE + FAIL-CLOSED DIAGNOSTIC (2026-11-04):
+The ModelCache null-vector recovery reached a new crash at ARM function
+f_00368efc m3g::Object3D::duplicate, original label L_369060:
+r3 = LD32(r0), with r0 zero. The optional probe records the live
+guest registers and stops explicitly at this exact site rather than
+allocating fake Object3D models or skipping a virtual method.
+
+To apply to an existing private build, double-click "Repair Dead Space
+Windows.cmd" from this kit. It copies the new object3d_duplicate_probe.py,
+instruments only tools/out/fn_060.c and recompiles that single chunk.
+It writes an owner-local source/caller report to:
+windows-build/logs/object3d-duplicate-source.txt
+
+If the executable stops with [FATAL:OBJECT3D_DUPLICATE_NULL], send
+both windows-build/logs/windows-run.log and object3d-duplicate-source.txt.
+This report identifies all direct calls to the duplicate method and
+the full translated C code controlling the pointer. It excludes APK
+assets and is not sent to GitHub. The root cause of NULL remains unverified.
