@@ -17,6 +17,7 @@ TOOLS=ROOT/"experimental"/"lifted_milestone6"/"tools"
 WIN=ROOT/"experimental"/"windows_native_host"
 SOURCES=("host.c","rt.h","jni_vm.c","threads.c","libc_files.c",
          "gl_shim.c","front_sdl.c","windows_lifted_compat.h",
+         "win32_bionic_openflags.h",
          "win32_import_bridge.h","win32_missing_imports.c","win32_missing_gles.c")
 PROTOS= r'''#pragma once
 #include "rt.h"
