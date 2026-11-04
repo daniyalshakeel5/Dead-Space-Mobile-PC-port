@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # Real Dead Space Mobile Linux i686 runtime; NO synthetic test fixtures.
 set -euo pipefail
-: "${DS_PRIVATE_GAME_APK:?An actual original APK is required}"
-: "${DS_REAL_DATA_ZIP:?Actual external deadspace.zip is required}"
+: "${DS_PRIVATE_GAME_APK:?Authentic original game APK required; no synthetic fallback}"
 : "${GITHUB_WORKSPACE:?GitHub source checkout required}"
 : "${RUNNER_TEMP:?Ephemeral build directory required}"
-[[ -s "$DS_PRIVATE_GAME_APK" && -s "$DS_REAL_DATA_ZIP" ]] || { echo 'REAL INPUTS MISSING'; exit 40; }
+[[ -s "$DS_PRIVATE_GAME_APK" ]] || { echo 'REAL APK INPUT MISSING'; exit 40; }
 root="$RUNNER_TEMP/dspc-live"
 assets="$root/apk/assets"
 mkdir -p "$root/apk" "$root/data" "$root/logs"
@@ -13,19 +12,22 @@ unzip -qq "$DS_PRIVATE_GAME_APK" -d "$root/apk"
 [[ -s "$root/apk/lib/armeabi/libDeadSpace.so" ]] || {
   echo 'REAL FAIL: APK does not contain lib/armeabi/libDeadSpace.so'; exit 41;
 }
-unzip -qq "$DS_REAL_DATA_ZIP" -d "$root/data"
-mapfile -d '' -t roots < <(find "$root/data" -type d -name published -print0)
-if (( "${#roots[@]}" > 1 )); then
-  echo 'REAL FAIL: ambiguous multiple published asset roots'; exit 42;
-fi
-if (( "${#roots[@]}" == 1 )); then
-  mkdir -p "$assets/published"
-  cp -a -n "${roots[0]}/." "$assets/published/"
+if [[ -n "${DS_REAL_DATA_ZIP:-}" ]]; then
+  [[ -s "$DS_REAL_DATA_ZIP" ]] || { echo 'REAL FAIL: external game data path missing'; exit 42; }
+  unzip -qq "$DS_REAL_DATA_ZIP" -d "$root/data"
+  mapfile -d '' -t roots < <(find "$root/data" -type d -name published -print0)
+  if (( "${#roots[@]}" > 1 )); then
+    echo 'REAL FAIL: ambiguous multiple published asset roots'; exit 42;
+  fi
+  if (( "${#roots[@]}" == 1 )); then
+    mkdir -p "$assets/published"
+    cp -a -n "${roots[0]}/." "$assets/published/"
+  fi
 fi
 [[ -d "$assets/published" && -s "$assets/EAMCore.ini" ]] || {
   echo 'REAL FAIL: original resources or EAMCore.ini missing'; exit 43;
 }
-echo "REAL INPUT: $(find "$assets/published" -type f | wc -l) published resource files"
+echo "REAL APK ASSETS: $(find "$assets/published" -type f | wc -l) published resource files"; find "$assets/published" -mindepth 1 -maxdepth 1 -printf 'asset-subtree: %f\n' | head -n 30
 echo "REAL ELF SHA-256: $(sha256sum "$root/apk/lib/armeabi/libDeadSpace.so" | cut -d' ' -f1)"
 src="$GITHUB_WORKSPACE/experimental/lifted_milestone6/tools"
 cp -a "$src" "$root/tools"
@@ -73,5 +75,5 @@ print("REAL GAME framebuffer sampled distinct colors:", colors)
 if colors < 5:
     raise SystemExit("REAL FAIL: game framebuffer is blank/flat")
 PY
-echo 'REAL PASS: genuine APK+data, compiled native i686 engine, 900 SDL frames, nonblank frame'
+echo 'REAL PASS: original APK, translated/compiled native i686 engine, 900 SDL frames, nonblank frame'
 echo 'This is a real runtime smoke test, NOT proof of fully playable gameplay.'
