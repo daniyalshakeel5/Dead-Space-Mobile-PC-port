@@ -30,6 +30,36 @@ jobs:
           echo "Original projectile model size: $(stat -c %s assets/published/models/lurker_projectile.m3g)"
           echo "Original projectile model first 64 bytes:"
           head -c 64 assets/published/models/lurker_projectile.m3g | od -An -tx1
+          python3 - <<'PY'
+          import struct,collections
+          p="assets/published/models/lurker_projectile.m3g"
+          d=open(p,"rb").read()
+          print("[REAL_M3G_OBJECT_TABLE] filename",p,"length",len(d))
+          if d[:12] != bytes.fromhex("ab 49 4d 2d 4d 33 47 bb 0d 0a 1a 0a"):
+              print("[REAL_M3G_OBJECT_TABLE] Unexpected original signature")
+          pos=12
+          for section in range(8):
+              if pos+13>len(d): break
+              scheme=d[pos];length,raw=struct.unpack_from("<II",d,pos+1)
+              if length<13 or pos+length>len(d):
+                  print("[REAL_M3G_OBJECT_TABLE] Invalid section at",pos,length);break
+              end=pos+length-4
+              print("[REAL_M3G_OBJECT_TABLE] section",section,"compression",scheme,
+                    "section bytes",length,"uncompressed bytes",raw)
+              cur=pos+9; hist=collections.Counter(); examples=[]
+              if scheme==0:
+                  while cur+5<=end:
+                      typ=d[cur];size=struct.unpack_from("<I",d,cur+1)[0]
+                      if size>end-cur-5:
+                          print("[REAL_M3G_OBJECT_TABLE] Invalid object length at",cur,typ,size);break
+                      hist[typ]+=1
+                      if len(examples)<16:examples.append((cur,typ,size))
+                      cur+=5+size
+                  print("[REAL_M3G_OBJECT_TABLE] types",sorted(hist.items()),"first",examples,
+                        "consumed",cur-pos-9,"/",end-pos-9)
+              pos+=length
+              if pos==len(d):break
+          PY
           echo "Original model first 64 bytes:"
           head -c 64 assets/published/models/slasher.m3g | od -An -tx1
       - name: Translate REAL ARM model loader and print target data flow
@@ -43,7 +73,7 @@ jobs:
           python3 - "$RUNNER_TEMP/generated" <<'PY'
           import pathlib,sys,re
           d=pathlib.Path(sys.argv[1])
-          for func in ("f_00324884","f_0032ad98","f_00326568"):
+          for func in ("f_0032a4c4","f_003266b0","f_003267fc"):
               print("\n========= ACTUAL GENERATED SOURCE",func,"=========",flush=True)
               matches=[]
               for p in d.glob("fn_*.c"):
