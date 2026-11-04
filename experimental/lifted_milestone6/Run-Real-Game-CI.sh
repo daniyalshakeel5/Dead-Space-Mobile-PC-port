@@ -67,6 +67,7 @@ python3 modelcache_node_probe.py --source out/fn_003.c --instrument
 python3 object3d_duplicate_probe.py --source out/fn_060.c --instrument
 python3 m3g_magic_probe.py --source out/fn_055.c --instrument
 python3 m3g_object_trace.py --source out/fn_055.c --instrument
+python3 m3g_loader_serialization.py --source out/fn_055.c --instrument
 cd out
 chmod +x build.sh
 # Use three independent GCC workers on GitHub's four-core Linux runner;
@@ -95,7 +96,7 @@ echo "REAL NATIVE TEST: frame target=$test_frames screenshot_at=$shot_at"
 set +e
 timeout --kill-after=20s "${runtime_budget}s" xvfb-run -a env \
   LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy \
-  DS_WINDOW=1 DS_NOVSYNC=1 DS_ASSET_TRACE=1 DS_M3G_TRACE=1 DS_WATCHDOG=45 \
+  DS_WINDOW=1 DS_NOVSYNC=1 DS_ASSET_TRACE=1 DS_M3G_TRACE=1 DS_M3G_SERIALIZE=1 DS_WATCHDOG=45 \
   DS_DATA="$assets" DS_ASSETS="$assets" \
   DS_STEPS=create,surface,frame DS_FRAMES="$test_frames" \
   DS_CLICKS="60:640:360,180:640:360,300:640:360,510:640:360" \
