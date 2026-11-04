@@ -1,8 +1,9 @@
-name: Windows owner-only native game build kit
+name: Dead Space Mobile fresh Windows installer kit
 on:
   push:
     branches: [work/deadspace-windows-lifted-host-2026-11-04]
     paths:
+      - experimental/windows_native_host/Install-DeadSpace-Fresh.ps1
       - experimental/windows_native_host/Build-DeadSpace-Windows.ps1
       - experimental/windows_native_host/Build-DeadSpace-Windows.cmd
       - experimental/windows_native_host/README-TEST-WINDOWS.txt
@@ -12,55 +13,117 @@ on:
 permissions:
   contents: read
 jobs:
-  powershell-check:
+  windows-fresh-install-test:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
-      - name: Validate one-click Windows PowerShell launcher syntax
+      - name: Verify Windows PowerShell scripts parse on PowerShell 5 and PowerShell 7
         shell: pwsh
         run: |
-          $source = 'experimental/windows_native_host/Build-DeadSpace-Windows.ps1'
-          $tokens = $null
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path $source).Path, [ref]$tokens, [ref]$errors) | Out-Null
-          if ($errors.Count -gt 0) { throw ($errors | Out-String) }
-          Write-Host 'PASS: GUI build script parses correctly in native Windows PowerShell'
+          $files = @(
+             'experimental/windows_native_host/Install-DeadSpace-Fresh.ps1',
+             'experimental/windows_native_host/Build-DeadSpace-Windows.ps1'
+          )
+          foreach($p in $files) {
+             $tokens = $null
+             $errors = $null
+             [System.Management.Automation.Language.Parser]::ParseFile(
+               (Resolve-Path $p).Path, [ref]$tokens, [ref]$errors) | Out-Null
+             if ($errors.Count) { throw ("Parse failed: " + $p + "`n" + ($errors | Out-String)) }
+             Write-Host "PASS PowerShell syntax: $p"
+          }
+      - name: Create a synthetic owned-APK fixture and exercise full fresh extraction
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $fixture = Join-Path $env:RUNNER_TEMP 'deadspace-fixture.apk'
+          $zip = [IO.Compression.ZipFile]::Open($fixture, [IO.Compression.ZipArchiveMode]::Create)
+          try {
+            $arm = New-Object byte[] 128
+            $arm[0]=0x7f; $arm[1]=0x45; $arm[2]=0x4c; $arm[3]=0x46
+            $arm[4]=1; $arm[5]=1; $arm[18]=40
+            $e = $zip.CreateEntry('lib/armeabi/libDeadSpace.so')
+            $stream = $e.Open(); try { $stream.Write($arm,0,$arm.Length) } finally { $stream.Dispose() }
+            $e = $zip.CreateEntry('assets/EAMCore.ini')
+            $stream = $e.Open(); try {
+              $b=[Text.Encoding]::UTF8.GetBytes('[fixture]' + [Environment]::NewLine)
+              $stream.Write($b,0,$b.Length)
+            } finally { $stream.Dispose() }
+            $e = $zip.CreateEntry('assets/var/settings.sb')
+            $stream = $e.Open(); try { $stream.WriteByte(1) } finally { $stream.Dispose() }
+          } finally { $zip.Dispose() }
+          $root = Join-Path $env:RUNNER_TEMP 'DeadSpaceFreshProject'
+          $installer = Join-Path $PWD 'experimental/windows_native_host/Install-DeadSpace-Fresh.ps1'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -ApkPath $fixture -InstallDir $root -PrepareOnly
+          if ($LASTEXITCODE -ne 0) { throw "Fresh extraction installer failed ($LASTEXITCODE)" }
+          foreach($path in @('apk/lib/armeabi/libDeadSpace.so','apk/assets/EAMCore.ini','apk/assets/var/settings.sb','tools/gen_all.py','tools/lift.py','tools/overrides.py','tools/texturepack_fault_guard.py','tools/host.c','tools/build_win32_lifted.sh','tools/windows_lifted_compat.h','original-elf-sha256.txt')) {
+            if (!(Test-Path (Join-Path $root $path))) { throw "Missing extracted file: $path" }
+          }
+          Write-Host 'PASS fresh APK extraction, ELF validation, and translator + native Windows source installation'
+          # An existing installation is not silently overwritten.
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -ApkPath $fixture -InstallDir $root -PrepareOnly
+          if ($LASTEXITCODE -eq 0) { throw "Installer incorrectly overwrote a nonempty project" }
+          Write-Host 'PASS existing game project protected against accidental overwrite'
+      - name: Reject incompatible Xperia library and ZIP path traversal
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $installer = Join-Path $PWD 'experimental/windows_native_host/Install-DeadSpace-Fresh.ps1'
+          foreach ($case in @('xperia','traversal')) {
+            $file = Join-Path $env:RUNNER_TEMP ($case+'.apk')
+            $zip = [IO.Compression.ZipFile]::Open($file,[IO.Compression.ZipArchiveMode]::Create)
+            try {
+              $e=$zip.CreateEntry('assets/EAMCore.ini'); $s=$e.Open(); $s.Dispose()
+              $name=if($case -eq 'xperia') {'lib/armeabi/libEAMGameDeadSpace.so'} else {'lib/armeabi/libDeadSpace.so'}
+              $e=$zip.CreateEntry($name); $s=$e.Open();$s.WriteByte(42);$s.Dispose()
+              if ($case -eq 'traversal') {
+                $e=$zip.CreateEntry('../escape.txt');$s=$e.Open();$s.WriteByte(42);$s.Dispose()
+              }
+            } finally { $zip.Dispose() }
+            $destination=Join-Path $env:RUNNER_TEMP ($case+'-dest')
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -ApkPath $file -InstallDir $destination -PrepareOnly
+            if ($LASTEXITCODE -eq 0) { throw "Unsafe archive accepted: $case" }
+            if (Test-Path $destination) { throw "Unsafe archive wrote to install directory: $case" }
+            Write-Host "PASS rejected $case before extraction"
+          }
   bash-check:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Check WSL cross-build script and ensure local-only original data
+      - name: Validate translators and native Windows compiler script
         run: |
           bash -n experimental/lifted_milestone6/tools/build_win32_lifted.sh
-          grep -q 'DeadSpaceMobile-Win32.exe' experimental/lifted_milestone6/tools/build_win32_lifted.sh
-          grep -q 'tools/out' experimental/lifted_milestone6/tools/build_win32_lifted.sh
+          python3 -m py_compile experimental/lifted_milestone6/tools/gen_all.py experimental/lifted_milestone6/tools/lift.py experimental/lifted_milestone6/tools/overrides.py experimental/lifted_milestone6/tools/texturepack_fault_guard.py
   package-kit:
-    needs: [powershell-check, bash-check]
+    needs: [windows-fresh-install-test, bash-check]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Stage no-game-assets Windows one-click kit
+      - name: Stage complete source-only fresh Windows installer
         run: |
           mkdir -p package/tools
           src=experimental/lifted_milestone6/tools
-          cp "$src/host.c" "$src/jni_vm.c" "$src/threads.c" "$src/libc_files.c" package/tools/
-          cp "$src/gl_shim.c" "$src/front_sdl.c" "$src/gen_gl.py" package/tools/
-          cp "$src/windows_lifted_compat.h" "$src/build_win32_lifted.sh" package/tools/
+          for f in rt.h host.c jni_vm.c threads.c libc_files.c gl_shim.c front_sdl.c build.sh build_win32_lifted.sh gen_all.py gen_gl.py lift.py overrides.py jninames.py texturepack_fault_guard.py windows_lifted_compat.h; do
+            test -s "$src/$f"
+            cp "$src/$f" package/tools/
+          done
           cp experimental/windows_native_host/win32_substrate.c package/tools/
           cp experimental/windows_native_host/win32_substrate.h package/tools/
+          cp experimental/windows_native_host/Install-DeadSpace-Fresh.ps1 package/
           cp experimental/windows_native_host/Build-DeadSpace-Windows.ps1 package/
           cp experimental/windows_native_host/Build-DeadSpace-Windows.cmd package/
           cp experimental/windows_native_host/README-TEST-WINDOWS.txt package/
           if find package -type f | grep -E '\.(apk|so|m3g|ogg|dex|bin)$'; then
-            echo 'Refusing to publish original EA game data'; exit 1
+             echo "Refusing to publish original EA binaries/assets"; exit 1
           fi
-          echo 'Packaging only native host source/GUI scripts. No generated fn_*.c.'
+          echo "PASS: complete ARM-to-C translator + Win32 host kit (no EA data)"
           find package -type f -printf '%P\n' | sort
-      - name: Publish one-click native Windows test build kit
+      - name: Upload tested fresh install kit
         uses: actions/upload-artifact@v4
         with:
-          name: DeadSpaceMobile-Windows-x86-PrivateGame-Builder
+          name: DeadSpaceMobile-FRESH-Windows-Installer
           path: package/
           if-no-files-found: error
           retention-days: 30
