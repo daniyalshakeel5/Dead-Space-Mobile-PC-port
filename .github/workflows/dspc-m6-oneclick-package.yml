@@ -57,7 +57,12 @@ jobs:
         run: |
           set -euo pipefail
           bash -n experimental/lifted_milestone6/Apply-TexturePack-Linux.sh
+          grep -q "loader_vector_probe.py" experimental/lifted_milestone6/Apply-TexturePack-Linux.sh
+          grep -q 'found_loader' experimental/lifted_milestone6/Apply-TexturePack-Linux.sh
+          grep -q 'M3G_LOADER' experimental/lifted_milestone6/tools/loader_vector_probe.py
           python3 -m py_compile experimental/lifted_milestone6/tools/texturepack_fault_guard.py
+          python3 -m py_compile experimental/lifted_milestone6/tools/loader_vector_probe.py
+          python3 -m unittest discover -s tests -p 'test_loader_vector_probe.py' -v
           python3 - <<'PY'
           import importlib.util
           from pathlib import Path
