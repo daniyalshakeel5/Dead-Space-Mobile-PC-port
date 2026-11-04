@@ -2,8 +2,8 @@
 # Target owner-confirmed f_0035b2e0 TexturePack NULL fault in Linux ELF32.
 # No fake textures, skipped engine methods, or original asset modifications.
 set -euo pipefail
-root="\${1:?Existing Milestone5 project required}"
-guard="\${2:?TexturePack guard Python required}"
+root="${1:?Existing Milestone5 project required}"
+guard="${2:?TexturePack guard Python required}"
 root="$(cd "$root" && pwd)"
 out="$root/tools/out"
 binary="$out/dspc_sdl"
@@ -16,12 +16,12 @@ exec > >(tee "$out/texturepack-build.log") 2>&1
 echo "[DS TEXPACK] Native Linux executable: $binary"
 echo "[DS TEXPACK] Owner APK, assets and saves remain unchanged."
 mapfile -t candidates < <(grep -l '^u64 f_0035b2e0(' "$out"/fn_*.c || true)
-[[ "\${#candidates[@]}" -eq 1 ]] || {
-    echo "[DS TEXPACK ERROR] Expected one f_0035b2e0 C source; found \${#candidates[@]}" >&2
+[[ "${#candidates[@]}" -eq 1 ]] || {
+    echo "[DS TEXPACK ERROR] Expected one f_0035b2e0 C source; found ${#candidates[@]}" >&2
     exit 12
 }
-src="\${candidates[0]}"
-obj="\${src%.c}.o"
+src="${candidates[0]}"
+obj="${src%.c}.o"
 backup="$binary.pre-texturepack-diagnostic.bak"
 [[ -f "$backup" ]] || cp -p -- "$binary" "$backup"
 echo "[DS TEXPACK] Crash site source: $src"
@@ -33,17 +33,17 @@ trap cleanup EXIT
 gcc -m32 -O1 -g3 -fno-omit-frame-pointer -msse2 -mfpmath=sse -ffp-contract=off \
     -w -c "$src" -o "$tempobj"
 mapfile -t objs < <(printf '%s\n' "$out"/fn_*.o)
-(( "\${#objs[@]}" >= 20 )) || {
+(( "${#objs[@]}" >= 20 )) || {
     echo "[DS TEXPACK ERROR] Original compiled translated function objects missing" >&2
     exit 13
 }
 for n in unlifted overrides tables host_sdl; do
     [[ -s "$out/$n.o" ]] || { echo "[DS TEXPACK ERROR] Missing $n.o" >&2; exit 14; }
 done
-for i in "\${!objs[@]}"; do
-    if [[ "\${objs[i]}" == "$obj" ]]; then objs[i]="$tempobj"; fi
+for i in "${!objs[@]}"; do
+    if [[ "${objs[i]}" == "$obj" ]]; then objs[i]="$tempobj"; fi
 done
-gcc -m32 -no-pie -o "$tempbin" "\${objs[@]}" \
+gcc -m32 -no-pie -o "$tempbin" "${objs[@]}" \
     "$out/unlifted.o" "$out/overrides.o" "$out/tables.o" "$out/host_sdl.o" \
     -lm -lpthread -ldl -lSDL2
 [[ -s "$tempbin" ]]
