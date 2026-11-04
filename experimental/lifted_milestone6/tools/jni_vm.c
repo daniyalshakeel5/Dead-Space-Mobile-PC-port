@@ -449,7 +449,23 @@ static u64 jni_NewArray(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
 static u64 jni_ArrayElements(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr(sname()); JObj* o = OBJ(r1); if (r2) *(u8*)P(r2) = 0; RET(o ? U(o->p) : 0); }
 static u64 jni_ArrayRegionGet(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
     const char* n = sname(); tr(n); JObj* o = OBJ(r1); int esz = esz_of(n); u32 buf = *(u32*)P(sp);
-    if (o) memcpy(P(buf), (u8*)o->p + (size_t)r2 * esz, (size_t)r3 * esz); RET(0);
+    if (!o || o->kind != K_ARRAY || o->esz != esz || !o->p ||
+        r2 > o->n || r3 > o->n-r2 || !buf) {
+        g_exception=1;
+        if (getenv("DS_ASSET_TRACE"))
+            fprintf(stderr, "[JNI_ARRAY_REGION_BAD] method=%s handle=%08x offset=%u len=%u buffer=%08x\n",
+                    n, r1, r2, r3, buf);
+        RET(0);
+    }
+    memcpy(P(buf), (u8*)o->p + (size_t)r2 * esz, (size_t)r3 * esz);
+    if (getenv("DS_ASSET_TRACE") && esz==1 && r3==12) {
+        const u8* d=P(buf);
+        fprintf(stderr, "[JNI_12_BYTE_READ] tid=%lu dest=%08x array=%08x off=%u bytes=",
+                (unsigned long)pthread_self(),buf,r1,r2);
+        for(int i=0;i<12;i++) fprintf(stderr,"%02x ",(unsigned)d[i]);
+        fprintf(stderr,"\n");
+    }
+    RET(0);
 }
 static u64 jni_ArrayRegionSet(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
     const char* n = sname(); tr(n); JObj* o = OBJ(r1); int esz = esz_of(n); u32 buf = *(u32*)P(sp);
