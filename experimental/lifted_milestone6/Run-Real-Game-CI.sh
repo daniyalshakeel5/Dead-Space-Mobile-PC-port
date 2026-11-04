@@ -56,6 +56,30 @@ code=$?
 set -e
 echo "REAL GAME EXIT: $code"
 if (( code != 0 )); then
+  # Symbolize the ACTUAL crash address from this run's debug-enabled i686
+  # binary; no test fixture, guessed symbol, or separate download required.
+  echo '===== REAL NATIVE CRASH: symbolized execution addresses ====='
+  mapfile -t fault_pcs < <(sed -n 's/.*signal 11 at pc=\(0x[0-9a-fA-F]*\).*/\1/p' "$root/logs/native-run.log" | sort -u)
+  mapfile -t backtrace_pcs < <(grep -m 1 'backtrace (use nm' "$root/logs/native-run.log" | grep -oE '0x[0-9a-fA-F]+' || true)
+  if (( ${#fault_pcs[@]} == 0 )); then
+    echo 'No SIGSEGV PC found; inspect the last runtime lines below.'
+  else
+    for pc in "${fault_pcs[@]}"; do
+      echo "Actual fault PC: $pc"
+      addr2line -e ./dspc_sdl -a -f -C -i "$pc" || true
+      nm -n ./dspc_sdl | awk -v pc="$pc" '
+        BEGIN { t=strtonum(pc) }
+        (NF >= 3 && $2 ~ /^[Tt]$/) { a=strtonum("0x"$1); if (a <= t && a >= best) { best=a; sym=$3; } }
+        END { if (sym != "") printf "Nearest compiled function: %s (0x%x + 0x%x)\n", sym,best,t-best; }
+      ' || true
+    done
+    for pc in "${backtrace_pcs[@]}"; do
+      addr2line -e ./dspc_sdl -a -f -C "$pc" || true
+    done
+  fi
+  echo '===== LAST REAL RESOURCE/M3G/OBJECT LOADING EVENTS ====='
+  grep -E 'M3G_LOADER|TEXPACK_|FATAL:|GUEST_RESOURCE_(MISS|OK)|AssetManager.openFd|AssetManager.open\('     "$root/logs/native-run.log" | tail -n 65 || true
+  echo '===== END ACTUAL RUNTIME SYMBOLS ====='
   echo 'REAL FAIL: original game native executable crashed, trapped or timed out'
   tail -n 100 "$root/logs/native-run.log"; exit 46;
 fi
