@@ -1,85 +1,74 @@
-name: "Dead Space: REAL APK native i686 runtime"
+name: "Dead Space Mobile — REAL APK Linux native runtime"
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/deadspace-real-game-runtime.yml
   workflow_dispatch:
-    inputs:
-      private_asset_repo:
-        description: "Private repository with authentic original game release assets"
-        required: true
-        default: "daniyalshakeel5/Dead-Space-Mobile-Assets"
-        type: string
-      release_tag:
-        description: "Private release tag"
-        required: true
-        default: "native-game-inputs"
-        type: string
 
 permissions:
   contents: read
 
 jobs:
-  native-i686-real-game:
-    name: "Build original ARM game, run 900 SDL frames"
+  real-apk-i686-native:
+    name: "Real game ELF → i686 translation → SDL/OpenGL game frames"
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout real port source
+        uses: actions/checkout@v4
         with:
           ref: work/deadspace-milestone6-analysis-2026-11-04
-      - name: "Require original private game access"
+      - name: Download the ACTUAL Dead Space Mobile APK from the owner's existing GitHub release
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.DS_PRIVATE_ASSETS_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if [[ -z "$GH_TOKEN" ]]; then
-            echo "::error::Missing DS_PRIVATE_ASSETS_TOKEN (Contents:Read permission on private game assets)"
-            exit 1
-          fi
-          echo "Private original game source is configured."
-      - name: "Download real APK and game data from private GitHub Release"
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.DS_PRIVATE_ASSETS_TOKEN }}
-          PRIVATE_REPO: ${{ inputs.private_asset_repo }}
-          PRIVATE_TAG: ${{ inputs.release_tag }}
-        run: |
-          set -euo pipefail
-          if [[ ! "$PRIVATE_REPO" =~ ^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$ ]]; then
-            echo "::error::Private repository must be owner/name"; exit 2
-          fi
-          mkdir -p "$RUNNER_TEMP/private-dspc"
-          gh release download "$PRIVATE_TAG" -R "$PRIVATE_REPO" \
-            --pattern '*.apk' --pattern 'deadspace.zip' \
-            --dir "$RUNNER_TEMP/private-dspc"
-          mapfile -t apks < <(find "$RUNNER_TEMP/private-dspc" -maxdepth 1 -type f -iname '*.apk')
-          if (( ${#apks[@]} != 1 )); then
-            echo "::error::Expected exactly one real APK in the private release"; exit 3
-          fi
-          [[ -s "$RUNNER_TEMP/private-dspc/deadspace.zip" ]] || {
-            echo "::error::Private original deadspace.zip is missing"; exit 4;
+          mkdir -p "$RUNNER_TEMP/actual-original-game"
+          gh release download apk-files-for-testing \
+            -R daniyalshakeel5/Dead-Space-Mobile-PC-port \
+            --pattern 'Deas.Space.Mobile.Fixes.apk' \
+            --dir "$RUNNER_TEMP/actual-original-game"
+          apk="$RUNNER_TEMP/actual-original-game/Deas.Space.Mobile.Fixes.apk"
+          [[ -s "$apk" ]] || {
+            echo "::error::Actual game APK is missing from GitHub Release apk-files-for-testing"
+            exit 10
           }
-          echo "DS_PRIVATE_GAME_APK=${apks[0]}" >> "$GITHUB_ENV"
-          echo "DS_REAL_DATA_ZIP=$RUNNER_TEMP/private-dspc/deadspace.zip" >> "$GITHUB_ENV"
-          echo "Private original game data is staged on ephemeral runner only."
-      - name: "Install native Linux i686 GCC, SDL2, OpenGL and translator requirements"
+          echo "Real game APK size: $(stat -c %s "$apk") bytes"
+          echo "Real game archive SHA-256: $(sha256sum "$apk" | cut -d ' ' -f 1)"
+          unzip -l "$apk" 'lib/armeabi/libDeadSpace.so' 'assets/EAMCore.ini' 'assets/published/*' | head -n 35
+          echo "DS_PRIVATE_GAME_APK=$apk" >> "$GITHUB_ENV"
+          # No fake resource archive is invented. The original APK's published
+          # assets are used directly. An additional external archive can be
+          # included in a future real run only when actually available.
+      - name: Install Linux i686 compiler and SDL/OpenGL software rendering
         shell: bash
         run: |
           set -euo pipefail
           sudo dpkg --add-architecture i386
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            build-essential gcc-multilib g++-multilib libc6-dev-i386 \
+            build-essential gcc-multilib libc6-dev-i386 \
             libsdl2-dev:i386 libgl1-mesa-dri:i386 \
             xvfb xauth unzip file python3-venv
           python3 -m venv "$RUNNER_TEMP/dspc-python"
-          "$RUNNER_TEMP/dspc-python/bin/pip" install --disable-pip-version-check \
-            pyelftools Pillow
+          "$RUNNER_TEMP/dspc-python/bin/pip" install --disable-pip-version-check pyelftools Pillow
           echo "$RUNNER_TEMP/dspc-python/bin" >> "$GITHUB_PATH"
-      - name: "REAL GAME: compile original ARM, launch i686 SDL, interact and check 900 frames"
+      - name: Build and run REAL translated game (900 frames; no synthetic fixture)
         shell: bash
         run: bash experimental/lifted_milestone6/Run-Real-Game-CI.sh
-      - name: "Prevent copyrighted game file artifacts"
+      - name: Report authentic runtime result
         if: always()
         shell: bash
-        run: echo "No original APK, data, screenshots or game assets are uploaded to public artifacts."
+        run: |
+          root="$RUNNER_TEMP/dspc-live"
+          if [[ -f "$root/logs/native-build.log" ]]; then
+            echo "Native translated compile log: $(wc -l < "$root/logs/native-build.log") lines"
+          fi
+          if [[ -f "$root/logs/native-run.log" ]]; then
+            echo "==== Actual game runtime log, last 160 lines ===="
+            tail -n 160 "$root/logs/native-run.log"
+          fi
+          echo "The original copyrighted APK and extracted assets remain only on the transient runner."
