@@ -10,6 +10,9 @@
 #include <ws2tcpip.h>
 #include <errno.h>
 #include <limits.h>
+#ifndef PTHREAD_STACK_MIN
+#define PTHREAD_STACK_MIN 16384u
+#endif
 
 /* Windows i686 uses 32-bit pointer parameters for sscanf conversion outputs.
  * All scanf variadic parameters are output pointers, unlike printf, so native
