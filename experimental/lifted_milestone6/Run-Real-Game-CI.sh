@@ -67,6 +67,7 @@ python3 modelcache_node_probe.py --source out/fn_003.c --instrument
 python3 object3d_duplicate_probe.py --source out/fn_060.c --instrument
 python3 m3g_magic_probe.py --source out/fn_055.c --instrument
 python3 m3g_object_trace.py --source out/fn_055.c --instrument
+python3 native_datainput_read_trace.py --source out/fn_055.c --instrument
 python3 m3g_loader_serialization.py --source out/fn_055.c --instrument
 cd out
 chmod +x build.sh
