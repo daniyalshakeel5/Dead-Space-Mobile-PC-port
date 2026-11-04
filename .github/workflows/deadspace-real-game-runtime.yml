@@ -56,7 +56,7 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/dspc-python"
           "$RUNNER_TEMP/dspc-python/bin/pip" install --disable-pip-version-check pyelftools Pillow
           echo "$RUNNER_TEMP/dspc-python/bin" >> "$GITHUB_PATH"
-      - name: "900-frame real APK boot: native model source recovery and final-frame rendering"
+      - name: "Real APK first install: difficulty and intro path, persistent save, optional second boot"
         shell: bash
         env:
           DS_REAL_TEST_FRAMES: "900"
@@ -72,6 +72,9 @@ jobs:
           if [[ -s "$root/native-build.log" ]]; then
             tail -n 300 "$root/native-build.log" > "$root/native-build-tail.log"
           fi
+          if [[ -s "$root/native-second-launch.log" ]]; then
+            tail -n 500 "$root/native-second-launch.log" > "$root/native-second-launch-tail.log"
+          fi
       - name: Upload actual native framebuffer and compact game runtime logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -81,6 +84,8 @@ jobs:
           retention-days: 7
           path: |
             ${{ runner.temp }}/dspc-live/logs/native-frame.png
+            ${{ runner.temp }}/dspc-live/logs/native-second-launch.png
+            ${{ runner.temp }}/dspc-live/logs/native-second-launch-tail.log
             ${{ runner.temp }}/dspc-live/logs/native-run-tail.log
             ${{ runner.temp }}/dspc-live/logs/native-build-tail.log
       - name: Report authentic runtime result
