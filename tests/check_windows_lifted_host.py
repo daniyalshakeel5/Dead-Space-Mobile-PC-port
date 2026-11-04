@@ -6,6 +6,7 @@ Private build mode is handled by build_win32_lifted.sh on the owner's WSL.
 """
 from __future__ import annotations
 import os
+import argparse
 from pathlib import Path
 import shutil
 import subprocess
@@ -47,6 +48,9 @@ def run(args,cwd):
     if p.stderr.strip():print("WARN",p.stderr[-4000:])
 
 def main():
+    ap=argparse.ArgumentParser()
+    ap.add_argument("--sdl-root",type=Path,default=None)
+    args=ap.parse_args()
     cc=os.environ.get("WINCC","i686-w64-mingw32-gcc-posix")
     with tempfile.TemporaryDirectory(prefix="dspc_win_host_") as t:
         root=Path(t)
@@ -61,14 +65,30 @@ def main():
         run(flags+["-fsyntax-only","win32_substrate.c"],root)
         run(flags+["-o","dspc_windows_host_test.exe","host.c",
                    "win32_substrate.c","tables.c","-lm","-lwinpthread"],root)
-        run(["file",str(root/"dspc_windows_host_test.exe")],root)
-        import struct
-        exe=(root/"dspc_windows_host_test.exe").read_bytes()
-        assert exe[:2]==b"MZ"
-        off=struct.unpack_from("<I",exe,0x3c)[0]
-        assert exe[off:off+4]==b"PE\x00\x00"
-        assert struct.unpack_from("<H",exe,off+4)[0]==0x14c
-        print("PASS: actual native i686 Windows host C compiles/links into PE32"
-              " with original engine excluded",flush=True)
+        if args.sdl_root:
+            sdk=args.sdl_root/"i686-w64-mingw32"
+            inc=sdk/"include"/"SDL2"
+            lib=sdk/"lib"
+            if not (inc/"SDL.h").exists() or not lib.exists():
+                raise SystemExit(f"SDL2 MinGW 32-bit SDK missing: {sdk}")
+            sdlflags=flags+["-DDS_SDL","-DSDL_MAIN_HANDLED",
+                            "-I"+str(inc)]
+            run(sdlflags+["-fsyntax-only","host.c"],root)
+            run(sdlflags+["-o","dspc_windows_sdl_host_test.exe",
+                "host.c","win32_substrate.c","tables.c",
+                "-L"+str(lib),"-lSDL2","-lm","-lwinpthread"],root)
+            check_pe(root/"dspc_windows_sdl_host_test.exe")
+        check_pe(root/"dspc_windows_host_test.exe")
+    print("PASS: actual native i686 Windows host C compiles/links into PE32"
+          " with original engine excluded",flush=True)
+
+def check_pe(path: Path):
+    import struct
+    exe=path.read_bytes()
+    assert exe[:2]==b"MZ"
+    off=struct.unpack_from("<I",exe,0x3c)[0]
+    assert exe[off:off+4]==b"PE\x00\x00"
+    assert struct.unpack_from("<H",exe,off+4)[0]==0x14c
+    print(f"PASS: verified PE32 native x86 {path.name} ({len(exe)} bytes)")
 if __name__=="__main__":
     main()
