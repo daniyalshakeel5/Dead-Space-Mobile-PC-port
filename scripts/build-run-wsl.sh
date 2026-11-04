@@ -19,7 +19,7 @@ fi
 sudo dpkg --add-architecture i386
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
-  gcc-multilib libc6-dev-i386 python3 python3-venv unzip \
+  gcc-multilib libc6-dev-i386 python3 python3-venv unzip util-linux binutils \
   libsdl2-2.0-0:i386 libgl1:i386 libgl1-mesa-dri:i386 ca-certificates
 build="$HOME/DeadSpaceMobilePC-Linux"
 mkdir -p "$build/apk" "$build/logs" "$build/sdl-dev"
@@ -33,7 +33,7 @@ so="$build/apk/lib/armeabi/libDeadSpace.so"
 [[ -s "$so" && -s "$build/apk/assets/EAMCore.ini" ]] || {
   echo 'Incompatible APK: expected lib/armeabi/libDeadSpace.so and assets/EAMCore.ini' >&2; exit 2;
 }
-mkdir -p "$build/apk/assets/var"
+mkdir -p "$build/apk/assets/var" "$build/apk/assets/published/var"
 python3 -m venv "$build/venv"
 "$build/venv/bin/pip" install -q pyelftools
 # Extract SDL2 i386 headers to avoid multiarch development-package conflicts.
@@ -60,7 +60,19 @@ export DS_DATA="$build/apk/assets"
 export DS_ASSETS="$build/apk/assets"
 export DS_WINDOW=1 DS_NOVSYNC=1 DS_STEPS=create,surface,frame DS_FRAMES=0
 export DS_WATCHDOG=45 DS_QUIET_JAVA=1
-./dspc_sdl "$so" 2>&1 | tee "$build/logs/game.log"
+# Match the reference agent single-CPU environment for first boot.
+cpu=$(python3 -c "import os; print(min(os.sched_getaffinity(0)))")
+set +e
+taskset -c "$cpu" ./dspc_sdl "$so" 2>&1 | tee "$build/logs/game.log"
+rc=${PIPESTATUS[0]}
+set -e
+if (( rc != 0 )); then
+  echo "Native game crashed. Mapping logged PCs to C functions:" >&2
+  grep -m 1 "backtrace (use nm" "$build/logs/game.log" | grep -oE "0x[0-9a-fA-F]+" |
+    xargs -r addr2line -a -f -C -e "$tools/out/dspc_sdl" > "$build/logs/backtrace.txt" || true
+  cat "$build/logs/backtrace.txt" >&2
+fi
+exit "$rc"
 PLAY
 chmod +x "$build/play.sh"
 echo "Linux game built. Launching now. Next time: $build/play.sh"
