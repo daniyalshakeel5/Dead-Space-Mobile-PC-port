@@ -1,0 +1,68 @@
+name: "Dead Space: real APK model loader source context"
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/deadspace-real-model-loader-context.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-source-context:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/deadspace-milestone6-analysis-2026-11-04
+      - name: Download original game release (no synthetic input)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/real"
+          gh release download apk-files-for-testing -R daniyalshakeel5/Dead-Space-Mobile-PC-port \
+            --pattern 'Deas.Space.Mobile.Fixes.apk' --dir "$RUNNER_TEMP/real"
+          cd "$RUNNER_TEMP/real"
+          unzip -qq Deas.Space.Mobile.Fixes.apk 'lib/armeabi/libDeadSpace.so' 'assets/published/models/slasher.m3g'
+          echo "Original ARM library SHA256: $(sha256sum lib/armeabi/libDeadSpace.so)"
+          echo "Original model size: $(stat -c %s assets/published/models/slasher.m3g)"
+          echo "Original model first 64 bytes:"
+          head -c 64 assets/published/models/slasher.m3g | od -An -tx1
+      - name: Translate REAL ARM model loader and print target data flow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --break-system-packages --disable-pip-version-check pyelftools
+          work="$GITHUB_WORKSPACE/experimental/lifted_milestone6/tools"
+          cd "$work"
+          DS_SO="$RUNNER_TEMP/real/lib/armeabi/libDeadSpace.so" DS_TEXTUREPACK_DIAG=0 python3 gen_all.py "$RUNNER_TEMP/generated"
+          python3 - "$RUNNER_TEMP/generated" <<'PY'
+          import pathlib,sys,re
+          d=pathlib.Path(sys.argv[1])
+          for func in ("f_000629b4","f_0027e644","f_0032b260"):
+              print("\n========= ACTUAL GENERATED SOURCE",func,"=========",flush=True)
+              matches=[]
+              for p in d.glob("fn_*.c"):
+                  s=p.read_text().splitlines()
+                  for i,line in enumerate(s):
+                      if line.startswith("u64 "+func+"("):
+                          matches.append((p,s,i))
+              print("Found",len(matches),"copies",flush=True)
+              for p,s,i in matches:
+                  end=next((j for j in range(i+1,len(s)) if s[j].startswith("u64 f_")),len(s))
+                  print("FILE",p.name,"FUNCTION LINES",i+1,end,flush=True)
+                  if func=="f_000629b4":
+                      # Full function, enough to prove stack slot data provenance.
+                      lo=i;hi=min(end,i+1200)
+                      for j in range(lo,hi):print(f"{j+1:6d}: {s[j]}")
+                  else:
+                      for j in range(i,min(i+130,end)):print(f"{j+1:6d}: {s[j]}")
+          # Also show raw local neighborhood around the exact runtime SIGSEGV.
+          p=d/"fn_003.c"
+          if p.exists():
+              s=p.read_text().splitlines()
+              print("\n========= REAL MODEL CRASH LOCAL SOURCE =========")
+              for i in range(17380,min(len(s),17525)):
+                  print(f"{i+1:6d}: {s[i]}")
+          PY
