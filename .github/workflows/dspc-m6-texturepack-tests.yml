@@ -1,20 +1,7 @@
 name: Milestone 6 lifted TexturePack diagnostics (asset-free)
 on:
-  push:
-    branches:
-      - work/deadspace-milestone6-analysis-2026-11-04
-    paths:
-      - experimental/lifted_milestone6/tools/gen_all.py
-      - experimental/lifted_milestone6/tools/host.c
-      - experimental/lifted_milestone6/tools/jni_vm.c
-      - experimental/lifted_milestone6/tools/libc_files.c
-      - tests/check_m6_host_c_syntax.py
-      - tests/test_m6_bionic_errno.c
-      - experimental/lifted_milestone6/tools/build.sh
-      - experimental/lifted_milestone6/tools/texturepack_fault_guard.py
-      - tests/test_m6_texturepack_probe.py
-      - .github/workflows/dspc-m6-texturepack-tests.yml
   workflow_dispatch:
+
 permissions:
   contents: read
 jobs:

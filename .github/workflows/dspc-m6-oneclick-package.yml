@@ -1,12 +1,7 @@
 name: Dead Space Milestone6 one-click WSL source update
 on:
-  push:
-    branches:
-      - work/deadspace-milestone6-analysis-2026-11-04
-    paths:
-      - experimental/lifted_milestone6/**
-      - .github/workflows/dspc-m6-oneclick-package.yml
   workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
