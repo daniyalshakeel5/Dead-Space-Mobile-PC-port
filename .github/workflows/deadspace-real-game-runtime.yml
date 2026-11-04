@@ -56,7 +56,7 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/dspc-python"
           "$RUNNER_TEMP/dspc-python/bin/pip" install --disable-pip-version-check pyelftools Pillow
           echo "$RUNNER_TEMP/dspc-python/bin" >> "$GITHUB_PATH"
-      - name: "Real APK first install: difficulty and intro path, persistent save, optional second boot"
+      - name: "Real APK 900-frame first boot: trace original EASTL M3G byte insertion and saved progress"
         shell: bash
         env:
           DS_REAL_TEST_FRAMES: "900"
