@@ -91,7 +91,7 @@ test_frames="${DS_REAL_TEST_FRAMES:-900}"
 [[ "$test_frames" =~ ^[0-9]+$ && "$test_frames" -ge 60 && "$test_frames" -le 900 ]] || {
   echo 'REAL FAIL: DS_REAL_TEST_FRAMES must be 60..900'; exit 45;
 }
-if (( test_frames > 650 )); then shot_at=650; else shot_at=$((test_frames-10)); fi
+shot_at=$((test_frames-10))
 runtime_budget=360
 if (( test_frames > 300 )); then runtime_budget=900; fi
 echo "REAL NATIVE TEST: frame target=$test_frames screenshot_at=$shot_at"
@@ -156,11 +156,16 @@ fi
 python3 - "$root/logs/native-frame.ppm" <<'PY'
 import sys
 from PIL import Image
-im=Image.open(sys.argv[1]).convert("RGB").resize((80,45))
+source=Image.open(sys.argv[1]).convert("RGB")
+im=source.resize((80,45))
 colors=len(set(im.getdata()))
 print("REAL GAME framebuffer sampled distinct colors:", colors)
+print("REAL GAME native output size:", source.size)
 if colors < 5:
     raise SystemExit("REAL FAIL: game framebuffer is blank/flat")
+out=sys.argv[1].rsplit(".",1)[0]+".png"
+source.save(out, format="PNG")
+print("REAL GAME visual capture:", out)
 PY
 echo "REAL PASS: original APK, native i686 engine, $test_frames SDL frames, nonblank frame"
 echo 'This is a real runtime smoke test, NOT proof of fully playable gameplay.'
