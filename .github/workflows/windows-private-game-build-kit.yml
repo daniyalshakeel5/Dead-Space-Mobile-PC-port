@@ -6,6 +6,7 @@ on:
       - experimental/windows_native_host/Install-DeadSpace-Fresh.ps1
       - experimental/windows_native_host/Build-DeadSpace-Windows.ps1
       - experimental/windows_native_host/Build-DeadSpace-Windows.cmd
+      - experimental/windows_native_host/Install Dead Space Mobile.cmd
       - experimental/windows_native_host/README-TEST-WINDOWS.txt
       - experimental/lifted_milestone6/tools/**
       - .github/workflows/windows-private-game-build-kit.yml
@@ -121,6 +122,7 @@ jobs:
           cp experimental/windows_native_host/Install-DeadSpace-Fresh.ps1 package/
           cp experimental/windows_native_host/Build-DeadSpace-Windows.ps1 package/
           cp experimental/windows_native_host/Build-DeadSpace-Windows.cmd package/
+          cp 'experimental/windows_native_host/Install Dead Space Mobile.cmd' package/
           cp experimental/windows_native_host/README-TEST-WINDOWS.txt package/
           if find package -type f | grep -E '\.(apk|so|m3g|ogg|dex|bin)$'; then
              echo "Refusing to publish original EA binaries/assets"; exit 1
