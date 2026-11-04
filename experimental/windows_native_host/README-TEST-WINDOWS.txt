@@ -1,19 +1,53 @@
-Dead Space Mobile - native Windows x86 experimental game build
+DEAD SPACE MOBILE — FRESH WINDOWS INSTALLER
+November 4, 2026
 
-There are NO copyrighted EA assets, binaries, or generated ARM-to-C code in
-this archive. All game content remains in your own existing WSL project.
+This is a SOURCE-ONLY installer. It contains NO copyrighted Dead Space Mobile
+game files or compiled game logic. You must supply your own matching original
+Dead Space Mobile APK (the version containing lib/armeabi/libDeadSpace.so).
 
-No terminal commands:
-1. Extract this archive outside your current dspc folder.
-2. Double-click Build-DeadSpace-Windows.cmd.
-3. It locates your already translated WSL project or opens a folder picker.
-4. The one-click workflow compiles game functions locally to an x86 Windows
-   SDL2/OpenGL executable, using WSL only as a cross-compiler.
-5. It launches the new executable directly on Windows.
-6. On crash, send windows-build/logs/windows-run.log.
+NO TERMINAL COMMANDS:
+1. Download the GitHub Actions artifact DeadSpaceMobile-FRESH-Windows-Installer.
+2. Extract it anywhere, e.g. your Downloads folder.
+3. Double-click Build-DeadSpace-Windows.cmd.
+4. Select the original .apk file in the Windows file picker.
+5. The installer automatically creates Documents\DeadSpaceMobilePC,
+   extracts the original APK, validates the ARM32 library, installs the full
+   ARM-to-C translator and native Windows host, ensures build dependencies
+   exist in WSL, regenerates the translated game source, builds a native
+   x86 Windows SDL2/OpenGL executable, and launches the Windows build.
+6. Your Windows game directory and logs will be:
+   Documents\DeadSpaceMobilePC\windows-build\
+   - DeadSpaceMobile-Win32.exe
+   - Play Dead Space Windows.cmd
+   - compile-windows.log
+   - logs\windows-run.log
 
-Nothing overwrites the original game, current translated C, saves, or WSL
-runtime. New Windows-specific build results are in windows-build/.
+Important: the Xperia Play release with libEAMGameDeadSpace.so will be
+REJECTED. It uses a different native game library and asset profile. Use
+the original libDeadSpace.so APK. A mismatched edition must not be silently
+mixed with an existing translation.
 
-The actual host/SDL Windows PE32 link is verified in GitHub CI with synthetic
-guest functions. Actual native Windows Dead Space gameplay remains UNVERIFIED.
+The installer refuses to overwrite an existing nonempty installation folder.
+Its default location is Documents\DeadSpaceMobilePC. The APK and generated
+code are kept privately on your machine; nothing is uploaded to GitHub.
+
+WSL is a build tool only. The resulting Windows PE32 game runs directly on
+Windows, not inside WSL, Android, or an ARM instruction interpreter.
+
+VERIFIED IN CI:
+- Synthetic APK archive extraction, expected layout, ARM32 ELF header check
+- Full native translator and Win32 host source installation
+- Safe rejection of Xperia library, ZIP traversal and duplicate installation
+- Windows PowerShell 5 syntax and Bash build-script syntax
+- Actual lifted-host Windows PE32 compile/link using synthetic game tables
+
+NOT YET VERIFIED:
+- Full native Windows compilation of the user-owned 16,387 translated
+  game functions, or successful original-engine startup/rendering/gameplay.
+- Audio and advanced analog controls are still under development.
+
+When testing, send either compile-windows.log or logs\windows-run.log if it
+fails. No need to type terminal commands.
+
+Development branch / PR:
+https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/pull/2
