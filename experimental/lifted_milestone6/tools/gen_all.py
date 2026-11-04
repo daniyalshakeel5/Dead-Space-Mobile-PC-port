@@ -88,7 +88,7 @@ def main():
         original = p.read_text(encoding="utf-8")
         p.write_text(patch_texturepack(original), encoding="utf-8")
         print(f"TexturePack null-vector diagnostics injected into {p}")
-        tot = sum(os.path.getsize(f"{OUT}/{x}") for x in os.listdir(OUT))
+    tot = sum(os.path.getsize(f"{OUT}/{x}") for x in os.listdir(OUT))
     print(f"{len(ok)} lifted, {len(unlifted)} unlifted stubs, {len(imps)} imports, {idx} chunks, {tot/1e6:.1f} MB of C")
 
 if __name__ == "__main__":
