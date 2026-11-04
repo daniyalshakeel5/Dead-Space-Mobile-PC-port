@@ -40,7 +40,7 @@ jobs:
           python3 - "$RUNNER_TEMP/generated" <<'PY'
           import pathlib,sys,re
           d=pathlib.Path(sys.argv[1])
-          for func in ("f_000629b4","f_00061414","f_0032b260","f_003531e8"):
+          for func in ("f_0035df54","f_003267fc","f_000620f0","f_001a3570","f_0032b260"):
               print("\n========= ACTUAL GENERATED SOURCE",func,"=========",flush=True)
               matches=[]
               for p in d.glob("fn_*.c"):
@@ -57,7 +57,7 @@ jobs:
                       lo=i;hi=min(end,i+1200)
                       for j in range(lo,hi):print(f"{j+1:6d}: {s[j]}")
                   else:
-                      for j in range(i,min(i+380,end)):print(f"{j+1:6d}: {s[j]}")
+                      for j in range(i,min(i+260,end)):print(f"{j+1:6d}: {s[j]}")
           # Also show raw local neighborhood around the exact runtime SIGSEGV.
           p=d/"fn_003.c"
           if p.exists():
