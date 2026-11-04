@@ -1,0 +1,24 @@
+name: Compile actual lifted host as Windows PE32 (no original game data)
+on:
+  push:
+    branches: [work/deadspace-windows-lifted-host-2026-11-04]
+    paths:
+      - experimental/lifted_milestone6/tools/**
+      - experimental/windows_native_host/**
+      - tests/check_windows_lifted_host.py
+      - .github/workflows/windows-lifted-host-crosscheck.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mingw-host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native Windows cross compiler (i686 POSIX pthread model)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-mingw-w64-i686-posix binutils-mingw-w64-i686 file
+      - name: Cross-compile the actual lifted host as native Win32 PE32
+        run: python3 tests/check_windows_lifted_host.py
