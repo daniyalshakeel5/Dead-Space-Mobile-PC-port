@@ -91,6 +91,18 @@ static u64 call_java_native(u32 addr, u32 self, const char* kinds, int n, JArg* 
     return call_ind(addr, nw > 0 ? w[0] : 0, nw > 1 ? w[1] : 0, nw > 2 ? w[2] : 0, nw > 3 ? w[3] : 0, sp2);
 }
 
+/* Android asset directory iteration is ASCII-sorted. Host readdir() returns
+ * filesystem/inode order, which differs from the original Android asset VFS
+ * and can reorder model/texture registries. Sort the real asset names, never
+ * substitute content or synthesize entries. */
+static int ds_asset_name_compare(const void* aa, const void* bb) {
+    JObj* a = OBJ(*(const u32*)aa);
+    JObj* b = OBJ(*(const u32*)bb);
+    const char* an = a && a->s ? a->s : "";
+    const char* bn = b && b->s ? b->s : "";
+    return strcmp(an, bn);
+}
+
 // ---- the Java methods the game expects from Android
 /* Honor java.io.InputStream byte-array semantics. In particular, zero-length
  * reads return 0 (including at EOF), while a positive read at EOF is -1.
@@ -158,6 +170,7 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
             u32 names[1024]; u32 cnt = 0; struct dirent* e;
             while ((e = readdir(d)) && cnt < 1024) if (strcmp(e->d_name, ".") && strcmp(e->d_name, "..")) names[cnt++] = new_obj(K_STRING, e->d_name, 0, 0);
             closedir(d);
+            qsort(names, cnt, sizeof names[0], ds_asset_name_compare);
             if (getenv("DS_ASSET_TRACE")) {
                 fprintf(stderr, "[JAVA_ASSET_LIST] path=%s files=%u\n", path, cnt);
                 for (u32 i = 0; i < cnt && i < 32; i++) {
