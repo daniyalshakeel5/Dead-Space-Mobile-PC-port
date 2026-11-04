@@ -24,9 +24,12 @@ jobs:
           gh release download apk-files-for-testing -R daniyalshakeel5/Dead-Space-Mobile-PC-port \
             --pattern 'Deas.Space.Mobile.Fixes.apk' --dir "$RUNNER_TEMP/real"
           cd "$RUNNER_TEMP/real"
-          unzip -qq Deas.Space.Mobile.Fixes.apk 'lib/armeabi/libDeadSpace.so' 'assets/published/models/slasher.m3g'
+          unzip -qq Deas.Space.Mobile.Fixes.apk 'lib/armeabi/libDeadSpace.so' 'assets/published/models/slasher.m3g' 'assets/published/models/lurker_projectile.m3g'
           echo "Original ARM library SHA256: $(sha256sum lib/armeabi/libDeadSpace.so)"
           echo "Original model size: $(stat -c %s assets/published/models/slasher.m3g)"
+          echo "Original projectile model size: $(stat -c %s assets/published/models/lurker_projectile.m3g)"
+          echo "Original projectile model first 64 bytes:"
+          head -c 64 assets/published/models/lurker_projectile.m3g | od -An -tx1
           echo "Original model first 64 bytes:"
           head -c 64 assets/published/models/slasher.m3g | od -An -tx1
       - name: Translate REAL ARM model loader and print target data flow
@@ -40,7 +43,7 @@ jobs:
           python3 - "$RUNNER_TEMP/generated" <<'PY'
           import pathlib,sys,re
           d=pathlib.Path(sys.argv[1])
-          for func in ("f_00368efc","f_00365a2c","f_0035c844"):
+          for func in ("f_00324884","f_0032ad98","f_00326568"):
               print("\n========= ACTUAL GENERATED SOURCE",func,"=========",flush=True)
               matches=[]
               for p in d.glob("fn_*.c"):
