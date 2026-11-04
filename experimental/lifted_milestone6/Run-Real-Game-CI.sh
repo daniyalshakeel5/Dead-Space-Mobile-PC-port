@@ -173,6 +173,51 @@ out=sys.argv[1].rsplit(".",1)[0]+".png"
 source.save(out, format="PNG")
 print("REAL GAME visual capture:", out)
 PY
+# Reuse the exact same writable save directory when the genuine game has
+# created progress. A fresh install goes difficulty -> cutscene -> gameplay;
+# only a later launch can legitimately be assessed for its main menu.
+progress_count="$(find "$root/userdata" -type f | wc -l)"
+echo "REAL FIRST-RUN PERSISTED FILE COUNT: $progress_count"
+if (( progress_count > 0 )) && [[ "${DS_VERIFY_SECOND_BOOT:-1}" == "1" ]]; then
+  echo "REAL SECOND-LAUNCH TEST: reusing original first-run progress and APK, without scripted clicks"
+  set +e
+  timeout --kill-after=20s 360s xvfb-run -a env \
+    LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy \
+    DS_WINDOW=1 DS_NOVSYNC=1 DS_QUIET_JAVA=1 DS_M3G_SERIALIZE=1 \
+    DS_NATIVE_BUFFERED_IO=1 DS_MODELCACHE_NULL_SOURCE_RETURN=1 DS_WATCHDOG=45 \
+    DS_ASSETS="$assets" DS_DATA="$root/userdata" \
+    DS_STEPS=create,surface,frame DS_FRAMES=120 DS_CLICKS="" \
+    DS_SHOT="110:$root/logs/native-second-launch.ppm" \
+    ./dspc_sdl "$root/apk/lib/armeabi/libDeadSpace.so" \
+    > "$root/logs/native-second-launch.log" 2>&1
+  second_code=$?
+  set -e
+  echo "REAL SECOND-LAUNCH EXIT: $second_code"
+  if (( second_code != 0 )) || ! grep -q '^ran frames' "$root/logs/native-second-launch.log"; then
+    echo 'REAL FAIL: actual second launch did not complete 120 frames with persisted progress'
+    tail -n 100 "$root/logs/native-second-launch.log"
+    exit 49
+  fi
+  [[ -s "$root/logs/native-second-launch.ppm" ]] || {
+    echo 'REAL FAIL: no second-launch framebuffer'; exit 50;
+  }
+  python3 - "$root/logs/native-second-launch.ppm" <<'SECOND_LAUNCH_IMAGE'
+from PIL import Image
+import sys
+image = Image.open(sys.argv[1]).convert("RGB")
+colors = len(set(image.resize((80,45)).getdata()))
+print("REAL SECOND-LAUNCH framebuffer distinct colors:", colors)
+if colors < 5:
+    raise SystemExit("REAL FAIL: blank second-launch framebuffer")
+image.save(sys.argv[1].rsplit(".",1)[0] + ".png")
+SECOND_LAUNCH_IMAGE
+  echo 'REAL SECOND-LAUNCH SMOKE PASS: process completed and rendered a nonblank frame.'
+  echo 'Do not claim the main menu is visible without examining the captured second-launch image.'
+else
+  echo 'REAL SECOND-LAUNCH UNVERIFIED: no first-run progress saved yet, or verification disabled.'
+  echo 'Do not interpret a new-install difficulty prompt as a missing-main-menu bug.'
+fi
+
 echo "REAL PASS: original APK, native i686 engine, $test_frames SDL frames, nonblank frame"
 echo "REAL PROGRESS FILES: $(find "$root/userdata" -type f | wc -l) in isolated writable user data"
 find "$root/userdata" -type f -printf '[REAL_PROGRESS_FILE] %P (%s bytes)\n' | head -n 40
