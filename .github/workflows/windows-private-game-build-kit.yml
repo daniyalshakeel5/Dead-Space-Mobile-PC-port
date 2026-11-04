@@ -70,6 +70,7 @@ jobs:
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -ApkPath $fixture -InstallDir $root -PrepareOnly
           if ($LASTEXITCODE -eq 0) { throw "Installer incorrectly overwrote a nonempty project" }
           Write-Host 'PASS existing game project protected against accidental overwrite'
+          $global:LASTEXITCODE = 0 # expected rejection is not a CI failure
       - name: Reject incompatible Xperia library and ZIP path traversal
         shell: pwsh
         run: |
@@ -92,6 +93,7 @@ jobs:
             if ($LASTEXITCODE -eq 0) { throw "Unsafe archive accepted: $case" }
             if (Test-Path $destination) { throw "Unsafe archive wrote to install directory: $case" }
             Write-Host "PASS rejected $case before extraction"
+            $global:LASTEXITCODE = 0 # expected rejection is not a CI failure
           }
   bash-check:
     runs-on: ubuntu-24.04
