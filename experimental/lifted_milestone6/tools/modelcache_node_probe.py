@@ -34,8 +34,8 @@ def patch(source: str) -> str:
         return source
     if "ModelCache16loadNodeUncached" not in part[:250]:
         raise ValueError("Wrong model loading function; refusing to alter game")
-    if part.count(CALL) != 1 or part.count(COPY) != 1 or part.count(CRASH) != 1:
-        raise ValueError("Exact original model loader call, copy or null fault differs")
+    if part.count(CALL) != 1 or part.count(COPY) < 1 or part.count(CRASH) != 1:
+        raise ValueError("Verified model load, vector assignment or exact crash instruction differs")
     src = r'''
   /* DS_REAL_MODELCACHE_VECTOR_000629B4 */
   fprintf(stderr,
