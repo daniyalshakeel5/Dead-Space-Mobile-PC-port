@@ -122,7 +122,7 @@ static int stream_read(JObj* o, u8* dst, int len) {
                 resource, n);
         for (int ds_i=0; ds_i<12; ds_i++)
             fprintf(stderr, "%02x ", (unsigned)dst[ds_i]);
-        fprintf(stderr, "\\n");
+        fprintf(stderr, "\n");
     }
     if (getenv("DS_ASSET_TRACE") && n != (size_t)len) {
         fprintf(stderr, "[JAVA_STREAM_PARTIAL] resource=%s request=%d got=%zu "
