@@ -114,7 +114,7 @@ static int stream_read(JObj* o, u8* dst, int len) {
     size_t n = fread(dst, 1, (size_t)len, fp);
     if (getenv("DS_ASSET_TRACE") && n != (size_t)len) {
         fprintf(stderr, "[JAVA_STREAM_PARTIAL] resource=%s request=%d got=%zu "
-                "position=%ld eof=%d error=%d\\n",
+                "position=%ld eof=%d error=%d\n",
                 o->s ? o->s : "(unknown)", len, n,
                 ftell(fp), feof(fp), ferror(fp));
     }
