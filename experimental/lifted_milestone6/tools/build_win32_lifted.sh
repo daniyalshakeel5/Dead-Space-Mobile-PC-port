@@ -68,19 +68,29 @@ for f in "${chunks[@]}" "$GEN"/overrides.c "$GEN"/unlifted.c "$GEN"/tables.c; do
     stem=$(basename "${f%.c}")
     printf '[DS WINDOWS] Compiling %d/%d: %s\n' \
         "$((count+1))" "$((${#chunks[@]}+3))" "$stem"
-    "$CC" "${CFLAGS[@]}" -c "$f" -o "$OBJ/$stem.o"
+    if [[ -f "$OBJ/$stem.o" && "$OBJ/$stem.o" -nt "$f" &&
+          "$OBJ/$stem.o" -nt "$GEN/protos.h" && "$OBJ/$stem.o" -nt "$GEN/rt.h" ]]; then
+        echo "[DS WINDOWS] Reusing compiled $stem.o (source unchanged)"
+    else
+        "$CC" "${CFLAGS[@]}" -c "$f" -o "$OBJ/$stem.o"
+    fi
     count=$((count+1))
 done
 "$CC" "${CFLAGS[@]}" -c "$SRC/host.c" -o "$OBJ/host_win.o"
 "$CC" "${CFLAGS[@]}" -c "$SRC/win32_substrate.c" -o "$OBJ/win32_substrate.o"
+for name in win32_missing_imports win32_missing_gles; do
+    "$CC" "${CFLAGS[@]}" -include "$SRC/win32_import_bridge.h" \
+        -c "$SRC/$name.c" -o "$OBJ/$name.o"
+done
 
 mapfile -t objects < <(find "$OBJ" -maxdepth 1 -type f -name 'fn_*.o' | sort)
 objects+=( "$OBJ/overrides.o" "$OBJ/unlifted.o" "$OBJ/tables.o"
-           "$OBJ/host_win.o" "$OBJ/win32_substrate.o" )
+           "$OBJ/host_win.o" "$OBJ/win32_substrate.o"
+           "$OBJ/win32_missing_imports.o" "$OBJ/win32_missing_gles.o" )
 echo "[DS WINDOWS] Linking ${#objects[@]} native Windows x86 objects..."
 "$CC" -static-libgcc -Wl,--large-address-aware -Wl,--stack,16777216 \
    -o "$WORK/DeadSpaceMobile-Win32.exe" \
-   "${objects[@]}" "-L$SDKROOT/lib" -lSDL2 -lwinpthread -lm
+   "${objects[@]}" "-L$SDKROOT/lib" -lSDL2 -lwinpthread -lws2_32 -lopengl32 -lm
 
 cp -f "$SDKROOT/bin/SDL2.dll" "$WORK/SDL2.dll"
 WINPTHREAD=$("$CC" -print-file-name=libwinpthread-1.dll)
