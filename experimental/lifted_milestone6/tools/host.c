@@ -506,6 +506,8 @@ static void* run(void* p) {
 }
 
 int main(int argc, char** argv) {
+    /* Runs against the actual JNI implementation; separate from real APK boot. */
+    if (getenv("DS_JNI_STREAM_SELFTEST")) return ds_test_asset_streams();
     const char* so = argc > 1 ? argv[1] : "libDeadSpace.so";
     setvbuf(stdout, NULL, _IONBF, 0);
     if (getenv("TRACE")) trace_f = fopen(getenv("TRACE"), "w");
