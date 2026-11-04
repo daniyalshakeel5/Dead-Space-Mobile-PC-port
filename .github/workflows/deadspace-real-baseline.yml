@@ -20,7 +20,7 @@ jobs:
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386 libsdl2-2.0-0:i386 libgl1-mesa-dri:i386 libgl1:i386 xvfb xauth unar
+          sudo apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386 libsdl2-2.0-0:i386 libgl1-mesa-dri:i386 libgl1:i386 xvfb xauth libarchive-tools
           # Extract target headers without installing unrelated i386 GUI
           # development tools that conflict with the runner's host packages.
           mkdir -p "$RUNNER_TEMP/sdl-dev"
@@ -44,7 +44,8 @@ jobs:
           sha1sum "$root/apk/lib/armeabi/libDeadSpace.so" | tee "$root/logs/identity.txt"
           [[ "$(sha1sum "$root/apk/lib/armeabi/libDeadSpace.so" | cut -d' ' -f1)" == 64a3323cd3cc0c483a645b62af8508624163ba9b ]]
           if [[ "$SOURCE" == milestone6 ]]; then
-            unar -q -o "$root/reference" dspc_milestone6.rar
+            mkdir -p "$root/reference"
+            bsdtar -xf dspc_milestone6.rar -C "$root/reference"
             mapfile -t entries < <(find "$root/reference" -name gen_all.py -type f)
             [[ "${#entries[@]}" == 1 ]]
             cp -a "$(dirname "${entries[0]}")" "$root/tools"
