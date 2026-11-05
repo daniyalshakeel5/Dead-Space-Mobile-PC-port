@@ -71,7 +71,7 @@ def main():
         f.write("const char* const JNI_NAMES[] = {" + ",".join('"%s"' % n for n in JNI_NAMES) + "};\n")
         f.write(f"const u32 JNI_N = {len(JNI_NAMES)};\n")
     import gen_gl; gen_gl.main(f"{OUT}/gl_gen.c")
-    for fn in ("rt.h", "host.c", "jni_vm.c", "threads.c", "libc_files.c", "gl_shim.c", "front_sdl.c", "build.sh"): shutil.copy(fn, OUT)
+    for fn in ("rt.h", "host.c", "jni_vm.c", "threads.c", "libc_files.c", "gl_shim.c", "front_sdl.c", "windows_lifted_compat.h", "build.sh"): shutil.copy(fn, OUT)
     # Preserve the exact guest translation. Add a fail-closed two-point probe
     # only to the confirmed TexturePack::load NULL-vector site. Do not mask
     # the exception or invent empty textures. DS_TEXTUREPACK_DIAG=0 disables.

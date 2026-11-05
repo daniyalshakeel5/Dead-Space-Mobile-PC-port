@@ -109,7 +109,7 @@ static int ds_asset_name_compare(const void* aa, const void* bb) {
  * Never write outside the guest byte[] when a malformed JNI argument arrives. */
 static int stream_read(JObj* o, u8* dst, int len) {
     if (len == 0) return 0;
-    if (len < 0 || !o || !o->p || !dst) return -1;
+    if (len < 0 || !o || !dst) return -1;
     pthread_mutex_lock(&g_objlock);
     if (!o->p) { pthread_mutex_unlock(&g_objlock); return -1; }
     FILE* fp = (FILE*)o->p;
@@ -156,25 +156,26 @@ static int stream_byte_array_ok(JObj* b, s32 offset, s32 count) {
  * old shim incorrectly reported bytes skipped beyond the resource's length.
  * The native M3G decoder relies on accurate stream positioning. */
 static u64 stream_skip(JObj* stream, u64 requested_raw) {
-    if (!stream || !stream->p) { g_exception = 1; return 0; }
+    if (!stream) { g_exception = 1; return 0; }
     s64 requested = (s64)requested_raw;
     if (requested <= 0) return 0;
+    pthread_mutex_lock(&g_objlock);
+    if (!stream->p) { g_exception = 1; pthread_mutex_unlock(&g_objlock); return 0; }
     FILE* fp = (FILE*)stream->p;
-    flockfile(fp);
     long start = ftell(fp);
     if (start < 0 || fseek(fp, 0, SEEK_END) != 0) {
-        g_exception = 1; funlockfile(fp); return 0;
+        g_exception = 1; pthread_mutex_unlock(&g_objlock); return 0;
     }
     long end = ftell(fp);
     if (end < 0 || fseek(fp, start, SEEK_SET) != 0) {
-        g_exception = 1; funlockfile(fp); return 0;
+        g_exception = 1; pthread_mutex_unlock(&g_objlock); return 0;
     }
     u64 available = end > start ? (u64)(end - start) : 0;
     u64 actual = (u64)requested < available ? (u64)requested : available;
     if (fseek(fp, start + (long)actual, SEEK_SET) != 0) {
-        g_exception = 1; funlockfile(fp); return 0;
+        g_exception = 1; pthread_mutex_unlock(&g_objlock); return 0;
     }
-    funlockfile(fp);
+    pthread_mutex_unlock(&g_objlock);
     if (getenv("DS_ASSET_TRACE") && (u64)requested != actual)
         fprintf(stderr,
             "[JAVA_STREAM_SKIP_CLAMP] requested=%llu actual=%llu at=%ld file_size=%ld\n",
@@ -255,18 +256,18 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
             return 0;
         }
         if (!strcmp(nm, "available")) {
-            if (!so->p) { g_exception = 1; return 0; }
+            pthread_mutex_lock(&g_objlock);
+            if (!so->p) { g_exception = 1; pthread_mutex_unlock(&g_objlock); return 0; }
             FILE* fp = (FILE*)so->p;
-            flockfile(fp);
             long cur = ftell(fp);
             if (cur < 0 || fseek(fp, 0, SEEK_END) != 0) {
-                g_exception = 1; funlockfile(fp); return 0;
+                g_exception = 1; pthread_mutex_unlock(&g_objlock); return 0;
             }
             long end = ftell(fp);
             if (fseek(fp, cur, SEEK_SET) != 0 || end < 0) {
-                g_exception = 1; funlockfile(fp); return 0;
+                g_exception = 1; pthread_mutex_unlock(&g_objlock); return 0;
             }
-            funlockfile(fp);
+            pthread_mutex_unlock(&g_objlock);
             return end > cur ? (u32)(end - cur) : 0;
         }
         if (!strcmp(nm, "skip")) return stream_skip(so, a[0].j);
@@ -336,8 +337,25 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
     if (!strcmp(c, "com/ea/blast/PowerManagerAndroid")) return 0;
     if (!strcmp(c, "com/ea/blast/TouchSurfaceAndroid") && !strcmp(nm, "IsTouchScreenMultiTouch")) return 1;
     if (!strcmp(c, "com/ea/blast/GetAppDataDirectoryDelegate") && !strcmp(m->sig, "()Ljava/lang/String;")) {
-        const char* d = getenv("DS_DATA") ? getenv("DS_DATA") : "userdata"; mkdir(d, 0755);
+        const char* d = getenv("DS_DATA") ? getenv("DS_DATA") : "userdata";
+        if (mkdir(d, 0755) != 0 && errno != EEXIST)
+            fprintf(stderr, "[APP_STORAGE_ERROR] create root %s errno=%d\n", d, errno);
         char full[4096]; if (!realpath(d, full)) snprintf(full, sizeof full, "%s", d);
+#ifdef _WIN32
+        /* Android's first-launch files live in <appdata>/var. The donor APK
+         * contains no initial settings/level-save files, and the Windows
+         * launcher intentionally sets DS_DATA to the existing asset root for
+         * resource-path compatibility. Create only the directory; the game
+         * owns and generates its actual binary save file contents. */
+        char var_dir[4096];
+        int nv = snprintf(var_dir, sizeof var_dir, "%s/var", full);
+        if (nv < 0 || (size_t)nv >= sizeof var_dir)
+            fprintf(stderr, "[APP_STORAGE_ERROR] save directory path too long\n");
+        else if (mkdir(var_dir, 0755) != 0 && errno != EEXIST)
+            fprintf(stderr, "[APP_STORAGE_ERROR] mkdir %s errno=%d\n", var_dir, errno);
+        else
+            fprintf(stderr, "[APP_STORAGE_READY] var_dir=%s\n", var_dir);
+#endif
         if (getenv("DS_ASSET_TRACE")) fprintf(stderr, "[JAVA_APP_STORAGE] %s -> %s\n", nm, full);
         return new_obj(K_STRING, full, 0, 0);
     }
