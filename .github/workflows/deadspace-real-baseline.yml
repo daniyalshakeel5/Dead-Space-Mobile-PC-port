@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         source: [current]
-        mode: [debugger]
+        mode: [original-reader, native-reader]
     steps:
       - uses: actions/checkout@v4
       - name: Install native i686 dependencies
@@ -65,6 +65,22 @@ jobs:
           export DS_SO="$DS_ROOT/apk/lib/armeabi/libDeadSpace.so"
           python3 gen_all.py > "$DS_ROOT/logs/generation.log" 2>&1
           python3 m3g_loader_serialization.py --source out/fn_055.c --instrument
+          python3 - <<'PY'
+          from pathlib import Path
+          from native_buffered_input import patch
+          from lift import Image, FuncLifter
+          import os
+          img = Image(os.environ["DS_SO"])
+          fn = FuncLifter(img, 0x347d68)
+          fn.lift()
+          with open(os.environ["DS_ROOT"] + "/logs/buffered-source.log", "w") as log:
+              for addr, lines in sorted(fn.out.items()):
+                  log.write(f"{addr:08x} {img.w(addr):08x}: " + " ".join(lines) + "\n")
+          matches = [p for p in Path("out").glob("fn_*.c") if "u64 f_00347d68(" in p.read_text()]
+          assert len(matches) == 1
+          p = matches[0]
+          p.write_text(patch(p.read_text()))
+          PY
           cd out
           DS_BUILD_JOBS=3 SDL_CFLAGS="-I$SDL_PREFIX/usr/include/SDL2 -I$SDL_PREFIX/usr/include/i386-linux-gnu" SDL_LIBS="/usr/lib/i386-linux-gnu/libSDL2-2.0.so.0" bash build.sh > "$DS_ROOT/logs/build.log" 2>&1
           file dspc_sdl | tee "$DS_ROOT/logs/executable.txt"
@@ -76,10 +92,11 @@ jobs:
           set +e
           set -uo pipefail
           cd "$DS_ROOT/tools/out"
-          # Baseline uses the translated routines directly. No optional
-          # buffered-reader replacement or null-model recovery is enabled.
+          # A/B the original reader against the recovered buffered reader.
+          # Both use the genuine assets and original model decoder.
           export DS_ASSET_TRACE=1
           export DS_M3G_SERIALIZE=1
+          if [[ "$MODE" == native-reader ]]; then export DS_NATIVE_BUFFERED_IO=1; fi
           affinity=()
           if [[ "$SOURCE" == milestone6 ]]; then
             cpu=$(python3 -c 'import os; print(min(os.sched_getaffinity(0)))')
@@ -107,7 +124,7 @@ jobs:
         run: |
           root="$RUNNER_TEMP/baseline"
           mkdir -p "$root/evidence"
-          for name in runtime build generation; do
+          for name in runtime build generation buffered-source; do
             if [[ -f "$root/logs/$name.log" ]]; then tail -n 1000 "$root/logs/$name.log" > "$root/evidence/$name-tail.log"; fi
           done
           cp "$root/logs/identity.txt" "$root/logs/executable.txt" "$root/logs/exit-code.txt" "$root/evidence/" 2>/dev/null || true
