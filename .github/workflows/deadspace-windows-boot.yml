@@ -1,0 +1,92 @@
+name: Native Windows boot verification
+on:
+  push:
+    branches: [work/deadspace-portable-runtime-2026-11-05]
+    paths: [.github/workflows/deadspace-windows-boot.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  boot-windows:
+    name: Boot genuine game on Windows with software OpenGL
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-boot-runtime
+          run-id: 42046961978
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/dsboot
+      - name: Prepare genuine assets and x86 OpenGL
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = "$env:RUNNER_TEMP/dsboot"
+          New-Item -ItemType Directory -Force "$root/evidence", "$root/shots" | Out-Null
+          python -m pip install --quiet Pillow
+          gh release download apk-files-for-testing --repo $env:GITHUB_REPOSITORY --pattern 'Deas.Space.Mobile.Fixes.apk' --dir $root
+          if ($LASTEXITCODE) { throw 'APK download failed' }
+          7z x "$root/Deas.Space.Mobile.Fixes.apk" "-o$root/apk" -y | Out-Null
+          if ($LASTEXITCODE) { throw 'APK extraction failed' }
+          $identity = (Get-FileHash "$root/apk/lib/armeabi/libDeadSpace.so" -Algorithm SHA1).Hash.ToLower()
+          if ($identity -ne '64a3323cd3cc0c483a645b62af8508624163ba9b') { throw 'Wrong game library' }
+          $identity | Set-Content "$root/evidence/library-sha1.txt"
+          New-Item -ItemType Directory -Force "$root/apk/assets/var" | Out-Null
+          gh release download 26.2.6 --repo mmozeiko/build-mesa --pattern 'mesa-llvmpipe-x86-26.2.6.7z' --dir $root
+          if ($LASTEXITCODE) { throw 'Mesa download failed' }
+          7z x "$root/mesa-llvmpipe-x86-26.2.6.7z" "-o$root/mesa" -y | Out-Null
+          if ($LASTEXITCODE) { throw 'Mesa extraction failed' }
+          $gl = Get-ChildItem "$root/mesa" -Recurse -Filter opengl32.dll | Select-Object -First 1
+          if (!$gl) { Get-ChildItem "$root/mesa" -Recurse | Select-Object FullName; throw 'x86 Mesa DLL missing' }
+          Copy-Item "$($gl.DirectoryName)/*.dll" $root -Force
+          Get-ChildItem $root -Filter '*.dll' | Select-Object Name,Length | Out-File "$root/evidence/dlls.txt"
+          python -m pip install --quiet Pillow
+      - name: Launch native Windows game and record boot
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = ("$env:RUNNER_TEMP/dsboot" -replace '\\','/')
+          $env:DS_ASSETS = "$root/apk/assets"
+          $env:DS_DATA = $env:DS_ASSETS
+          $env:DS_WINDOW = '1'
+          $env:DS_NOVSYNC = '1'
+          $env:DS_QUIET_JAVA = '1'
+          $env:DS_ASSET_TRACE = '1'
+          $env:DS_STEPS = 'create,surface,frame'
+          $env:DS_FRAMES = '3600'
+          $env:DS_CLICKS = '600:640:675,1500:1145:668,2400:1145:668'
+          $env:DS_SHOT_EVERY = '30'
+          $env:DS_SHOT_DIR = "$root/shots"
+          $env:GALLIUM_DRIVER = 'llvmpipe'
+          $env:LIBGL_ALWAYS_SOFTWARE = '1'
+          $env:SDL_AUDIODRIVER = 'dummy'
+          $p = Start-Process "$root/DeadSpaceMobile-Win32.exe" -WorkingDirectory $root -ArgumentList "`"$root/apk/lib/armeabi/libDeadSpace.so`"" -PassThru -RedirectStandardOutput "$root/evidence/stdout.log" -RedirectStandardError "$root/evidence/stderr.log"
+          if (!$p.WaitForExit(600000)) {
+            Stop-Process -Id $p.Id -Force
+            'TIMEOUT after 600 seconds' | Set-Content "$root/evidence/exit-code.txt"
+            throw 'Windows game hung'
+          }
+          $p.Refresh()
+          $p.ExitCode | Set-Content "$root/evidence/exit-code.txt"
+          Get-Content "$root/evidence/stdout.log" -Tail 80
+          Get-Content "$root/evidence/stderr.log" -Tail 100
+          if ($p.ExitCode -ne 0) { throw "Windows game exited with $($p.ExitCode)" }
+          if (!(Select-String -Path "$root/evidence/stdout.log" -Pattern '^ran frames')) { throw 'Frame loop did not complete' }
+      - name: Convert captured game frames
+        if: always()
+        shell: pwsh
+        run: |
+          $root = "$env:RUNNER_TEMP/dsboot"
+          python -c "from pathlib import Path; from PIL import Image; import sys; r=Path(sys.argv[1]); [(Image.open(p).save(r/'evidence'/(p.stem+'.png'))) for p in (r/'shots').glob('*.ppm')]" $root
+          Get-Content "$root/evidence/stdout.log" -Tail 80 -ErrorAction SilentlyContinue
+          Get-Content "$root/evidence/stderr.log" -Tail 100 -ErrorAction SilentlyContinue
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-real-boot-evidence
+          path: ${{ runner.temp }}/dsboot/evidence
+          retention-days: 7
