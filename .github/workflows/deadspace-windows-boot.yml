@@ -16,7 +16,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: windows-boot-runtime
-          run-id: 42046961978
+          run-id: 42098800665
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/dsboot
       - name: Prepare genuine assets and x86 OpenGL
@@ -57,9 +57,9 @@ jobs:
           $env:DS_QUIET_JAVA = '1'
           $env:DS_ASSET_TRACE = '1'
           $env:DS_STEPS = 'create,surface,frame'
-          $env:DS_FRAMES = '3600'
+          $env:DS_FRAMES = '18000'
           $env:DS_CLICKS = '600:640:675,1500:1145:668,2400:1145:668'
-          $env:DS_SHOT_EVERY = '30'
+          $env:DS_SHOT_EVERY = '150'
           $env:DS_SHOT_DIR = "$root/shots"
           $env:GALLIUM_DRIVER = 'llvmpipe'
           $env:LIBGL_ALWAYS_SOFTWARE = '1'
