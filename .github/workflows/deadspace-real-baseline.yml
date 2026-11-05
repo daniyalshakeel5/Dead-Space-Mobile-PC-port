@@ -79,7 +79,7 @@ jobs:
               for address, (size, name) in sorted(img.funcs.items()):
                   if "InputStream" in name:
                       log.write(f"STREAM_SYMBOL {address:08x} size={size} {name}\n")
-              for address in (0x326948, 0x32ad98):
+              for address in (0x326948, 0x32ad98, 0x347c28, 0x383454):
                   decoded = FuncLifter(img, address)
                   decoded.lift()
                   for addr, lines in sorted(decoded.out.items()):
@@ -124,6 +124,7 @@ jobs:
             -ex 'p/x g_base' -ex 'x/20wx r4' -ex 'x/20wx *(unsigned int*)r4' \
             -ex 'x/20wx r6' \
             -ex 'frame 1' -ex 'info locals' -ex 'list' \
+            -ex 'x/20wx r4' -ex 'x/20wx *(unsigned int*)r4' \
             --args ./dspc_sdl "$DS_ROOT/apk/lib/armeabi/libDeadSpace.so" > "$DS_ROOT/logs/runtime.log" 2>&1
           code=$?
           echo "$code" > "$DS_ROOT/logs/exit-code.txt"
