@@ -39,25 +39,7 @@ IMP(vsscanf) {
     RET(ds_guest_scan((const char*)P(r0), (const char*)P(r1), (const u32*)P(r2)));
 }
 
-/* Android's dirent is 280 bytes; never expose MinGW's host struct layout. */
-IMP(readdir_r) {
-    T(readdir_r);
-    if (!r0 || !r1 || !r2) RET(EINVAL);
-    errno = 0;
-    struct dirent *e = readdir((DIR*)P(r0));
-    if (!e) {
-        *(u32*)P(r2) = 0;
-        RET(errno);
-    }
-    u8 *b = (u8*)P(r1);
-    memset(b, 0, 280);
-    *(u64*)(b + 0) = (u64)e->d_ino;
-    *(u16*)(b + 16) = 280;
-    b[18] = 0; /* MinGW d_type is not reliable. */
-    strncpy((char*)(b + 19), e->d_name, 255);
-    *(u32*)P(r2) = r1;
-    RET(0);
-}
+/* Directory iteration uses the shared Bionic adapter in libc_files.c. */
 
 /* The translated engine creates a *separate* guest stack per native worker
  * (threads.c:thread_entry). Windows cannot adopt an arbitrary Android stack

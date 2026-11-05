@@ -370,8 +370,25 @@ static const char* sname(void) { return stub_names[g_stub_idx]; }
  * starting a game. This tests file ownership only; actual game boot remains
  * a separate required CI gate using the user's original APK. */
 static int ds_test_asset_streams(void) {
-    char root[]="/tmp/dspc-jni-stream-XXXXXX", path[256];
+    char path[4096];
+#ifdef _WIN32
+    char base[MAX_PATH], root[MAX_PATH];
+    DWORD n = GetTempPathA(sizeof base, base);
+    if (!n || n >= sizeof base) return 2;
+    unsigned attempt;
+    for (attempt = 0; attempt < 128; ++attempt) {
+        int len = snprintf(root, sizeof root, "%sdspc-jni-%lu-%lu-%u",
+                           base, (unsigned long)GetCurrentProcessId(),
+                           (unsigned long)GetTickCount(), attempt);
+        if (len < 0 || (size_t)len >= sizeof root) return 2;
+        if (CreateDirectoryA(root, NULL)) break;
+        if (GetLastError() != ERROR_ALREADY_EXISTS) return 2;
+    }
+    if (attempt == 128) return 2;
+#else
+    char root[]="/tmp/dspc-jni-stream-XXXXXX";
     if (!mkdtemp(root)) { perror("mkdtemp"); return 2; }
+#endif
     snprintf(path, sizeof path, "%s/%s", root, "probe.dat");
     FILE* seed=fopen(path, "wb");
     if (!seed) { perror("fopen"); rmdir(root); return 2; }
