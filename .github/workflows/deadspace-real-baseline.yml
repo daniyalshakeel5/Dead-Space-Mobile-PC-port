@@ -14,14 +14,14 @@ jobs:
       fail-fast: false
       matrix:
         source: [current]
-        mode: [serialized, traced]
+        mode: [debugger]
     steps:
       - uses: actions/checkout@v4
       - name: Install native i686 dependencies
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update -qq
-          sudo apt-get -o Acquire::http::Timeout=20 -o Acquire::Retries=2 install -y --no-install-recommends gcc-multilib libc6-dev-i386 libsdl2-2.0-0:i386 libgl1-mesa-dri:i386 libgl1:i386 xvfb xauth libarchive-tools
+          sudo apt-get -o Acquire::http::Timeout=20 -o Acquire::Retries=2 install -y --no-install-recommends gcc-multilib libc6-dev-i386 libsdl2-2.0-0:i386 libgl1-mesa-dri:i386 libgl1:i386 xvfb xauth libarchive-tools gdb
           # Extract target headers without installing unrelated i386 GUI
           # development tools that conflict with the runner's host packages.
           mkdir -p "$RUNNER_TEMP/sdl-dev"
@@ -78,7 +78,8 @@ jobs:
           cd "$DS_ROOT/tools/out"
           # Baseline uses the translated routines directly. No optional
           # buffered-reader replacement or null-model recovery is enabled.
-          if [[ "$MODE" == serialized ]]; then export DS_M3G_SERIALIZE=1; else export DS_ASSET_TRACE=1; fi
+          export DS_ASSET_TRACE=1
+          export DS_M3G_SERIALIZE=1
           affinity=()
           if [[ "$SOURCE" == milestone6 ]]; then
             cpu=$(python3 -c 'import os; print(min(os.sched_getaffinity(0)))')
@@ -92,7 +93,11 @@ jobs:
             DS_CLICKS="600:640:675,1500:1145:668,2400:1145:668" \
             DS_SHOT_EVERY=120 DS_SHOT_DIR="$DS_ROOT/shots" \
             DS_SHOT="7190:$DS_ROOT/shots/final.ppm" \
-            ./dspc_sdl "$DS_ROOT/apk/lib/armeabi/libDeadSpace.so" > "$DS_ROOT/logs/runtime.log" 2>&1
+            gdb -q -batch -ex 'set pagination off' -ex 'set print elements 24' \
+            -ex run -ex 'thread apply all bt 6' -ex 'frame 0' -ex 'info locals' \
+            -ex 'list' -ex 'info registers' -ex 'p/x sp' -ex 'x/80wx sp' \
+            -ex 'frame 1' -ex 'info locals' -ex 'list' \
+            --args ./dspc_sdl "$DS_ROOT/apk/lib/armeabi/libDeadSpace.so" > "$DS_ROOT/logs/runtime.log" 2>&1
           code=$?
           echo "$code" > "$DS_ROOT/logs/exit-code.txt"
           tail -n 100 "$DS_ROOT/logs/runtime.log"
@@ -103,7 +108,7 @@ jobs:
           root="$RUNNER_TEMP/baseline"
           mkdir -p "$root/evidence"
           for name in runtime build generation; do
-            if [[ -f "$root/logs/$name.log" ]]; then tail -n 500 "$root/logs/$name.log" > "$root/evidence/$name-tail.log"; fi
+            if [[ -f "$root/logs/$name.log" ]]; then tail -n 1000 "$root/logs/$name.log" > "$root/evidence/$name-tail.log"; fi
           done
           cp "$root/logs/identity.txt" "$root/logs/executable.txt" "$root/logs/exit-code.txt" "$root/evidence/" 2>/dev/null || true
           if [[ -f "$root/logs/runtime.log" && -f "$root/tools/out/dspc_sdl" ]]; then
