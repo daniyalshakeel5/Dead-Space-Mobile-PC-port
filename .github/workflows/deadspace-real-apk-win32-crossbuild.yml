@@ -52,6 +52,7 @@ jobs:
           cd "$dir/tools"
           export DS_SO="$dir/apk/lib/armeabi/libDeadSpace.so"
           DS_TEXTUREPACK_DIAG=0 python3 gen_all.py
+          python3 -c "from stream_position_audit import instrument; instrument('out')"
           [[ -s out/fn_058.c && -s out/fn_055.c ]] ||
             { echo 'ACTUAL WINDOWS FAIL: genuine decoded game source missing'; exit 23; }
           echo "REAL_GAME_TRANSLATED_FUNCTION_CHUNKS=$(find out -maxdepth 1 -name 'fn_*.c' | wc -l)"
