@@ -1,6 +1,6 @@
 # Native runtime status — November 5, 2026
 
-The game is not yet independently verified as playable. Full native Windows compilation now passes; Linux model loading remains unstable. Keyboard/mouse gameplay, PS4 sticks, audio and hardware GPU behavior still require runtime validation.
+The game is not yet independently verified as playable. Full native Windows compilation passes, and an actual Windows runner renders the EA splash screen before crashing. Linux model loading also remains unstable. Keyboard/mouse gameplay, PS4 sticks, audio and hardware GPU behavior still require runtime validation.
 
 ## Windows compile verified
 
@@ -9,6 +9,14 @@ Commit `63c6552afdf97887a7b8ac55035f65e5d0026501` on `work/deadspace-portable-ru
 The previous run failed because the merged host defined `imp_readdir_r` twice and the JNI stream regression helper used POSIX `mkdtemp`. The fix removes the duplicate Windows directory shim in favor of the shared Bionic adapter and creates temporary directories with Win32 APIs on Windows. Linux retains `mkdtemp`.
 
 Default Windows builds retain the original model decoder, without empty-model recovery or automatic replacement of the buffered reader.
+
+## Actual Windows boot result
+
+Run https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42098354191 tested the unchanged executable from run 42046961978 on Windows Server 2022 with the original APK assets and x86 Mesa llvmpipe 26.2.6. It completed all 208 initializers, returned JNI version 0x10004, created a 1280x720 OpenGL window, and rendered the EA splash at frame 30 (visually inspected). It did not complete the requested 3,600 frames or reach difficulty selection.
+
+The process exited with -1073741819 / 0xc0000005, a null read. Runtime PC 0x014a9eda minus module base 0x00e50000 gives RVA 0x00659eda; adding the executable's preferred base 0x00400000 gives 0x00a59eda. GNU addr2line resolves that address to `f_00368efc`, `fn_060.c:47397` (the previously identified m3g::Object3D::duplicate routine). Logs show exploder.m3g reads and an implausible 1,294,810,446-byte skip clamped to EOF before the crash. This establishes the Windows failure site, not the original source of the invalid model state.
+
+Evidence artifact: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42098354191/artifacts/13449215243 . The first attempt never launched the game because its graphics setup selected an unsuitable Mesa package. The successful setup uses mmozeiko/build-mesa's dedicated mesa-llvmpipe-x86-26.2.6.7z package.
 
 ## Genuine-game Linux evidence
 
