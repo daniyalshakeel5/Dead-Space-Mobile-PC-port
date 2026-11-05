@@ -108,11 +108,11 @@ jobs:
           if ($identity -ne '64a3323cd3cc0c483a645b62af8508624163ba9b') { throw 'Wrong game library' }
           $identity | Set-Content "$root/evidence/library-sha1.txt"
           New-Item -ItemType Directory -Force "$root/apk/assets/var" | Out-Null
-          gh release download 26.2.6 --repo pal1000/mesa-dist-win --pattern 'mesa3d-26.2.6-release-msvc.7z' --dir $root
+          gh release download 26.2.6 --repo mmozeiko/build-mesa --pattern 'mesa-llvmpipe-x86-26.2.6.7z' --dir $root
           if ($LASTEXITCODE) { throw 'Mesa download failed' }
-          7z x "$root/mesa3d-26.2.6-release-msvc.7z" "-o$root/mesa" -y | Out-Null
+          7z x "$root/mesa-llvmpipe-x86-26.2.6.7z" "-o$root/mesa" -y | Out-Null
           if ($LASTEXITCODE) { throw 'Mesa extraction failed' }
-          $gl = Get-ChildItem "$root/mesa" -Recurse -Filter opengl32.dll | Where-Object { $_.FullName -match '[\\/]x86[\\/]' } | Select-Object -First 1
+          $gl = Get-ChildItem "$root/mesa" -Recurse -Filter opengl32.dll | Select-Object -First 1
           if (!$gl) { Get-ChildItem "$root/mesa" -Recurse | Select-Object FullName; throw 'x86 Mesa DLL missing' }
           Copy-Item "$($gl.DirectoryName)/*.dll" $root -Force
           Get-ChildItem $root -Filter '*.dll' | Select-Object Name,Length | Out-File "$root/evidence/dlls.txt"
