@@ -13,14 +13,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        source: [milestone6, current]
+        source: [current]
+        mode: [serialized, traced]
     steps:
       - uses: actions/checkout@v4
       - name: Install native i686 dependencies
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386 libsdl2-2.0-0:i386 libgl1-mesa-dri:i386 libgl1:i386 xvfb xauth libarchive-tools
+          sudo apt-get -o Acquire::http::Timeout=20 -o Acquire::Retries=2 install -y --no-install-recommends gcc-multilib libc6-dev-i386 libsdl2-2.0-0:i386 libgl1-mesa-dri:i386 libgl1:i386 xvfb xauth libarchive-tools
           # Extract target headers without installing unrelated i386 GUI
           # development tools that conflict with the runner's host packages.
           mkdir -p "$RUNNER_TEMP/sdl-dev"
@@ -63,18 +64,21 @@ jobs:
           export DS_TEXTUREPACK_DIAG=0
           export DS_SO="$DS_ROOT/apk/lib/armeabi/libDeadSpace.so"
           python3 gen_all.py > "$DS_ROOT/logs/generation.log" 2>&1
+          python3 m3g_loader_serialization.py --source out/fn_055.c --instrument
           cd out
           DS_BUILD_JOBS=3 SDL_CFLAGS="-I$SDL_PREFIX/usr/include/SDL2 -I$SDL_PREFIX/usr/include/i386-linux-gnu" SDL_LIBS="/usr/lib/i386-linux-gnu/libSDL2-2.0.so.0" bash build.sh > "$DS_ROOT/logs/build.log" 2>&1
           file dspc_sdl | tee "$DS_ROOT/logs/executable.txt"
       - name: Run real first boot through difficulty and intro
         env:
           SOURCE: ${{ matrix.source }}
+          MODE: ${{ matrix.mode }}
         run: |
           set +e
           set -uo pipefail
           cd "$DS_ROOT/tools/out"
           # Baseline uses the translated routines directly. No optional
           # buffered-reader replacement or null-model recovery is enabled.
+          if [[ "$MODE" == serialized ]]; then export DS_M3G_SERIALIZE=1; else export DS_ASSET_TRACE=1; fi
           affinity=()
           if [[ "$SOURCE" == milestone6 ]]; then
             cpu=$(python3 -c 'import os; print(min(os.sched_getaffinity(0)))')
@@ -120,6 +124,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: real-apk-baseline-${{ matrix.source }}
+          name: real-apk-baseline-${{ matrix.source }}-${{ matrix.mode }}
           path: ${{ runner.temp }}/baseline/evidence
           retention-days: 7
