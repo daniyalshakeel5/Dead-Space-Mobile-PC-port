@@ -18,11 +18,12 @@ jobs:
       - name: Checkout Windows native host and portable original-code translator
         uses: actions/checkout@v4
       - name: Install real MinGW-w64 x86 compiler and ELF translator dependencies
+        timeout-minutes: 12
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y \
             python3 python3-pyelftools gcc-mingw-w64-i686-posix \
             binutils-mingw-w64-i686 unzip curl tar file
       - name: Retrieve the actual released APK, not a synthetic fixture

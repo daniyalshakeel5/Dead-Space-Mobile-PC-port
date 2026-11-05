@@ -1,6 +1,6 @@
 # Native runtime status — November 5, 2026
 
-The game is not yet independently verified as playable. Full native Windows compilation passes, and an actual Windows runner renders the EA splash screen before crashing. Linux model loading also remains unstable. Keyboard/mouse gameplay, PS4 sticks, audio and hardware GPU behavior still require runtime validation.
+The game is not yet independently verified as playable. Full native Windows compilation passes. One Windows run completed 3,600 frames through difficulty selection and the developer intro; a repeat of that same executable crashed during model loading. Linux model loading also remains unstable. Keyboard/mouse gameplay, PS4 sticks, audio and hardware GPU behavior still require runtime validation.
 
 ## Windows compile verified
 
@@ -17,6 +17,14 @@ Run https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42
 The process exited with -1073741819 / 0xc0000005, a null read. Runtime PC 0x014a9eda minus module base 0x00e50000 gives RVA 0x00659eda; adding the executable's preferred base 0x00400000 gives 0x00a59eda. GNU addr2line resolves that address to `f_00368efc`, `fn_060.c:47397` (the previously identified m3g::Object3D::duplicate routine). Logs show exploder.m3g reads and an implausible 1,294,810,446-byte skip clamped to EOF before the crash. This establishes the Windows failure site, not the original source of the invalid model state.
 
 Evidence artifact: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42098354191/artifacts/13449215243 . The first attempt never launched the game because its graphics setup selected an unsuitable Mesa package. The successful setup uses mmozeiko/build-mesa's dedicated mesa-llvmpipe-x86-26.2.6.7z package.
+
+## Repeatability check
+
+Run https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42098800665 at `a28f634` completed 3,600 frames with exit code 0. Its 120 captured frames were sampled visually: EA splash, difficulty selection, and IronMonkey Studios intro text; no corridor gameplay was verified. The log still contains a 288,957,320-byte skip while reading lurker.m3g, so successful process completion does not establish correct model decoding.
+
+Run https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42100410002 reused that exact executable and requested 18,000 frames. It crashed during slasher.m3g loading with 0xc0000005 before the extended test. Stability remains unresolved.
+
+Commit `10aa42e` adds read-only instrumentation around the original loadObject and BufferedInputStream::setPosition functions, recording cursor, cache origin/count and upcoming bytes. It does not replace the parser or skip invalid objects.
 
 ## Genuine-game Linux evidence
 
