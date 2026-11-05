@@ -80,11 +80,48 @@ IMP(opendir)  { T(opendir); const char* path = P(r0); DIR* d = opendir(path); in
     if (!d) g_errno = saved;
     ds_asset_io_note("opendir", path, d != NULL, saved); errno = saved; RET(U(d)); }
 IMP(closedir) { T(closedir); int rc = closedir(P(r0)); if (rc < 0) g_errno = errno; RET(rc); }
-static u8 g_dirent[280];
-IMP(readdir) {                                               // bionic struct dirent: ino(8) off(8) reclen(2) type(1) name[256]
-    T(readdir); struct dirent* e = readdir(P(r0)); if (!e) RET(0);
-    memset(g_dirent, 0, sizeof g_dirent); *(u64*)(g_dirent + 0) = e->d_ino; *(u16*)(g_dirent + 16) = 280; g_dirent[18] = e->d_type;
-    strncpy((char*)g_dirent + 19, e->d_name, 255); RET(U(g_dirent));
+/* Android ARM dirent has 64-bit inode/offset and a 256-byte name.
+ * Never pass a host dirent to the guest: the i686 glibc layout differs.
+ * readdir64 also avoids EOVERFLOW for large host filesystem inode numbers. */
+static __thread u8 g_dirent[280];
+static pthread_mutex_t ds_directory_lock = PTHREAD_MUTEX_INITIALIZER;
+static int ds_read_directory(u32 directory, u8* entry, u32* result) {
+    int saved = errno;
+    *result = 0;
+    if (!directory || !entry) return EINVAL;
+    pthread_mutex_lock(&ds_directory_lock);
+    errno = 0;
+    struct dirent64* e = readdir64(P(directory));
+    int error = e ? 0 : errno;
+    if (e) {
+        memset(entry, 0, 280);
+        u64 inode = (u64)e->d_ino, offset = (u64)e->d_off;
+        u16 size = 280;
+        memcpy(entry, &inode, 8);
+        memcpy(entry + 8, &offset, 8);
+        memcpy(entry + 16, &size, 2);
+        entry[18] = e->d_type;
+        strncpy((char*)entry + 19, e->d_name, 255);
+        *result = U(entry);
+    }
+    pthread_mutex_unlock(&ds_directory_lock);
+    errno = saved;
+    return error;
+}
+IMP(readdir) {
+    T(readdir);
+    u32 result;
+    int error = ds_read_directory(r0, g_dirent, &result);
+    if (error) g_errno = error;
+    RET(result);
+}
+IMP(readdir_r) {
+    T(readdir_r);
+    if (!r2) RET(EINVAL);
+    u32 result;
+    int error = ds_read_directory(r0, P(r1), &result);
+    ST32(r2, result);
+    RET(error);  // zero at EOF with a null result; error number otherwise
 }
 IMP(localtime) { T(localtime); time_t t = (time_t)*(s32*)P(r0); RET(U(localtime(&t))); }
 IMP(gmtime)    { T(gmtime);    time_t t = (time_t)*(s32*)P(r0); RET(U(gmtime(&t))); }

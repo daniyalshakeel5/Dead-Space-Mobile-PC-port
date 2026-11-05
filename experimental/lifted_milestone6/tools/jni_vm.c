@@ -158,6 +158,12 @@ static int stream_byte_array_ok(JObj* b, s32 offset, s32 count) {
 static u64 stream_skip(JObj* stream, u64 requested_raw) {
     if (!stream || !stream->p) { g_exception = 1; return 0; }
     s64 requested = (s64)requested_raw;
+    if (getenv("DS_ASSET_TRACE")) {
+        static __thread unsigned ds_skip_logs;
+        if (ds_skip_logs++ < 128)
+            fprintf(stderr, "[JAVA_STREAM_SKIP_REQUEST] path=%s requested=%lld\n",
+                    stream->s ? stream->s : "", (long long)requested);
+    }
     if (requested <= 0) return 0;
     FILE* fp = (FILE*)stream->p;
     flockfile(fp);
@@ -342,6 +348,8 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
         return new_obj(K_STRING, full, 0, 0);
     }
     *handled = 0;
+    if (getenv("DS_ASSET_TRACE"))
+        fprintf(stderr, "[JAVA_UNIMPLEMENTED] %s.%s %s\n", c, nm, m->sig);
     if (g_log_java) printf("   [java] UNIMPLEMENTED %s.%s %s\n", c, nm, m->sig);
     return 0;
 }

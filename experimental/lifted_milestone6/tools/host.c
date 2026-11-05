@@ -109,8 +109,37 @@ IMP(strdup)  { T(strdup);  RET(U(strdup(P(r0)))); }
 
 // ---- C++ runtime
 IMP(__aeabi_atexit) { T(__aeabi_atexit); RET(0); }
-IMP(__cxa_guard_acquire) { T(__cxa_guard_acquire); RET((*(u8*)P(r0) & 1) ? 0 : 1); }
-IMP(__cxa_guard_release) { T(__cxa_guard_release); *(u8*)P(r0) = 1; RET(0); }
+/* ARM C++ guard: bit 0 marks a completed initializer. Bit 8 is private
+ * pending state. Waiters must not initialize the same static twice. */
+static pthread_mutex_t ds_guard_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t ds_guard_changed = PTHREAD_COND_INITIALIZER;
+IMP(__cxa_guard_acquire) {
+    T(__cxa_guard_acquire);
+    u32* guard = P(r0);
+    pthread_mutex_lock(&ds_guard_lock);
+    while (__atomic_load_n(guard, __ATOMIC_ACQUIRE) & 0x100u)
+        pthread_cond_wait(&ds_guard_changed, &ds_guard_lock);
+    if (__atomic_load_n(guard, __ATOMIC_ACQUIRE) & 1u) {
+        pthread_mutex_unlock(&ds_guard_lock); RET(0);
+    }
+    __atomic_store_n(guard, 0x100u, __ATOMIC_RELEASE);
+    pthread_mutex_unlock(&ds_guard_lock);
+    RET(1);
+}
+IMP(__cxa_guard_release) {
+    T(__cxa_guard_release);
+    pthread_mutex_lock(&ds_guard_lock);
+    __atomic_store_n((u32*)P(r0), 1u, __ATOMIC_RELEASE);
+    pthread_cond_broadcast(&ds_guard_changed);
+    pthread_mutex_unlock(&ds_guard_lock); RET(0);
+}
+IMP(__cxa_guard_abort) {
+    T(__cxa_guard_abort);
+    pthread_mutex_lock(&ds_guard_lock);
+    __atomic_store_n((u32*)P(r0), 0u, __ATOMIC_RELEASE);
+    pthread_cond_broadcast(&ds_guard_changed);
+    pthread_mutex_unlock(&ds_guard_lock); RET(0);
+}
 IMP(__stack_chk_fail) { T(__stack_chk_fail); fprintf(stderr, "!! stack check failed\n"); exit(3); }
 IMP(abort)   { T(abort); fprintf(stderr, "!! guest called abort()\n"); exit(3); }
 
@@ -137,10 +166,18 @@ IMP(pthread_once) {
 #endif
 
 // ---- bionic atomics
-IMP(__atomic_inc)  { T(__atomic_inc);  u32 v = *(u32*)P(r0); *(u32*)P(r0) = v + 1; RET(v); }
-IMP(__atomic_dec)  { T(__atomic_dec);  u32 v = *(u32*)P(r0); *(u32*)P(r0) = v - 1; RET(v); }
-IMP(__atomic_swap) { T(__atomic_swap); u32 v = *(u32*)P(r1); *(u32*)P(r1) = r0; RET(v); }
-IMP(__atomic_cmpxchg) { T(__atomic_cmpxchg); u32 v = *(u32*)P(r2); if (v == r0) { *(u32*)P(r2) = r1; RET(0); } RET(1); }
+// Guest resource workers share reference counts and synchronization words.
+// Ordinary load/store pairs lose updates and provide no inter-thread ordering.
+IMP(__atomic_inc)  { T(__atomic_inc); RET(__atomic_fetch_add((u32*)P(r0), 1u, __ATOMIC_SEQ_CST)); }
+IMP(__atomic_dec)  { T(__atomic_dec); RET(__atomic_fetch_sub((u32*)P(r0), 1u, __ATOMIC_SEQ_CST)); }
+IMP(__atomic_swap) { T(__atomic_swap); RET(__atomic_exchange_n((u32*)P(r1), r0, __ATOMIC_SEQ_CST)); }
+IMP(__atomic_cmpxchg) {
+    T(__atomic_cmpxchg);
+    u32 expected = r0;
+    int changed = __atomic_compare_exchange_n((u32*)P(r2), &expected, r1,
+                                              0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+    RET(changed ? 0 : 1);
+}
 
 // ---- address space (anonymous mappings and a private brk area, like the reference)
 static u32 g_brk, g_brk_end;
