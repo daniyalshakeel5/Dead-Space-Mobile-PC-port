@@ -19,7 +19,7 @@ The baseline workflow verifies original library SHA-1 `64a3323cd3cc0c483a645b62a
 - Debugger run 41998017860 stopped in `f_00325b04` (EASTL byte-vector insertion), called by `f_00326948` (Loader::loadObject3D), with a requested length of 303,117,103 bytes and a null allocation destination. The cause of that length is not yet established.
 - A/B run 42043485140 at `7e65ae9` compared original and recovered buffered readers, both with the original model decoder and identical loader serialization. Both crashed at the object-reference table access in `f_00326948`. The original-reader run failed while loading slasher.m3g; the recovered-reader run reached lurker/lurker_projectile before failing while loading exploder.m3g. This does not justify enabling the replacement reader as a fix.
 
-The next capture (commit `4b551e7`, run 42044380174) records the actual stream object's vtable, loader memory, and instruction-to-C context. Its purpose is to identify the stream layer producing the bad reference. No reference clamping, fabricated models, or skipped decoder failures are introduced.
+Further captures 42044380174 and 42045533809 still failed. The latter identifies the caller stream as DataInputStream (vtable read target `g_base + 0x324884`) wrapping another stream at offset +4. Before the slasher crash, Java received skip requests of -123,602,854 and +1,294,810,446 bytes. Those values are already implausible; simply permitting backward skips is not an established fix. The current capture does not dump the nested buffered stream's cursor/cache, which remains a useful next target. No reference clamping, fabricated models, or skipped decoder failures were introduced.
 
 ## Next work
 
