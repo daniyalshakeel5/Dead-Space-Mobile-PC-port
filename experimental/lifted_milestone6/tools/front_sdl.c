@@ -36,9 +36,12 @@ static void pad_release(void);
 static void pad_read(float* lx,float* ly,float* rx,float* ry);
 static int pc_move_finger(void) {
     const char* p=getenv("DS_PC_MOVE_FINGER");
-    return p && !strcmp(p,"0") ? 0 : 1;
+    /* The game uses the primary pointer for the left virtual joystick. A
+     * secondary finger is still available for regression comparisons. */
+    return p && !strcmp(p,"1") ? 1 : 0;
 }
 static float pc_move_x,pc_move_y,pc_look_x,pc_look_y;
+static unsigned pc_input_trace_frames;
 static void pc_release(void) {
     if(pc_move_active) host_pointer_id(2,pc_move_finger(),pc_move_x,pc_move_y);
     if(pc_look_active) host_pointer_id(2,2,pc_look_x,pc_look_y);
@@ -60,6 +63,11 @@ static void pc_update(float dx,float dy) {
     if(len>1) { x/=len; y/=len; }
     pad_read(&lx,&ly,&rx,&ry);
     if(lx!=0 || ly!=0) { x=lx; y=ly; }
+    if (getenv("DS_INPUT_DIAG") && (lx!=0 || ly!=0 || rx!=0 || ry!=0)) {
+        if (++pc_input_trace_frames % 120 == 1)
+            fprintf(stderr,"[CONTROLLER_AXES] left=%.3f,%.3f right=%.3f,%.3f touch=%d finger=%d\n",
+                    lx,ly,rx,ry,pc_move_active,pc_move_finger());
+    } else pc_input_trace_frames=0;
     /* Stick camera does not need desktop mouse capture. */
     dx+=rx*4.0f; dy+=ry*4.0f;
     if(x!=0 || y!=0) {
@@ -70,16 +78,15 @@ static void pc_update(float dx,float dy) {
             pc_move_x=bx; pc_move_y=by;
             host_pointer_id(0,pc_move_finger(),bx,by); pc_move_active=1;
         } else {
-            /* Advance through a swipe instead of teleporting to its end.
-             * Match the real mouse drag used by the gameplay regression. */
-            float speed=getenv("DS_PC_MOVE_FAST") ? 1.0f : .25f;
-            if(pc_shift) speed*=2.0f;
-            pc_move_x+=x*speed*g_w/1280.0f;
-            pc_move_y+=y*speed*g_h/720.0f;
-            if(fabsf(pc_move_x-bx)>g_w*.20f || fabsf(pc_move_y-by)>g_h*.35f) {
-                host_pointer_id(2,pc_move_finger(),pc_move_x,pc_move_y);
-                pc_move_active=0;
-            } else host_pointer_id(1,pc_move_finger(),pc_move_x,pc_move_y);
+            /* A virtual joystick measures displacement from its touch-down
+             * anchor. The previous implementation moved 0.25 pixel/frame:
+             * on real DualShock hardware this stays near the neutral zone.
+             * Send a stable proportional offset while held. The first frame
+             * is intentionally down-only so the engine sees the anchor. */
+            float radius_x=g_w*.14f, radius_y=g_h*.18f;
+            pc_move_x=bx+x*radius_x;
+            pc_move_y=by+y*radius_y;
+            host_pointer_id(1,pc_move_finger(),pc_move_x,pc_move_y);
         }
     } else if(pc_move_active) {
         host_pointer_id(2,pc_move_finger(),pc_move_x,pc_move_y); pc_move_active=0;
