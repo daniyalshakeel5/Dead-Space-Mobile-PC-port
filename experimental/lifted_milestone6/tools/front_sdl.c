@@ -1,6 +1,7 @@
 // front_sdl.c - window, OpenGL context and event pump (SDL2). Included by host.c when built with -DDS_SDL.
 #include <SDL.h>
 static void host_pointer(int kind, float x, float y);   // kind: 0 down, 1 move, 2 up (defined in host.c)
+static void host_pointer_id(int kind, int finger, float x, float y);
 static void host_key(int down, int keycode, int alt);     // Android key codes (defined in host.c)
 static SDL_Window* g_win; static SDL_GLContext g_ctx; static int g_w, g_h; static float g_sx = 1, g_sy = 1;
 
@@ -20,12 +21,55 @@ static int sdl_open(int w, int h) {
     printf("window %dx%d, GL_RENDERER=%s\n", g_w, g_h, dgl_glGetString ? (const char*)dgl_glGetString(0x1F01) : "?");
     return 1;
 }
+/* PC movement uses the game's verified left-screen drag path. Separate
+ * finger IDs allow movement, mouse look and ordinary menu touches together. */
+static int pc_w,pc_a,pc_s,pc_d,pc_shift,pc_capture,pc_move_active,pc_look_active;
+static int pc_fire,pc_aim;
+static float pc_move_x,pc_move_y,pc_look_x,pc_look_y;
+static void pc_release(void) {
+    if(pc_move_active) host_pointer_id(2,1,pc_move_x,pc_move_y);
+    if(pc_look_active) host_pointer_id(2,2,pc_look_x,pc_look_y);
+    if(pc_fire) host_key(0,103,0);
+    if(pc_aim) host_key(0,102,0);
+    pc_w=pc_a=pc_s=pc_d=pc_shift=pc_move_active=pc_look_active=pc_fire=pc_aim=0;
+}
+static void pc_set_capture(int enabled) {
+    pc_release();
+    if(SDL_SetRelativeMouseMode(enabled ? SDL_TRUE : SDL_FALSE)!=0) {
+        fprintf(stderr,"[PC_INPUT] mouse capture failed: %s\n",SDL_GetError()); return;
+    }
+    pc_capture=enabled;
+    fprintf(stderr,"[PC_INPUT] mouse look %s (F1 toggles)\n",enabled ? "on" : "off");
+}
+static void pc_update(float dx,float dy) {
+    float x=(float)(pc_d-pc_a),y=(float)(pc_s-pc_w);
+    float len=sqrtf(x*x+y*y);
+    if(len>0) {
+        x/=len; y/=len;
+        float bx=g_w*.25f,by=g_h*.70f;
+        if(!pc_move_active) host_pointer_id(0,1,bx,by);
+        pc_move_x=bx+x*g_w*.16f;
+        pc_move_y=by+y*g_h*(pc_shift ? .35f : .20f);
+        host_pointer_id(1,1,pc_move_x,pc_move_y); pc_move_active=1;
+    } else if(pc_move_active) {
+        host_pointer_id(2,1,pc_move_x,pc_move_y); pc_move_active=0;
+    }
+    if(pc_look_active) { host_pointer_id(2,2,pc_look_x,pc_look_y); pc_look_active=0; }
+    if(pc_capture && (dx!=0 || dy!=0)) {
+        float bx=g_w*.75f,by=g_h*.50f;
+        dx=fmaxf(-g_w*.20f,fminf(g_w*.20f,dx*g_sx));
+        dy=fmaxf(-g_h*.40f,fminf(g_h*.40f,dy*g_sy));
+        host_pointer_id(0,2,bx,by);
+        pc_look_x=bx+dx; pc_look_y=by+dy;
+        host_pointer_id(1,2,pc_look_x,pc_look_y); pc_look_active=1;
+    }
+}
 // Default PC bindings, modelled on the Xperia Play layout. Each entry: SDL scancode -> Android key code (+alt flag).
 static int map_scancode(int sc, int* alt) {
     *alt = 0;
     switch (sc) {
-        case SDL_SCANCODE_UP: case SDL_SCANCODE_W: return 19;    case SDL_SCANCODE_DOWN: case SDL_SCANCODE_S: return 20;
-        case SDL_SCANCODE_LEFT: case SDL_SCANCODE_A: return 21;  case SDL_SCANCODE_RIGHT: case SDL_SCANCODE_D: return 22;
+        case SDL_SCANCODE_UP: return 19;    case SDL_SCANCODE_DOWN: return 20;
+        case SDL_SCANCODE_LEFT: return 21;  case SDL_SCANCODE_RIGHT: return 22;
         case SDL_SCANCODE_ESCAPE: case SDL_SCANCODE_BACKSPACE: *alt = 1; return 4; // Android Back; window close/Alt+F4 exits
         case SDL_SCANCODE_RETURN: case SDL_SCANCODE_E: return 23;            // Cross: interact / confirm
         case SDL_SCANCODE_Q: *alt = 1; return 4;                              // Circle: kinesis / back
@@ -69,6 +113,17 @@ static void sdl_script_input(int frame) {
         }
         p+=n; if(*p==',') ++p; else break;
     }
+    p=getenv("DS_MOUSE_LOOK");
+    while(p && *p) {
+        int start,end,dx,dy,n=0;
+        if(sscanf(p,"%d:%d:%d:%d%n",&start,&end,&dx,&dy,&n)!=4 || !n) break;
+        if(frame>=start && frame<end) {
+            SDL_Event e; memset(&e,0,sizeof e); e.type=SDL_MOUSEMOTION;
+            e.motion.xrel=dx; e.motion.yrel=dy; SDL_PushEvent(&e);
+            if(frame==start) fprintf(stderr,"[INPUT_SCRIPT] mouse look frame=%d dx=%d dy=%d\n",frame,dx,dy);
+        }
+        p+=n; if(*p==',') ++p; else break;
+    }
     p=getenv("DS_MOUSE_DRAGS");
     while(p && *p) {
         int start,end,x0,y0,x1,y1,n=0;
@@ -95,11 +150,31 @@ static void sdl_script_input(int frame) {
 // returns 0 when the user closed the window; *resized is set when the drawable size changed
 static int sdl_pump(int* resized) {
     static int frame; sdl_script_input(++frame);
-    SDL_Event e; *resized = 0;
+    SDL_Event e; float look_dx=0,look_dy=0; *resized = 0;
     while (SDL_PollEvent(&e)) {
-        if (e.type == SDL_QUIT) return 0;
+        if (e.type == SDL_QUIT) { pc_release(); return 0; }
         // Escape is Android Back/Pause (handled by map_scancode), not a forced shutdown.
-        if ((e.type == SDL_KEYDOWN && !e.key.repeat) || e.type == SDL_KEYUP) { int alt, k = map_scancode(e.key.keysym.scancode, &alt); if (k) host_key(e.type == SDL_KEYDOWN, k, alt); }
+        if ((e.type == SDL_KEYDOWN && !e.key.repeat) || e.type == SDL_KEYUP) {
+            int down=e.type==SDL_KEYDOWN; SDL_Scancode sc=e.key.keysym.scancode;
+            if(sc==SDL_SCANCODE_F1) { if(down) pc_set_capture(!pc_capture); continue; }
+            if(sc==SDL_SCANCODE_W) { pc_w=down; continue; }
+            if(sc==SDL_SCANCODE_A) { pc_a=down; continue; }
+            if(sc==SDL_SCANCODE_S) { pc_s=down; continue; }
+            if(sc==SDL_SCANCODE_D) { pc_d=down; continue; }
+            if(sc==SDL_SCANCODE_LSHIFT) { pc_shift=down; continue; }
+            if(sc==SDL_SCANCODE_ESCAPE && down && pc_capture) pc_set_capture(0);
+            int alt,k=map_scancode(sc,&alt); if(k) host_key(down,k,alt);
+        }
+        if(e.type==SDL_WINDOWEVENT && e.window.event==SDL_WINDOWEVENT_FOCUS_LOST) {
+            pc_set_capture(0); host_pointer(2,0,0);
+        }
+        if(pc_capture && (e.type==SDL_MOUSEBUTTONDOWN || e.type==SDL_MOUSEBUTTONUP)) {
+            int down=e.type==SDL_MOUSEBUTTONDOWN;
+            if(e.button.button==SDL_BUTTON_LEFT) { pc_fire=down; host_key(down,103,0); }
+            if(e.button.button==SDL_BUTTON_RIGHT) { pc_aim=down; host_key(down,102,0); }
+            continue;
+        }
+        if(pc_capture && e.type==SDL_MOUSEMOTION) { look_dx+=e.motion.xrel; look_dy+=e.motion.yrel; continue; }
         if (e.type == SDL_CONTROLLERBUTTONDOWN || e.type == SDL_CONTROLLERBUTTONUP) { int alt, k = map_button(e.cbutton.button, &alt); if (k) host_key(e.type == SDL_CONTROLLERBUTTONDOWN, k, alt); }
         if (e.type == SDL_CONTROLLERDEVICEADDED) SDL_GameControllerOpen(e.cdevice.which);
         if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) host_pointer(0, (float)e.button.x * g_sx, (float)e.button.y * g_sy);
@@ -110,6 +185,7 @@ static int sdl_pump(int* resized) {
             if (w != g_w || h != g_h) { g_w = w; g_h = h; *resized = 1; int ww, wh; SDL_GetWindowSize(g_win, &ww, &wh); g_sx = (float)w / ww; g_sy = (float)h / wh; }
         }
     }
+    pc_update(look_dx,look_dy);
     return 1;
 }
 static void sdl_present(void) { SDL_GL_SwapWindow(g_win); }

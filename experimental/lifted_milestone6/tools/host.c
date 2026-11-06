@@ -429,7 +429,7 @@ static void segv_handler(int sig, siginfo_t* si, void* uc_) {
 #endif
 static u32 g_sp0_for_input, g_id_down, g_id_move, g_id_up, g_id_touchscreen; static int g_ids_ready;
 static u32 call_static_int(const char* name, u32 sp) { u32 a = find_export(name); return a ? (u32)call_ind(a, U(g_env_obj), 0, 0, 0, sp) : 0; }
-static void host_pointer(int kind, float x, float y) {
+static void host_pointer_id(int kind, int finger, float x, float y) {
     if (!g_ids_ready) {
         g_id_down = call_static_int("Java_com_ea_blast_TouchSurfaceAndroid_NativeGetIdRawPointerDown", g_sp0_for_input);
         g_id_move = call_static_int("Java_com_ea_blast_TouchSurfaceAndroid_NativeGetIdRawPointerMove", g_sp0_for_input);
@@ -439,9 +439,10 @@ static void host_pointer(int kind, float x, float y) {
     }
     u32 addr = find_export("Java_com_ea_blast_TouchSurfaceAndroid_NativeOnPointerEvent"); if (!addr) return;
     JArg a[5]; memset(a, 0, sizeof a);
-    a[0].i = kind == 0 ? g_id_down : kind == 1 ? g_id_move : g_id_up; a[1].i = g_id_touchscreen; a[2].i = 0; a[3].f = x; a[4].f = y;
+    a[0].i = kind == 0 ? g_id_down : kind == 1 ? g_id_move : g_id_up; a[1].i = g_id_touchscreen; a[2].i = (u32)finger; a[3].f = x; a[4].f = y;
     call_java_native(addr, class_handle("com/ea/blast/TouchSurfaceAndroid"), "IIIFF", 5, a, g_sp0_for_input);
 }
+static void host_pointer(int kind, float x, float y) { host_pointer_id(kind, 0, x, y); }
 static volatile u32 g_frame_counter;
 #ifndef _WIN32
 static void usr2_handler(int s) {
