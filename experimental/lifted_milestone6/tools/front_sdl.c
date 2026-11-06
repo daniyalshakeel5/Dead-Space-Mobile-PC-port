@@ -42,6 +42,26 @@ static int pc_move_finger(void) {
 }
 static float pc_move_x,pc_move_y,pc_look_x,pc_look_y;
 static unsigned pc_input_trace_frames;
+/* Context-sensitive bindings use the genuine game's JNI keyboard/touch.
+ * State is independent so triggers never accidentally release each other. */
+static int pad_aim, pad_fire, pad_melee, pad_cross;
+static int pad_stomp_held, pad_stomp_phase;
+static float pad_cross_x, pad_cross_y, pad_stomp_x, pad_stomp_y;
+static void pad_input_log(const char* action, int down) {
+    if(getenv("DS_INPUT_DIAG")) fprintf(stderr,"[PAD_ACTION] %s=%d\n",action,down);
+}
+static void pad_special_release(void) {
+    if(pad_aim) host_key(0,102,0);
+    if(pad_fire) host_key(0,103,0);
+    if(pad_melee) host_key(0,19,0);
+    if(pad_cross) {
+        host_key(0,23,0);
+        host_pointer_id(2,3,pad_cross_x,pad_cross_y);
+    }
+    if(pad_stomp_phase) host_pointer_id(2,4,pad_stomp_x,pad_stomp_y);
+    pad_aim=pad_fire=pad_melee=pad_cross=0;
+    pad_stomp_held=pad_stomp_phase=0;
+}
 static void pc_release(void) {
     if(pc_move_active) host_pointer_id(2,pc_move_finger(),pc_move_x,pc_move_y);
     if(pc_look_active) host_pointer_id(2,2,pc_look_x,pc_look_y);
@@ -120,10 +140,14 @@ static int map_scancode(int sc, int* alt) {
 static int map_button(int b, int* alt) {
     *alt = 0;
     switch (b) {
-        case SDL_CONTROLLER_BUTTON_A: return 23;  case SDL_CONTROLLER_BUTTON_B: *alt = 1; return 4;
-        case SDL_CONTROLLER_BUTTON_X: return 99;  case SDL_CONTROLLER_BUTTON_Y: return 100;
-        case SDL_CONTROLLER_BUTTON_LEFTSHOULDER: return 102; case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER: return 103;
-        case SDL_CONTROLLER_BUTTON_START: return 108; case SDL_CONTROLLER_BUTTON_BACK: return 109;
+        /* Cross, R1, L2 and R2 are contextual in pad_read. Android BACK
+         * pauses in this APK, so Circle must not emit Android BACK. */
+        case SDL_CONTROLLER_BUTTON_A: case SDL_CONTROLLER_BUTTON_B: return 0;
+        case SDL_CONTROLLER_BUTTON_X: return 99; case SDL_CONTROLLER_BUTTON_Y: return 100;
+        case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
+        case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER: return 0;
+        case SDL_CONTROLLER_BUTTON_START: *alt=1; return 4;  /* Options -> pause */
+        case SDL_CONTROLLER_BUTTON_BACK: return 109;
         case SDL_CONTROLLER_BUTTON_DPAD_UP: return 19; case SDL_CONTROLLER_BUTTON_DPAD_DOWN: return 20;
         case SDL_CONTROLLER_BUTTON_DPAD_LEFT: return 21; case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: return 22;
     }
@@ -139,7 +163,7 @@ static void pad_open(int index) {
     fprintf(stderr,"[CONTROLLER] connected: %s id=%d\n",SDL_GameControllerName(pad),(int)pad_id);
 }
 static void pad_init(void) {
-    if(getenv("DS_CONTROLLER_AXES")) {
+    if(getenv("DS_CONTROLLER_AXES") || getenv("DS_CONTROLLER_BUTTONS") || getenv("DS_CONTROLLER_TRIGGERS")) {
         int index=SDL_JoystickAttachVirtual(SDL_JOYSTICK_TYPE_GAMECONTROLLER,
                                           SDL_CONTROLLER_AXIS_MAX,SDL_CONTROLLER_BUTTON_MAX,0);
         if(index>=0) test_pad=SDL_JoystickOpen(index);
@@ -156,6 +180,7 @@ static void pad_release(void) {
         int alt,k=map_button(b,&alt); if(k) host_key(0,k,alt);
         pad_buttons[b]=0;
     }
+    pad_special_release();
     pc_release();
 }
 static void pad_stick(Sint16 rawx,Sint16 rawy,float* x,float* y) {
@@ -171,15 +196,63 @@ static void pad_read(float* lx,float* ly,float* rx,float* ry) {
               SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_LEFTY),lx,ly);
     pad_stick(SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_RIGHTX),
               SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_RIGHTY),rx,ry);
+    /* Xperia JNI physical keyboard actions: L1=aim, R1=fire.
+     * The PC binding makes L2 aim and R2 context-dependent. */
+    int aiming=SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_TRIGGERLEFT)>8192;
+    int r2=SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_TRIGGERRIGHT)>8192;
+    int firing=aiming && r2;
+    int saw=SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) && !aiming;
+    int cross=SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_A)!=0;
+    if(aiming!=pad_aim) { pad_aim=aiming; host_key(aiming,102,0); pad_input_log("aim-L2",aiming); }
+    if(firing!=pad_fire) { pad_fire=firing; host_key(firing,103,0); pad_input_log("fire-R2",firing); }
+    /* Xperia DPAD_UP is the plasma-saw action, rather than firing. */
+    if(saw!=pad_melee) { pad_melee=saw; host_key(saw,19,0); pad_input_log("plasma-saw-R1",saw); }
+    /* Native touchscreen game requires tapping doors and objects.
+     * Retain DPAD_CENTER for menus, but supply a centre-screen tap too. */
+    if(cross!=pad_cross) {
+        if(cross) {
+            pad_cross_x=g_w*.50f; pad_cross_y=g_h*.50f;
+            host_key(1,23,0);
+            host_pointer_id(0,3,pad_cross_x,pad_cross_y);
+        } else {
+            host_key(0,23,0);
+            host_pointer_id(2,3,pad_cross_x,pad_cross_y);
+        }
+        pad_cross=cross; pad_input_log("interact-X",cross);
+    }
+    /* Touchscreen stomp gesture: downswipe over the character, one
+     * gesture per R2 press when L2 is not held. */
+    int stomp=r2 && !aiming;
+    if(stomp && !pad_stomp_held) {
+        pad_stomp_phase=1;
+        pad_input_log("stomp-R2",1);
+    }
+    if(!stomp && pad_stomp_held) pad_input_log("stomp-R2",0);
+    pad_stomp_held=stomp;
+    if(pad_stomp_phase==1) {
+        pad_stomp_x=g_w*.35f; pad_stomp_y=g_h*.47f;
+        host_pointer_id(0,4,pad_stomp_x,pad_stomp_y);
+        pad_stomp_phase=2;
+    } else if(pad_stomp_phase==2) {
+        pad_stomp_y=g_h*.72f;
+        host_pointer_id(1,4,pad_stomp_x,pad_stomp_y);
+        pad_stomp_phase=3;
+    } else if(pad_stomp_phase==3) {
+        host_pointer_id(2,4,pad_stomp_x,pad_stomp_y);
+        pad_stomp_phase=0;
+    }
     for(int b=0;b<SDL_CONTROLLER_BUTTON_MAX;b++) {
         int down=SDL_GameControllerGetButton(pad,(SDL_GameControllerButton)b)!=0;
-        /* L2/R2 alias the game's Xperia L1/R1 actions. */
-        if(b==SDL_CONTROLLER_BUTTON_LEFTSHOULDER)
-            down|=SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_TRIGGERLEFT)>8192;
-        if(b==SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)
-            down|=SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_TRIGGERRIGHT)>8192;
+        if(b==SDL_CONTROLLER_BUTTON_A || b==SDL_CONTROLLER_BUTTON_B ||
+           b==SDL_CONTROLLER_BUTTON_LEFTSHOULDER ||
+           b==SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) {
+            pad_buttons[b]=down; continue;
+        }
         if(down!=pad_buttons[b]) {
-            int alt,k=map_button(b,&alt); if(k) host_key(down,k,alt);
+            int alt,k=map_button(b,&alt);
+            if(k) host_key(down,k,alt);
+            if(k && getenv("DS_INPUT_DIAG"))
+                fprintf(stderr,"[PAD_KEY] button=%d key=%d down=%d\n",b,k,down);
             pad_buttons[b]=down;
         }
     }
@@ -200,6 +273,37 @@ static void pad_script(int frame) {
         p+=n; if(*p==',') ++p; else break;
     }
     for(int i=0;i<4;i++) SDL_JoystickSetVirtualAxis(test_pad,i,(Sint16)fmaxf(-32768,fminf(32767,axes[i])));
+    /* Script physical SDL buttons with genuine APK execution.
+     * DS_CONTROLLER_BUTTONS=21000:21005:a,22000:22015:rightshoulder */
+    int buttons[SDL_CONTROLLER_BUTTON_MAX]={0};
+    p=getenv("DS_CONTROLLER_BUTTONS");
+    while(p && *p) {
+        int start,end,n=0; char name[48]={0};
+        if(sscanf(p,"%d:%d:%47[^,]%n",&start,&end,name,&n)!=3 || !n) break;
+        SDL_GameControllerButton b=SDL_GameControllerGetButtonFromString(name);
+        if(b!=SDL_CONTROLLER_BUTTON_INVALID && frame>=start && frame<end) {
+            buttons[b]=1;
+            if(frame==start) fprintf(stderr,"[INPUT_SCRIPT] button=%s down at frame=%d\n",name,frame);
+        }
+        p+=n; if(*p==',') ++p; else break;
+    }
+    for(int i=0;i<SDL_CONTROLLER_BUTTON_MAX;i++)
+        SDL_JoystickSetVirtualButton(test_pad,i,(Uint8)buttons[i]);
+    int triggers[2]={-32768,-32768};
+    p=getenv("DS_CONTROLLER_TRIGGERS");
+    while(p && *p) {
+        int start,end,l2,r2,n=0;
+        if(sscanf(p,"%d:%d:%d:%d%n",&start,&end,&l2,&r2,&n)!=4 || !n) break;
+        if(frame>=start && frame<end) {
+            triggers[0]=l2; triggers[1]=r2;
+            if(frame==start) fprintf(stderr,"[INPUT_SCRIPT] triggers L2=%d R2=%d frame=%d\n",l2,r2,frame);
+        }
+        p+=n; if(*p==',') ++p; else break;
+    }
+    SDL_JoystickSetVirtualAxis(test_pad,SDL_CONTROLLER_AXIS_TRIGGERLEFT,
+        (Sint16)fmaxf(-32768,fminf(32767,triggers[0])));
+    SDL_JoystickSetVirtualAxis(test_pad,SDL_CONTROLLER_AXIS_TRIGGERRIGHT,
+        (Sint16)fmaxf(-32768,fminf(32767,triggers[1])));
     SDL_JoystickUpdate();
 }
 /* Optional real-game automation: enqueue ordinary SDL input events so tests

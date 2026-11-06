@@ -1,4 +1,4 @@
-param([string]$Apk, [switch]$PrepareOnly, [switch]$RenderDiagnostics, [switch]$InputDiagnostics, [switch]$DisableFog, [double]$RenderMinFar = 0)
+param([string]$Apk, [switch]$PrepareOnly, [switch]$RenderDiagnostics, [switch]$InputDiagnostics, [switch]$DisableFog, [switch]$DisableCull, [double]$RenderMinFar = 0)
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $expected = '64a3323cd3cc0c483a645b62af8508624163ba9b'
@@ -64,6 +64,7 @@ try {
     if ($RenderDiagnostics) { $env:DS_RENDER_DIAG = '1' }
     if ($InputDiagnostics) { $env:DS_INPUT_DIAG = '1' }
     if ($DisableFog) { $env:DS_RENDER_NO_FOG = '1' }
+    if ($DisableCull) { $env:DS_RENDER_NO_CULL = '1' }
     if ($RenderMinFar -gt 0) {
         $env:DS_RENDER_MIN_FAR = $RenderMinFar.ToString([System.Globalization.CultureInfo]::InvariantCulture)
     }

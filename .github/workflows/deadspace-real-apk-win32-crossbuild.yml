@@ -92,7 +92,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        input: [baseline, far-clip, fog-off]
+        input: [baseline, far-clip, cull-off]
     runs-on: windows-2022
     timeout-minutes: 25
     steps:
@@ -143,8 +143,12 @@ jobs:
           $env:DS_RENDER_DIAG = '1'
           $env:DS_INPUT_DIAG = '1'
           if ('${{ matrix.input }}' -eq 'far-clip') { $env:DS_RENDER_MIN_FAR = '1200' }
-          if ('${{ matrix.input }}' -eq 'fog-off') { $env:DS_RENDER_NO_FOG = '1' }
+          if ('${{ matrix.input }}' -eq 'cull-off') { $env:DS_RENDER_NO_CULL = '1' }
           $env:DS_CONTROLLER_AXES = '18500:19500:0:-32768:0:0,20000:20100:-32768:0:0:0,20100:20300:-32768:0:16384:0,20300:20500:-32768:0:0:0,20500:20700:-32768:0:0:8192,20700:21000:-32768:0:0:0'
+          # Real APK with mapped SDL controller inputs: R1 melee, R2 stomp,
+          # Cross context tap, L2 aim + R2 fire, Options pause.
+          $env:DS_CONTROLLER_BUTTONS = '21400:21412:rightshoulder,21800:21806:a,23500:23508:start'
+          $env:DS_CONTROLLER_TRIGGERS = '21600:21620:-32768:32767,22000:22300:32767:-32768,22100:22150:32767:32767'
           $env:DS_CLICKS = '600:640:675,1500:1145:668,2400:1145:668'
           $env:DS_SHOT_EVERY = '150'
           $env:DS_SHOT_DIR = "$root/shots"

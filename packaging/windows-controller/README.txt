@@ -15,16 +15,18 @@ The game assets are not included; first setup extracts them from your APK.
 Windows 10/11, an x86-compatible PC and desktop OpenGL 2.1 are expected.
 
 CONTROLS
-Left stick: movement (18% radial dead zone, proportional input)
-Right stick: camera look; works without capturing the desktop mouse
-D-pad: original menu/navigation keys
-Cross: original confirm/interact key
-Circle: back; Options: original Start/Pause key; Share: Select
-Square/Triangle: original Xperia face actions
-L1/L2: original left-shoulder action; R1/R2: right-shoulder action
-Combat actions and walk/run tuning have not been fully verified.
-The controller now defaults to movement pointer 0 with proportional stick displacement.
-Physical DualShock 4 movement must still be confirmed on the user's PC.
+Left stick: movement (confirmed on physical PS4 controller)
+Right stick: camera look
+Options: pause (Android BACK, verified on previous Circle mapping)
+Circle: intentionally not bound to pause; future Kinesis context mapping
+Cross: centre-screen touchscreen tap and DPAD_CENTER for doors/objects
+R1: plasma saw melee via Xperia DPAD_UP (needs physical verification)
+L2 held: aim via original Xperia L1
+R2 while aiming: fire via original Xperia R1
+R2 without aiming: downward touchscreen swipe for stomp (needs verification)
+Square: reload; Triangle: original Xperia triangle; Share: Select
+D-pad: Xperia directional keys (up overlaps melee key)
+L1: reserved, no longer aliases L2 aim.
 
 Keyboard/mouse fallback: WASD movement; F1 toggles captured mouse look.
 Escape releases mouse capture and sends Back. Close the window to exit.
@@ -51,6 +53,7 @@ For controlled A/B rendering tests, open PowerShell in the extracted folder:
   powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -RenderDiagnostics -InputDiagnostics
   powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -RenderMinFar 1200
   powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -DisableFog
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -DisableCull
 Do not run different test switches simultaneously when comparing screenshots.
 Audio is intentionally not addressed in this build.
 This is an early test build, not a completed game port.

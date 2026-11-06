@@ -141,7 +141,12 @@ def main(out):
         o.append(f"IMP({gname}) {{\n  T({gname});\n")
         if dname.startswith("@"):                         # fixed-point matrices: 16 x 16.16 -> float[16]
             fn = "glLoadMatrixf" if dname == "@loadmatrixx" else "glMultMatrixf"
-            o.append(f"  if (dgl_{fn}) {{ float m[16]; const s32* s = (const s32*)P(r0); for (int i = 0; i < 16; i++) m[i] = fxf((u32)s[i]); dgl_{fn}(m); }}\n  RET(0);\n}}\n")
+            o.append(f"  if (dgl_{fn}) {{ float m[16], patched[16]; const s32* s = (const s32*)P(r0); for (int i = 0; i < 16; i++) m[i] = fxf((u32)s[i]); dgl_{fn}(ds_matrix_filter(m, patched, \"{gname}\")); }}\n  RET(0);\n}}\n")
+            continue
+        if gname == "glMatrixMode":
+            o.append("  ds_matrix_mode_set(r0);\n")
+        if gname in ("glLoadMatrixf", "glMultMatrixf"):
+            o.append(f'  if (dgl_{dname}) {{ float patched[16]; dgl_{dname}(ds_matrix_filter((const float*)P(r0), patched, "{gname}")); }}\n  RET(0);\n}}\n')
             continue
         r, dps = D[dname]
         if len(gps) != len(dps): raise SystemExit(f"arity mismatch {gname}")

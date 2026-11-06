@@ -4,6 +4,51 @@
 #define W(i) ((i) == 0 ? r0 : (i) == 1 ? r1 : (i) == 2 ? r2 : (i) == 3 ? r3 : ((u32*)P(sp))[(i) - 4])
 static inline float fxf(u32 w) { return (float)(s32)w * (1.0f / 65536.0f); }
 
+
+/* The game's intro does not appear to call glFrustumf/x. It loads complete
+ * projection matrices, so capture that real path before altering culling.
+ * Normal rendering is unchanged; the flags below enable controlled A/B runs. */
+static u32 ds_matrix_mode=0x1700; /* GL_MODELVIEW */
+static void ds_matrix_mode_set(u32 mode) { ds_matrix_mode=mode; }
+static const float* ds_matrix_filter(const float* src, float dst[16], const char* call) {
+    if(!src || ds_matrix_mode!=0x1701) return src; /* GL_PROJECTION */
+    int diag=getenv("DS_RENDER_DIAG")!=NULL;
+    const char* env=getenv("DS_RENDER_MIN_FAR");
+    double a=src[10],b=src[14],near_z=0,far_z=0;
+    int perspective = fabsf(src[11]+1.0f)<0.015f && fabsf(src[15])<0.015f;
+    int valid = perspective && fabs(a-1.0)>1e-8 && fabs(a+1.0)>1e-8 &&
+                isfinite(a) && isfinite(b);
+    if(valid) {
+        near_z=b/(a-1.0);
+        far_z=b/(a+1.0);
+        valid=isfinite(near_z)&&isfinite(far_z)&&near_z>0&&far_z>near_z;
+    }
+    if(diag) {
+        static unsigned reports;
+        static double last_far=-1,last_near=-1;
+        if(reports<100 && (reports<12 || fabs(far_z-last_far)>0.01 ||
+                            fabs(near_z-last_near)>0.001)) {
+            fprintf(stderr,"[RENDER_MATRIX] %s mode=%#x valid=%d near=%.8g far=%.8g m10=%.8g m11=%.8g m14=%.8g m15=%.8g\n",
+                    call,ds_matrix_mode,valid,near_z,far_z,a,src[11],b,src[15]);
+            reports++; last_far=far_z;last_near=near_z;
+        }
+    }
+    if(valid && env && *env) {
+        char* end=0; double minimum=strtod(env,&end);
+        if(end!=env && end && *end=='\0' && isfinite(minimum) &&
+           minimum>far_z && minimum>near_z) {
+            memcpy(dst,src,16*sizeof(float));
+            dst[10]=(float)(-(minimum+near_z)/(minimum-near_z));
+            dst[14]=(float)(-(2.0*minimum*near_z)/(minimum-near_z));
+            if(diag) {
+                static int logged;
+                if(!logged++) fprintf(stderr,"[RENDER_MATRIX_FAR] %s original=%.8g expanded=%.8g\n",call,far_z,minimum);
+            }
+            return dst;
+        }
+    }
+    return src;
+}
 #include "gl_gen.c"
 
 /* Preserve the game's projection by default. DS_RENDER_DIAG records actual
@@ -60,7 +105,8 @@ IMP(glPixelStorei) {
 IMP(glEnable) {
     T(glEnable);
     if (!dgl_glEnable) RET(0);
-    if (r0 == 0x0B60 && getenv("DS_RENDER_NO_FOG")) { /* controlled visual A/B test: fog */ }
+    if (r0 == 0x0B44 && getenv("DS_RENDER_NO_CULL")) { /* diagnostic: backface culling */ }
+    else if (r0 == 0x0B60 && getenv("DS_RENDER_NO_FOG")) { /* diagnostic: fog */ }
     else if (r0 == 0x8D60) { dgl_glEnable(0x0C60); dgl_glEnable(0x0C61); dgl_glEnable(0x0C62); }   // GL_TEXTURE_GEN_STR_OES
     else dgl_glEnable(r0);
     RET(0);
