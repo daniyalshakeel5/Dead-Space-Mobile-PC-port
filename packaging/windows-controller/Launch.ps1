@@ -80,7 +80,7 @@ try {
     Write-Host 'Close the game window to exit. Logs are saved in the logs folder.'
     $process = Start-Process -FilePath (Join-Path $root 'DeadSpaceMobile-Win32.exe') -WorkingDirectory $root -ArgumentList ('"' + $so + '"') -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -Wait
     $code = $process.ExitCode
-    @("Exit code: $code", "Build: 271ba51894bfb660c8d038a09d5c18f6092a9d5e", "Time: $(Get-Date -Format o)") | Set-Content (Join-Path $logs "$stamp-result.txt")
+    @("Exit code: $code", "Build: 649769c89ac05085b6ebeca4c17b1bb7e91d77d2", "Time: $(Get-Date -Format o)") | Set-Content (Join-Path $logs "$stamp-result.txt")
     if ($code -ne 0) { throw "Game exited with code $code. Please send the files in logs." }
 } catch {
     $_ | Out-String | Tee-Object -FilePath (Join-Path $logs 'launcher-error.txt') | Write-Host

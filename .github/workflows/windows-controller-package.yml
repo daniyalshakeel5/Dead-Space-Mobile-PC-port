@@ -18,12 +18,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh run watch 42286136339 --repo $env:GITHUB_REPOSITORY --exit-status --interval 15
-          if ($LASTEXITCODE) { throw "Genuine game run 42286136339 did not pass" }
+          gh run watch 42286940055 --repo $env:GITHUB_REPOSITORY --exit-status --interval 15
+          if ($LASTEXITCODE) { throw "Genuine game run 42286940055 did not pass" }
       - uses: actions/download-artifact@v4
         with:
           name: windows-boot-runtime
-          run-id: 42286136339
+          run-id: 42286940055
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/controller-test
       - name: Verify exact executable from successful genuine-APK Windows run
@@ -33,15 +33,15 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $root = "$env:RUNNER_TEMP/controller-test"
-          $runSha = (gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/42286136339" --jq '.head_sha').Trim()
-          if ($LASTEXITCODE -ne 0 -or $runSha -ne '271ba51894bfb660c8d038a09d5c18f6092a9d5e') {
+          $runSha = (gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/42286940055" --jq '.head_sha').Trim()
+          if ($LASTEXITCODE -ne 0 -or $runSha -ne '649769c89ac05085b6ebeca4c17b1bb7e91d77d2') {
             throw "Unexpected binary source revision: $runSha"
           }
           $hash = (Get-FileHash "$root/DeadSpaceMobile-Win32.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
           if ((Get-Item "$root/DeadSpaceMobile-Win32.exe").Length -lt 1000000) {
             throw 'Native Windows executable is unexpectedly small'
           }
-          Write-Host "Verified passing genuine-game Windows build 271ba51894bfb660c8d038a09d5c18f6092a9d5e and executable SHA256 $hash"
+          Write-Host "Verified passing genuine-game Windows build 649769c89ac05085b6ebeca4c17b1bb7e91d77d2 and executable SHA256 $hash"
       - name: Validate launcher with genuine APK in Windows PowerShell 5
         shell: powershell
         env:
@@ -71,8 +71,8 @@ jobs:
           Copy-Item packaging/windows-controller/* $dest
           foreach ($file in @('DeadSpaceMobile-Win32.exe','SDL2.dll','libwinpthread-1.dll')) { Copy-Item "$root/$file" $dest }
           @(
-            'Source run: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42286136339'
-            'Source commit: 271ba51894bfb660c8d038a09d5c18f6092a9d5e'
+            'Source run: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42286940055'
+            'Source commit: 649769c89ac05085b6ebeca4c17b1bb7e91d77d2'
             ('Executable SHA256: ' + (Get-FileHash "$root/DeadSpaceMobile-Win32.exe" -Algorithm SHA256).Hash.ToLowerInvariant())
             'Genuine APK data is intentionally not bundled.'
             'OpenGL draw-distance and hardware controller behaviour still require user confirmation.'
