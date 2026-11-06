@@ -47,13 +47,17 @@ show movement to the first door and camera look during overlapping sticks.
 The Windows executable was tested with Mesa software OpenGL; your physical
 GPU and PS4 USB/Bluetooth connection still need testing. Audio, combat,
 long sessions, level transitions and campaign completion are not verified.
-The reported cutscene exterior has short/incorrect visible draw distance. This build
-includes diagnostic GL frustum/fog switches, not a proven permanent graphics fix.
+The original game passes a perspective projection matrix with near 0.05 and far
+approximately 30. The new Windows renderer's 1200-unit far plane dramatically
+restores exterior ship geometry in the genuine-game opening cutscene captures.
+The launcher now enables this projection correction by default. Hardware
+performance and later scenes should still be checked for depth-buffer issues.
 For controlled A/B rendering tests, open PowerShell in the extracted folder:
   powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -RenderDiagnostics -InputDiagnostics
   powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -RenderMinFar 1200
   powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -DisableFog
   powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -DisableCull
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -OriginalFarPlane
 Do not run different test switches simultaneously when comparing screenshots.
 Audio is intentionally not addressed in this build.
 This is an early test build, not a completed game port.

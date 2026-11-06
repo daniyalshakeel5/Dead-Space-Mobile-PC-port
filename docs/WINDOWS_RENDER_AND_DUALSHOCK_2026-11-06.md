@@ -33,3 +33,28 @@ From PowerShell inside the package, call `./Launch.ps1 -InputDiagnostics -Render
 2. On real DualShock 4, full left-stick tilt changes character position in tutorial, not merely logs input events; stick neutral stops movement. Right stick remains usable.
 3. At the same first-run ship cutscene frames, compare screenshots against baseline and reference gameplay. Resolve missing distant geometry without z-fighting or disappearance of UI/near objects.
 4. Leave the audio subsystem untouched until (2) and (3) are verified.
+
+## 2026-11-07 genuine-APK Windows visual verification
+
+Run 42280070096 passed native Windows PE32 compilation and all three real-APK
+Windows 24,000-frame tests (baseline, cull-off, matrix far-plane extended).
+The `[RENDER_MATRIX]` log establishes the actual game's perspective
+projection parameters: near = 0.05, far = approximately 30. Its geometry
+disappears prematurely in the cutscene with this far plane. Extending the
+OpenGL projection matrix far distance to 1200 restores the visible exterior
+ship and surrounding structure. Disabling back-face culling alone leaves
+most of the missing geometry clipped.
+
+The Windows packaged launcher now enables `DS_RENDER_MIN_FAR=1200` by
+default, with `-OriginalFarPlane` to compare the legacy 30-unit projection.
+This preserves the native game's original matrix generation and applies the
+correction only at the OpenGL submission boundary. The far-plane adjustment
+also affects indoor projections in this first build. Retest for z-fighting
+and visual issues on actual Windows hardware before marking campaign-wide
+graphics fidelity verified.
+
+The same Windows runtime job logs confirm `[PAD_ACTION]` events for melee
+(R1), stomp (R2), interact (Cross), aim (L2), and fire (L2+R2), and the
+Options key visibly brought up the pause menu. Other gameplay actions and
+door opening are not visually verified by those screenshots; the movement
+tutorial overlay remained present during their scripted activation.

@@ -33,7 +33,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $root = "$env:RUNNER_TEMP/controller-test"
-          $runSha = (gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/42272714707" --jq '.head_sha').Trim()
+          $runSha = (gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/42280070096" --jq '.head_sha').Trim()
           if ($LASTEXITCODE -ne 0 -or $runSha -ne 'f5c9378fb18e5a83bee220be14b902d7151dfe96') {
             throw "Unexpected binary source revision: $runSha"
           }
