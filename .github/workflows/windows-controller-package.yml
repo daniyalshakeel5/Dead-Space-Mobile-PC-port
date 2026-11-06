@@ -16,9 +16,25 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: windows-boot-runtime
-          run-id: 42228747637
+          run-id: 42272714707
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/controller-test
+      - name: Verify exact executable from successful genuine-APK Windows run
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = "$env:RUNNER_TEMP/controller-test"
+          $runSha = (gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/42272714707" --jq '.head_sha').Trim()
+          if ($LASTEXITCODE -ne 0 -or $runSha -ne 'acd4c1800b7949841be7f5ac5d6c6fcb216ed95e') {
+            throw "Unexpected binary source revision: $runSha"
+          }
+          $hash = (Get-FileHash "$root/DeadSpaceMobile-Win32.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne 'b6da1d09ff168507244fb9b1e9aff88bdeac8bf0c31e32950f83e37e0fb7e92f') {
+            throw "Windows runtime binary SHA256 mismatch: $hash"
+          }
+          Write-Host "Verified genuine-game Windows build acd4c1800b7949841be7f5ac5d6c6fcb216ed95e and executable SHA256 $hash"
       - name: Validate launcher with genuine APK in Windows PowerShell 5
         shell: powershell
         env:
@@ -47,10 +63,17 @@ jobs:
           New-Item -ItemType Directory $dest | Out-Null
           Copy-Item packaging/windows-controller/* $dest
           foreach ($file in @('DeadSpaceMobile-Win32.exe','SDL2.dll','libwinpthread-1.dll')) { Copy-Item "$root/$file" $dest }
+          @(
+            'Source run: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42272714707'
+            'Source commit: acd4c1800b7949841be7f5ac5d6c6fcb216ed95e'
+            'Executable SHA256: b6da1d09ff168507244fb9b1e9aff88bdeac8bf0c31e32950f83e37e0fb7e92f'
+            'Genuine APK data is intentionally not bundled.'
+            'OpenGL draw-distance and hardware controller behaviour still require user confirmation.'
+          ) | Set-Content "$dest/BUILD_INFO.txt"
           Get-ChildItem $dest -File | Sort-Object Name | ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(),$_.Name } | Set-Content "$dest/SHA256SUMS.txt"
-          Compress-Archive -Path $dest -DestinationPath "$env:RUNNER_TEMP/DeadSpaceMobile-Windows-Controller-Test.zip" -CompressionLevel Optimal
+          Compress-Archive -Path $dest -DestinationPath "$env:RUNNER_TEMP/DeadSpaceMobile-Windows-Controller-Fix-2026-11-06.zip" -CompressionLevel Optimal
       - uses: actions/upload-artifact@v4
         with:
-          name: DeadSpaceMobile-Windows-Controller-Test
-          path: ${{ runner.temp }}/DeadSpaceMobile-Windows-Controller-Test.zip
-          retention-days: 7
+          name: DeadSpaceMobile-Windows-Controller-Fix-2026-11-06
+          path: ${{ runner.temp }}/DeadSpaceMobile-Windows-Controller-Fix-2026-11-06.zip
+          retention-days: 14

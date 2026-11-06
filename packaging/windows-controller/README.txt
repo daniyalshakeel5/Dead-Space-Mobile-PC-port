@@ -1,4 +1,4 @@
-DEAD SPACE MOBILE - WINDOWS CONTROLLER TEST - 2026-11-06
+DEAD SPACE MOBILE - WINDOWS CONTROLLER + RENDERING DIAGNOSTICS - 2026-11-06
 
 1. Extract the entire ZIP into a writable folder (e.g. Documents).
 2. Connect your PS4 controller, preferably by USB for the first test.
@@ -23,6 +23,8 @@ Circle: back; Options: original Start/Pause key; Share: Select
 Square/Triangle: original Xperia face actions
 L1/L2: original left-shoulder action; R1/R2: right-shoulder action
 Combat actions and walk/run tuning have not been fully verified.
+The controller now defaults to movement pointer 0 with proportional stick displacement.
+Physical DualShock 4 movement must still be confirmed on the user's PC.
 
 Keyboard/mouse fallback: WASD movement; F1 toggles captured mouse look.
 Escape releases mouse capture and sends Back. Close the window to exit.
@@ -43,8 +45,16 @@ show movement to the first door and camera look during overlapping sticks.
 The Windows executable was tested with Mesa software OpenGL; your physical
 GPU and PS4 USB/Bluetooth connection still need testing. Audio, combat,
 long sessions, level transitions and campaign completion are not verified.
+The reported cutscene exterior has short/incorrect visible draw distance. This build
+includes diagnostic GL frustum/fog switches, not a proven permanent graphics fix.
+For controlled A/B rendering tests, open PowerShell in the extracted folder:
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -RenderDiagnostics -InputDiagnostics
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -RenderMinFar 1200
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -DisableFog
+Do not run different test switches simultaneously when comparing screenshots.
+Audio is intentionally not addressed in this build.
 This is an early test build, not a completed game port.
 
-Binary source commit: 5151cd670a0645d1ea150fcf50637c38c749c309
-Windows test: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42228747637
+Binary source commit: acd4c1800b7949841be7f5ac5d6c6fcb216ed95e
+Windows test: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42272714707
 Development: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/pull/4
