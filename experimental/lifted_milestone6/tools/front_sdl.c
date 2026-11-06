@@ -25,9 +25,13 @@ static int sdl_open(int w, int h) {
  * finger IDs allow movement, mouse look and ordinary menu touches together. */
 static int pc_w,pc_a,pc_s,pc_d,pc_shift,pc_capture,pc_move_active,pc_look_active;
 static int pc_fire,pc_aim;
+static int pc_move_finger(void) {
+    const char* p=getenv("DS_PC_MOVE_FINGER");
+    return p && !strcmp(p,"0") ? 0 : 1;
+}
 static float pc_move_x,pc_move_y,pc_look_x,pc_look_y;
 static void pc_release(void) {
-    if(pc_move_active) host_pointer_id(2,1,pc_move_x,pc_move_y);
+    if(pc_move_active) host_pointer_id(2,pc_move_finger(),pc_move_x,pc_move_y);
     if(pc_look_active) host_pointer_id(2,2,pc_look_x,pc_look_y);
     if(pc_fire) host_key(0,103,0);
     if(pc_aim) host_key(0,102,0);
@@ -47,12 +51,18 @@ static void pc_update(float dx,float dy) {
     if(len>0) {
         x/=len; y/=len;
         float bx=g_w*.25f,by=g_h*.70f;
-        if(!pc_move_active) host_pointer_id(0,1,bx,by);
-        pc_move_x=bx+x*g_w*.16f;
-        pc_move_y=by+y*g_h*(pc_shift ? .35f : .20f);
-        host_pointer_id(1,1,pc_move_x,pc_move_y); pc_move_active=1;
+        if(!pc_move_active) {
+            /* The game must consume the down position before the drag.
+             * Same-frame down/move can lose the joystick's anchor. */
+            pc_move_x=bx; pc_move_y=by;
+            host_pointer_id(0,pc_move_finger(),bx,by); pc_move_active=1;
+        } else {
+            pc_move_x=bx+x*g_w*.16f;
+            pc_move_y=by+y*g_h*(pc_shift ? .35f : .20f);
+            host_pointer_id(1,pc_move_finger(),pc_move_x,pc_move_y);
+        }
     } else if(pc_move_active) {
-        host_pointer_id(2,1,pc_move_x,pc_move_y); pc_move_active=0;
+        host_pointer_id(2,pc_move_finger(),pc_move_x,pc_move_y); pc_move_active=0;
     }
     if(pc_look_active) { host_pointer_id(2,2,pc_look_x,pc_look_y); pc_look_active=0; }
     if(pc_capture && (dx!=0 || dy!=0)) {
