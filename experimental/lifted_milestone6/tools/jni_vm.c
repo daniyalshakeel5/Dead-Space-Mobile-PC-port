@@ -1,6 +1,7 @@
 // jni_vm.c - a tiny fake Java VM for the translated game (included by host.c).
 // JNIEnv/JavaVM function tables, object handles, strings, arrays, calls into "Java" methods that the
 // game expects from Android (AssetManager, InputStream, delegates ...). Unknown Java methods are logged.
+#include <errno.h>
 #include <dirent.h>
 #include <sys/stat.h>
 
