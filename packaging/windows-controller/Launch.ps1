@@ -1,4 +1,4 @@
-param([string]$Apk, [switch]$PrepareOnly)
+param([string]$Apk, [switch]$PrepareOnly, [switch]$RenderDiagnostics, [switch]$InputDiagnostics, [switch]$DisableFog, [double]$RenderMinFar = 0)
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $expected = '64a3323cd3cc0c483a645b62af8508624163ba9b'
@@ -61,6 +61,12 @@ try {
     $env:DS_STEPS = 'create,surface,frame'
     $env:DS_FRAMES = '0'
     $env:DS_QUIET_JAVA = '1'
+    if ($RenderDiagnostics) { $env:DS_RENDER_DIAG = '1' }
+    if ($InputDiagnostics) { $env:DS_INPUT_DIAG = '1' }
+    if ($DisableFog) { $env:DS_RENDER_NO_FOG = '1' }
+    if ($RenderMinFar -gt 0) {
+        $env:DS_RENDER_MIN_FAR = $RenderMinFar.ToString([System.Globalization.CultureInfo]::InvariantCulture)
+    }
     $env:DS_ASSETS = (Join-Path $game 'assets').Replace('\','/')
     # Use the same asset/data layout as the verified Windows gameplay run.
     $env:DS_DATA = $env:DS_ASSETS
