@@ -2,6 +2,7 @@
 #include <SDL.h>
 static void host_pointer(int kind, float x, float y);   // kind: 0 down, 1 move, 2 up (defined in host.c)
 static void host_pointer_id(int kind, int finger, float x, float y);
+static void host_touchpad_id(int kind, int finger, float x, float y);
 static void host_key(int down, int keycode, int alt);     // Android key codes (defined in host.c)
 static SDL_Window* g_win; static SDL_GLContext g_ctx; static int g_w, g_h; static float g_sx = 1, g_sy = 1;
 
@@ -44,27 +45,92 @@ static float pc_move_x,pc_move_y,pc_look_x,pc_look_y;
 static unsigned pc_input_trace_frames;
 /* Context-sensitive bindings use the genuine game's JNI keyboard/touch.
  * State is independent so triggers never accidentally release each other. */
-static int pad_aim, pad_fire, pad_melee, pad_cross;
-static int pad_stomp_held, pad_stomp_phase;
-static float pad_cross_x, pad_cross_y, pad_stomp_x, pad_stomp_y;
+static int pad_aim, pad_fire, pad_cross;
+static int pad_r1_held, pad_stomp_held;
+static float pad_cross_x, pad_cross_y;
+/* Only explicitly recognized melee/stomp gestures enter the touchscreen.
+ * Right-stick look goes to the separate game's TouchPad module. */
+static int pad_swipe_phase, pad_swipe_direction, pad_swipe_next;
+static float pad_swipe_x, pad_swipe_y, pad_swipe_start_y, pad_swipe_end_y;
+static int pad_physical_touch_down, pad_physical_touch_finger;
+static float pad_physical_x0, pad_physical_y0, pad_physical_x1, pad_physical_y1;
+static void pad_begin_swipe(int direction, const char* source) {
+    if (pad_swipe_phase) { pad_swipe_next=direction; return; }
+    pad_swipe_direction=direction;
+    pad_swipe_phase=1;
+    if(getenv("DS_INPUT_DIAG")) fprintf(stderr,
+        "[PAD_SWIPE] %s from %s; top-left touchscreen; no right-stick action\n",
+        direction<0 ? "plasma-saw-up" : "stomp-down",source);
+}
+static void pad_swipe_tick(void) {
+    if (!pad_swipe_phase) return;
+    /* Top-left quadrant. Keep the action clear of the lower-left
+     * movement pad and the right-side firing/aiming controls. */
+    pad_swipe_x=g_w*.19f;
+    pad_swipe_start_y=g_h*(pad_swipe_direction<0 ? .39f : .13f);
+    pad_swipe_end_y=g_h*(pad_swipe_direction<0 ? .13f : .39f);
+    if (pad_swipe_phase==1) {
+        pad_swipe_y=pad_swipe_start_y;
+        host_pointer_id(0,4,pad_swipe_x,pad_swipe_y);
+    } else if (pad_swipe_phase==2 || pad_swipe_phase==3) {
+        float step=(pad_swipe_phase==2 ? .5f : 1.0f);
+        pad_swipe_y=pad_swipe_start_y+(pad_swipe_end_y-pad_swipe_start_y)*step;
+        host_pointer_id(1,4,pad_swipe_x,pad_swipe_y);
+    } else {
+        host_pointer_id(2,4,pad_swipe_x,pad_swipe_y);
+        pad_swipe_phase=0;
+        if (pad_swipe_next) {
+            int next=pad_swipe_next; pad_swipe_next=0;
+            pad_begin_swipe(next,"queued");
+        }
+        return;
+    }
+    ++pad_swipe_phase;
+}
+static void pad_physical_touch(const SDL_Event* e) {
+    if (!pad || e->ctouch.which!=pad_id || e->ctouch.touchpad!=0)
+        return;
+    if(e->type==SDL_CONTROLLERTOUCHPADDOWN) {
+        if(!pad_physical_touch_down) {
+            pad_physical_touch_down=1;
+            pad_physical_touch_finger=e->ctouch.finger;
+            pad_physical_x0=pad_physical_x1=e->ctouch.x;
+            pad_physical_y0=pad_physical_y1=e->ctouch.y;
+        }
+    } else if(pad_physical_touch_down && e->ctouch.finger==pad_physical_touch_finger) {
+        pad_physical_x1=e->ctouch.x; pad_physical_y1=e->ctouch.y;
+        if(e->type==SDL_CONTROLLERTOUCHPADUP) {
+            float dx=pad_physical_x1-pad_physical_x0;
+            float dy=pad_physical_y1-pad_physical_y0;
+            /* Touch alone is never a fire event; vertical swipes trigger
+             * the game's *upper-left* native screen gestures on release. */
+            if(fabsf(dy)>.16f && fabsf(dy)>fabsf(dx)*1.25f)
+                pad_begin_swipe(dy<0 ? -1 : 1,"physical-PS4-touchpad");
+            if(getenv("DS_INPUT_DIAG")) fprintf(stderr,
+                "[PAD_TOUCH] dx=%.3f dy=%.3f recognised=%d\n",
+                dx,dy,fabsf(dy)>.16f && fabsf(dy)>fabsf(dx)*1.25f);
+            pad_physical_touch_down=0;
+        }
+    }
+}
 static void pad_input_log(const char* action, int down) {
     if(getenv("DS_INPUT_DIAG")) fprintf(stderr,"[PAD_ACTION] %s=%d\n",action,down);
 }
 static void pad_special_release(void) {
     if(pad_aim) host_key(0,102,0);
     if(pad_fire) host_key(0,103,0);
-    if(pad_melee) host_key(0,19,0);
-    if(pad_cross) {
+     if(pad_cross) {
         host_key(0,23,0);
         host_pointer_id(2,3,pad_cross_x,pad_cross_y);
     }
-    if(pad_stomp_phase) host_pointer_id(2,4,pad_stomp_x,pad_stomp_y);
-    pad_aim=pad_fire=pad_melee=pad_cross=0;
-    pad_stomp_held=pad_stomp_phase=0;
+    if(pad_swipe_phase) host_pointer_id(2,4,pad_swipe_x,pad_swipe_y);
+    pad_aim=pad_fire=pad_cross=0;
+    pad_r1_held=pad_stomp_held=pad_swipe_phase=pad_swipe_direction=pad_swipe_next=0;
+    pad_physical_touch_down=0;
 }
 static void pc_release(void) {
     if(pc_move_active) host_pointer_id(2,pc_move_finger(),pc_move_x,pc_move_y);
-    if(pc_look_active) host_pointer_id(2,2,pc_look_x,pc_look_y);
+    if(pc_look_active) host_touchpad_id(2,2,pc_look_x,pc_look_y);
     if(pc_fire) host_key(0,103,0);
     if(pc_aim) host_key(0,102,0);
     pc_w=pc_a=pc_s=pc_d=pc_shift=pc_move_active=pc_look_active=pc_fire=pc_aim=0;
@@ -111,14 +177,16 @@ static void pc_update(float dx,float dy) {
     } else if(pc_move_active) {
         host_pointer_id(2,pc_move_finger(),pc_move_x,pc_move_y); pc_move_active=0;
     }
-    if(pc_look_active) { host_pointer_id(2,2,pc_look_x,pc_look_y); pc_look_active=0; }
+    if(pc_look_active) { host_touchpad_id(2,2,pc_look_x,pc_look_y); pc_look_active=0; }
     if((pc_capture || rx!=0 || ry!=0) && (dx!=0 || dy!=0)) {
         float bx=g_w*.75f,by=g_h*.50f;
         dx=fmaxf(-g_w*.20f,fminf(g_w*.20f,dx*g_sx));
         dy=fmaxf(-g_h*.40f,fminf(g_h*.40f,dy*g_sy));
-        host_pointer_id(0,2,bx,by);
+        /* The game has distinct touchscreen and touchpad module IDs.
+         * Using touchscreen here was firing weapons during camera pans. */
+        host_touchpad_id(0,2,bx,by);
         pc_look_x=bx+dx; pc_look_y=by+dy;
-        host_pointer_id(1,2,pc_look_x,pc_look_y); pc_look_active=1;
+        host_touchpad_id(1,2,pc_look_x,pc_look_y); pc_look_active=1;
     }
 }
 // Default PC bindings, modelled on the Xperia Play layout. Each entry: SDL scancode -> Android key code (+alt flag).
@@ -160,7 +228,8 @@ static void pad_open(int index) {
     pad=SDL_GameControllerOpen(index);
     if(!pad) { fprintf(stderr,"[CONTROLLER] open failed: %s\n",SDL_GetError()); return; }
     pad_id=SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(pad));
-    fprintf(stderr,"[CONTROLLER] connected: %s id=%d\n",SDL_GameControllerName(pad),(int)pad_id);
+    fprintf(stderr,"[CONTROLLER] connected: %s id=%d, SDL touchpads=%d\n",
+            SDL_GameControllerName(pad),(int)pad_id,SDL_GameControllerGetNumTouchpads(pad));
 }
 static void pad_init(void) {
     if(getenv("DS_CONTROLLER_AXES") || getenv("DS_CONTROLLER_BUTTONS") || getenv("DS_CONTROLLER_TRIGGERS")) {
@@ -205,8 +274,11 @@ static void pad_read(float* lx,float* ly,float* rx,float* ry) {
     int cross=SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_A)!=0;
     if(aiming!=pad_aim) { pad_aim=aiming; host_key(aiming,102,0); pad_input_log("aim-L2",aiming); }
     if(firing!=pad_fire) { pad_fire=firing; host_key(firing,103,0); pad_input_log("fire-R2",firing); }
-    /* Xperia DPAD_UP is the plasma-saw action, rather than firing. */
-    if(saw!=pad_melee) { pad_melee=saw; host_key(saw,19,0); pad_input_log("plasma-saw-R1",saw); }
+    /* Touch edition: plasma saw is a swipe UP in the top-left quadrant.
+     * DPAD_UP was a menu key and did not trigger the real melee action. */
+    if(saw && !pad_r1_held) pad_begin_swipe(-1,"R1");
+    if(saw!=pad_r1_held) pad_input_log("plasma-saw-R1",saw);
+    pad_r1_held=saw;
     /* Native touchscreen game requires tapping doors and objects.
      * Retain DPAD_CENTER for menus, but supply a centre-screen tap too. */
     if(cross!=pad_cross) {
@@ -220,27 +292,12 @@ static void pad_read(float* lx,float* ly,float* rx,float* ry) {
         }
         pad_cross=cross; pad_input_log("interact-X",cross);
     }
-    /* Touchscreen stomp gesture: downswipe over the character, one
-     * gesture per R2 press when L2 is not held. */
+    /* Stomp uses the same upper-left swipe area, but downward. */
     int stomp=r2 && !aiming;
-    if(stomp && !pad_stomp_held) {
-        pad_stomp_phase=1;
-        pad_input_log("stomp-R2",1);
-    }
-    if(!stomp && pad_stomp_held) pad_input_log("stomp-R2",0);
+    if(stomp && !pad_stomp_held) pad_begin_swipe(1,"R2-without-L2");
+    if(stomp!=pad_stomp_held) pad_input_log("stomp-R2",stomp);
     pad_stomp_held=stomp;
-    if(pad_stomp_phase==1) {
-        pad_stomp_x=g_w*.35f; pad_stomp_y=g_h*.47f;
-        host_pointer_id(0,4,pad_stomp_x,pad_stomp_y);
-        pad_stomp_phase=2;
-    } else if(pad_stomp_phase==2) {
-        pad_stomp_y=g_h*.72f;
-        host_pointer_id(1,4,pad_stomp_x,pad_stomp_y);
-        pad_stomp_phase=3;
-    } else if(pad_stomp_phase==3) {
-        host_pointer_id(2,4,pad_stomp_x,pad_stomp_y);
-        pad_stomp_phase=0;
-    }
+    pad_swipe_tick();
     for(int b=0;b<SDL_CONTROLLER_BUTTON_MAX;b++) {
         int down=SDL_GameControllerGetButton(pad,(SDL_GameControllerButton)b)!=0;
         if(b==SDL_CONTROLLER_BUTTON_A || b==SDL_CONTROLLER_BUTTON_B ||
@@ -289,6 +346,14 @@ static void pad_script(int frame) {
     }
     for(int i=0;i<SDL_CONTROLLER_BUTTON_MAX;i++)
         SDL_JoystickSetVirtualButton(test_pad,i,(Uint8)buttons[i]);
+    const char* swipes=getenv("DS_PAD_SWIPES");
+    while(swipes && *swipes) {
+        int start,dir,n=0;
+        if(sscanf(swipes,"%d:%d%n",&start,&dir,&n)!=2 || !n) break;
+        if(frame==start) pad_begin_swipe(dir<0 ? -1 : 1,"CI-physical-gesture-path");
+        swipes+=n;
+        if(*swipes==',') ++swipes; else break;
+    }
     int triggers[2]={-32768,-32768};
     p=getenv("DS_CONTROLLER_TRIGGERS");
     while(p && *p) {
@@ -366,7 +431,7 @@ static int sdl_pump(int* resized) {
     static int frame; sdl_script_input(++frame); pad_script(frame);
     SDL_Event e; float look_dx=0,look_dy=0; *resized = 0;
     while (SDL_PollEvent(&e)) {
-        if (e.type == SDL_QUIT) { pc_release(); return 0; }
+        if (e.type == SDL_QUIT) { pad_release(); return 0; }
         // Escape is Android Back/Pause (handled by map_scancode), not a forced shutdown.
         if ((e.type == SDL_KEYDOWN && !e.key.repeat) || e.type == SDL_KEYUP) {
             int down=e.type==SDL_KEYDOWN; SDL_Scancode sc=e.key.keysym.scancode;
@@ -391,6 +456,12 @@ static int sdl_pump(int* resized) {
         if(pc_capture && e.type==SDL_MOUSEMOTION) { look_dx+=e.motion.xrel; look_dy+=e.motion.yrel; continue; }
         if(e.type==SDL_WINDOWEVENT && e.window.event==SDL_WINDOWEVENT_FOCUS_GAINED) pad_focused=1;
         if(e.type==SDL_CONTROLLERDEVICEADDED) pad_open(e.cdevice.which);
+        if(e.type==SDL_CONTROLLERTOUCHPADDOWN ||
+           e.type==SDL_CONTROLLERTOUCHPADMOTION ||
+           e.type==SDL_CONTROLLERTOUCHPADUP) {
+            pad_physical_touch(&e);
+            continue;  /* no implicit screen tap or fire */
+        }
         if(e.type==SDL_CONTROLLERDEVICEREMOVED && e.cdevice.which==pad_id) {
             pad_release(); SDL_GameControllerClose(pad); pad=NULL; pad_id=-1;
             fprintf(stderr,"[CONTROLLER] disconnected\n");

@@ -16,14 +16,16 @@ Windows 10/11, an x86-compatible PC and desktop OpenGL 2.1 are expected.
 
 CONTROLS
 Left stick: movement (confirmed on physical PS4 controller)
-Right stick: camera look
+Right stick: camera look via separate native TouchPad module (no firing taps)
 Options: pause (Android BACK, verified on previous Circle mapping)
 Circle: intentionally not bound to pause; future Kinesis context mapping
 Cross: centre-screen touchscreen tap and DPAD_CENTER for doors/objects
-R1: plasma saw melee via Xperia DPAD_UP (needs physical verification)
+R1: upward upper-left screen swipe for plasma saw (needs physical verification)
 L2 held: aim via original Xperia L1
 R2 while aiming: fire via original Xperia R1
-R2 without aiming: downward touchscreen swipe for stomp (needs verification)
+R2 without aiming: downward upper-left screen swipe for stomp (needs verification)
+Physical DualShock 4 touchpad: swipe UP for plasma saw, DOWN for stomp.
+Touchpad contact alone does not fire or tap the screen.
 Square: reload; Triangle: original Xperia triangle; Share: Select
 D-pad: Xperia directional keys (up overlaps melee key)
 L1: reserved, no longer aliases L2 aim.
@@ -47,13 +49,17 @@ show movement to the first door and camera look during overlapping sticks.
 The Windows executable was tested with Mesa software OpenGL; your physical
 GPU and PS4 USB/Bluetooth connection still need testing. Audio, combat,
 long sessions, level transitions and campaign completion are not verified.
+The game reads texture_env_generic_starfield.m3g from the original APK, but
+its background is still missing in captured opening-cutscene frames. Do NOT
+consider the skybox fixed by the expanded far plane. Enable SkyDiagnostics to
+record texture/cubemap and draw activity.
 The original game passes a perspective projection matrix with near 0.05 and far
 approximately 30. The new Windows renderer's 1200-unit far plane dramatically
 restores exterior ship geometry in the genuine-game opening cutscene captures.
 The launcher now enables this projection correction by default. Hardware
 performance and later scenes should still be checked for depth-buffer issues.
 For controlled A/B rendering tests, open PowerShell in the extracted folder:
-  powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -RenderDiagnostics -InputDiagnostics
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -RenderDiagnostics -InputDiagnostics -SkyDiagnostics
   powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -RenderMinFar 1200
   powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -DisableFog
   powershell -NoProfile -ExecutionPolicy Bypass -File .\\Launch.ps1 -DisableCull

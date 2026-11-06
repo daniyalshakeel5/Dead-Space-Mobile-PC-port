@@ -5,7 +5,7 @@ The portable SDL host now accepts analog stick input from mapped controllers, in
 | Control | Mapping |
 | --- | --- |
 | Left stick | Proportional movement through the game's touchscreen movement path |
-| Right stick | Camera look, without needing F1 mouse capture |
+| Right stick | Camera via *TouchPad* module, never action touchscreen (pending hardware verification) |
 | D-pad | Original directional keys / menu navigation |
 | Cross | Original DPAD_CENTER plus touchscreen centre tap for doors/objects (provisional) |
 | Circle | Original Xperia back key |
@@ -13,8 +13,8 @@ The portable SDL host now accepts analog stick input from mapped controllers, in
 | Triangle | Original Xperia triangle action |
 | L2 (hold) | Original Xperia L1: aim |
 | R2 while L2 held | Original Xperia R1: weapon fire |
-| R1 outside aim | Original Xperia D-pad Up: plasma saw melee |
-| R2 outside aim | Touchscreen downward swipe: stomp (provisional) |
+| R1 outside aim | Native upper-left touchscreen swipe **up** (plasma saw) |
+| R2 outside aim | Native upper-left touchscreen swipe **down** (stomp) |
 | Options | Android Back: pause (observed on physical controller) |
 | Circle | No pause, reserved pending verified Kinesis input |
 | Share | Original Select key |
@@ -49,3 +49,34 @@ The new native OpenGL path instruments glLoadMatrixf/x and glMultMatrixf/x,
 which can receive a prebuilt projection matrix; DS_RENDER_NO_CULL is a
 separate back-face test. Neither matrix-far nor cull-off is a verified fix
 without comparing the original cutscene screenshots.
+
+## November 7 physical-controller follow-up
+
+The user's previous real-Windows test confirmed left-stick movement, but found
+that right-stick camera panning fired the weapon and that the previous
+D-pad-Up melee mapping did not work. The underlying bug was that the camera
+emitted pointer events with the game's TouchScreen module. It now uses the
+separate TouchPad module, as the original Vita implementation does.
+
+The physical DualShock 4 touchpad now listens to SDL
+`SDL_CONTROLLERTOUCHPADDOWN/MOTION/UP` events. A deliberate primarily
+vertical swipe (at least 16% touchpad height) produces the game's *native*
+touchscreen swipe in the upper-left quadrant:
+
+- swipe up: plasma saw
+- swipe down: stomp
+
+Touchpad taps and horizontal camera movements do **not** produce screen taps
+or fire. R1 invokes the same up swipe; R2 outside L2 invokes down swipe.
+L2+R2 remains the original aimed weapon-fire path. Pointer 0 left-stick
+movement stays unchanged.
+
+`DS_PAD_SWIPES=start:direction,...` (direction -1 up, 1 down)
+only injects controller **input events** in genuine-APK CI, not synthetic
+game assets. `DS_INPUT_DIAG=1` prints `[CAMERA_TOUCHPAD]`, `[PAD_TOUCH]`,
+`[PAD_SWIPE]`, `[PAD_ACTION]` and available hardware touchpads.
+
+The original starfield file `texture_env_generic_starfield.m3g` is present
+in genuine APK reads, but the intro's background is still black in prior
+captures. `DS_SKY_DIAG=1` traces OpenGL cube-map binding/texture uploads/
+draw counters. This is research instrumentation, **not a skybox fix**.

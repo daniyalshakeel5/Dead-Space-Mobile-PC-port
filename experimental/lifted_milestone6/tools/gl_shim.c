@@ -49,6 +49,40 @@ static const float* ds_matrix_filter(const float* src, float dst[16], const char
     }
     return src;
 }
+/* Diagnostics only: starfield M3G bytes have been read from the genuine
+ * APK, but the background is absent. Count GL texture/cubemap use and draws
+ * before changing the renderer or inventing a replacement backdrop. */
+static int ds_sky_diag_enabled(void) {
+    static int enabled=-1;
+    if(enabled<0) enabled=getenv("DS_SKY_DIAG")!=NULL;
+    return enabled;
+}
+static unsigned ds_sky_cube_binds, ds_sky_cube_images, ds_sky_draws;
+static u32 ds_sky_bound_target;
+static void ds_sky_diag_bind(u32 target, u32 texture) {
+    if(!ds_sky_diag_enabled()) return;
+    ds_sky_bound_target=target;
+    if(target==0x8513 && ds_sky_cube_binds++<12)
+        fprintf(stderr,"[SKY_GL] bind-cubemap texture=%u count=%u\n",
+                texture, ds_sky_cube_binds);
+}
+static void ds_sky_diag_image(u32 target, u32 width, u32 height) {
+    if(!ds_sky_diag_enabled()) return;
+    if(target>=0x8515 && target<=0x851A) {
+        ++ds_sky_cube_images;
+        if(ds_sky_cube_images<=16)
+            fprintf(stderr,"[SKY_GL] cubemap-face target=%#x size=%ux%u count=%u\n",
+                    target,width,height,ds_sky_cube_images);
+    }
+}
+static void ds_sky_diag_draw(void) {
+    if(!ds_sky_diag_enabled()) return;
+    ++ds_sky_draws;
+    if(ds_sky_draws==1000 || ds_sky_draws==10000 ||
+       ds_sky_draws==100000 || ds_sky_draws==1000000)
+        fprintf(stderr,"[SKY_GL] drawcalls=%u cubemap-binds=%u faces=%u current-target=%#x\n",
+                ds_sky_draws,ds_sky_cube_binds,ds_sky_cube_images,ds_sky_bound_target);
+}
 #include "gl_gen.c"
 
 /* Preserve the game's projection by default. DS_RENDER_DIAG records actual
@@ -255,6 +289,7 @@ static u8* etc1_decode(const u8* src, int w, int h) {
 IMP(glCompressedTexImage2D) {
     T(glCompressedTexImage2D);
     u32 target = r0, level = r1, fmt = r2, w = r3, h = W(4), size = W(6); const u8* data = (const u8*)P(W(7));
+    ds_sky_diag_image(target,w,h);
     if (fmt == 0x8D64) {
         if (dgl_glTexImage2D && data) {
             u8* rgb = etc1_decode(data, (int)w, (int)h);

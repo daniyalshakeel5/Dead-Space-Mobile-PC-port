@@ -1,4 +1,4 @@
-param([string]$Apk, [switch]$PrepareOnly, [switch]$RenderDiagnostics, [switch]$InputDiagnostics, [switch]$DisableFog, [switch]$DisableCull, [switch]$OriginalFarPlane, [double]$RenderMinFar = 1200)
+param([string]$Apk, [switch]$PrepareOnly, [switch]$RenderDiagnostics, [switch]$InputDiagnostics, [switch]$SkyDiagnostics, [switch]$DisableFog, [switch]$DisableCull, [switch]$OriginalFarPlane, [double]$RenderMinFar = 1200)
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $expected = '64a3323cd3cc0c483a645b62af8508624163ba9b'
@@ -63,6 +63,7 @@ try {
     $env:DS_QUIET_JAVA = '1'
     if ($RenderDiagnostics) { $env:DS_RENDER_DIAG = '1' }
     if ($InputDiagnostics) { $env:DS_INPUT_DIAG = '1' }
+    if ($SkyDiagnostics) { $env:DS_SKY_DIAG = '1' }
     if ($DisableFog) { $env:DS_RENDER_NO_FOG = '1' }
     if ($DisableCull) { $env:DS_RENDER_NO_CULL = '1' }
     if ($OriginalFarPlane) { $RenderMinFar = 0 }

@@ -139,6 +139,13 @@ def main(out):
         if gname in done: continue
         done.add(gname)
         o.append(f"IMP({gname}) {{\n  T({gname});\n")
+        # Genuine game sky/starfield diagnostics, disabled by default.
+        if gname == "glBindTexture":
+            o.append("  ds_sky_diag_bind(W(0), W(1));\n")
+        elif gname == "glTexImage2D":
+            o.append("  ds_sky_diag_image(W(0), W(3), W(4));\n")
+        elif gname in ("glDrawElements", "glDrawArrays"):
+            o.append("  ds_sky_diag_draw();\n")
         if dname.startswith("@"):                         # fixed-point matrices: 16 x 16.16 -> float[16]
             fn = "glLoadMatrixf" if dname == "@loadmatrixx" else "glMultMatrixf"
             o.append(f"  if (dgl_{fn}) {{ float m[16], patched[16]; const s32* s = (const s32*)P(r0); for (int i = 0; i < 16; i++) m[i] = fxf((u32)s[i]); dgl_{fn}(ds_matrix_filter(m, patched, \"{gname}\")); }}\n  RET(0);\n}}\n")
