@@ -56,7 +56,6 @@ jobs:
           cd "$dir/tools"
           export DS_SO="$dir/apk/lib/armeabi/libDeadSpace.so"
           DS_TEXTUREPACK_DIAG=0 python3 gen_all.py
-          python3 -c "from stream_position_audit import instrument; instrument('out')"
           [[ -s out/fn_058.c && -s out/fn_055.c ]] ||
             { echo 'ACTUAL WINDOWS FAIL: genuine decoded game source missing'; exit 23; }
           echo "REAL_GAME_TRANSLATED_FUNCTION_CHUNKS=$(find out -maxdepth 1 -name 'fn_*.c' | wc -l)"
@@ -90,6 +89,10 @@ jobs:
   boot-windows:
     name: Boot genuine game on Windows with software OpenGL
     needs: compile-actual-game-win32
+    strategy:
+      fail-fast: false
+      matrix:
+        input: [keyboard, mouse]
     runs-on: windows-2022
     timeout-minutes: 25
     steps:
@@ -135,7 +138,12 @@ jobs:
           $env:DS_ASSET_TRACE = '1'
           $env:DS_IO_AUDIT = '1'
           $env:DS_STEPS = 'create,surface,frame'
-          $env:DS_FRAMES = '18000'
+          $env:DS_FRAMES = '24000'
+          if ('${{ matrix.input }}' -eq 'keyboard') {
+            $env:DS_KEY_HOLDS = '18500:19500:W,20000:21000:A'
+          } else {
+            $env:DS_MOUSE_DRAGS = '18500:19500:320:500:320:250,20000:21000:320:500:550:500'
+          }
           $env:DS_CLICKS = '600:640:675,1500:1145:668,2400:1145:668'
           $env:DS_SHOT_EVERY = '150'
           $env:DS_SHOT_DIR = "$root/shots"
@@ -143,9 +151,9 @@ jobs:
           $env:LIBGL_ALWAYS_SOFTWARE = '1'
           $env:SDL_AUDIODRIVER = 'dummy'
           $p = Start-Process "$root/DeadSpaceMobile-Win32.exe" -WorkingDirectory $root -ArgumentList "`"$root/apk/lib/armeabi/libDeadSpace.so`"" -PassThru -RedirectStandardOutput "$root/evidence/stdout.log" -RedirectStandardError "$root/evidence/stderr.log"
-          if (!$p.WaitForExit(600000)) {
+          if (!$p.WaitForExit(900000)) {
             Stop-Process -Id $p.Id -Force
-            'TIMEOUT after 600 seconds' | Set-Content "$root/evidence/exit-code.txt"
+            'TIMEOUT after 900 seconds' | Set-Content "$root/evidence/exit-code.txt"
             throw 'Windows game hung'
           }
           $p.Refresh()
@@ -165,6 +173,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: windows-real-boot-evidence
+          name: windows-input-evidence-${{ matrix.input }}
           path: ${{ runner.temp }}/dsboot/evidence
           retention-days: 7

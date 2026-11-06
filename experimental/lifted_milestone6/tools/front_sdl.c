@@ -48,8 +48,53 @@ static int map_button(int b, int* alt) {
     }
     return 0;
 }
+/* Optional real-game automation: enqueue ordinary SDL input events so tests
+ * exercise the same mappings and pointer path as a physical keyboard/mouse.
+ * DS_KEY_HOLDS=start:end:SDL-key-name,...
+ * DS_MOUSE_DRAGS=start:end:x0:y0:x1:y1,... (window coordinates). */
+static void sdl_script_input(int frame) {
+    const char* p=getenv("DS_KEY_HOLDS");
+    while(p && *p) {
+        int start,end,n=0; char name[32]={0};
+        if(sscanf(p,"%d:%d:%31[^,]%n",&start,&end,name,&n)!=3 || !n) break;
+        SDL_Scancode sc=SDL_GetScancodeFromName(name);
+        if(start>0 && end>start && sc!=SDL_SCANCODE_UNKNOWN && (frame==start || frame==end)) {
+            SDL_Event e; memset(&e,0,sizeof e);
+            e.type=frame==start ? SDL_KEYDOWN : SDL_KEYUP;
+            e.key.state=frame==start ? SDL_PRESSED : SDL_RELEASED;
+            e.key.keysym.scancode=sc;
+            e.key.keysym.sym=SDL_GetKeyFromScancode(sc);
+            if(SDL_PushEvent(&e)<0) fprintf(stderr,"[INPUT_SCRIPT_ERROR] %s\n",SDL_GetError());
+            fprintf(stderr,"[INPUT_SCRIPT] frame=%d key=%s down=%d\n",frame,name,frame==start);
+        }
+        p+=n; if(*p==',') ++p; else break;
+    }
+    p=getenv("DS_MOUSE_DRAGS");
+    while(p && *p) {
+        int start,end,x0,y0,x1,y1,n=0;
+        if(sscanf(p,"%d:%d:%d:%d:%d:%d%n",&start,&end,&x0,&y0,&x1,&y1,&n)!=6 || !n) break;
+        if(start>0 && end>start && frame>=start && frame<=end) {
+            int x=x0+(int)(((s64)x1-x0)*(frame-start)/(end-start));
+            int y=y0+(int)(((s64)y1-y0)*(frame-start)/(end-start));
+            SDL_Event e; memset(&e,0,sizeof e);
+            if(frame==start || frame==end) {
+                e.type=frame==start ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+                e.button.button=SDL_BUTTON_LEFT;
+                e.button.state=frame==start ? SDL_PRESSED : SDL_RELEASED;
+                e.button.x=x; e.button.y=y;
+                fprintf(stderr,"[INPUT_SCRIPT] frame=%d mouse_down=%d x=%d y=%d\n",frame,frame==start,x,y);
+            } else {
+                e.type=SDL_MOUSEMOTION; e.motion.state=SDL_BUTTON_LMASK;
+                e.motion.x=x; e.motion.y=y;
+            }
+            if(SDL_PushEvent(&e)<0) fprintf(stderr,"[INPUT_SCRIPT_ERROR] %s\n",SDL_GetError());
+        }
+        p+=n; if(*p==',') ++p; else break;
+    }
+}
 // returns 0 when the user closed the window; *resized is set when the drawable size changed
 static int sdl_pump(int* resized) {
+    static int frame; sdl_script_input(++frame);
     SDL_Event e; *resized = 0;
     while (SDL_PollEvent(&e)) {
         if (e.type == SDL_QUIT) return 0;
