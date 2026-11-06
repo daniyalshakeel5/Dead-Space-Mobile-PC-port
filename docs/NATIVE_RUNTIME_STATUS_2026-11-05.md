@@ -1,6 +1,6 @@
 # Native runtime status — November 5, 2026
 
-The Windows diagnostic executable has now independently rendered the original 3D corridor and movement tutorial. Stability and controls are not yet fully verified. Full native Windows compilation passes. One Windows run completed 3,600 frames through difficulty selection and the developer intro; a repeat of that same executable crashed during model loading. Linux model loading also remains unstable. Keyboard/mouse gameplay, PS4 sticks, audio and hardware GPU behavior still require runtime validation.
+The startup model-corruption race has been identified and repaired: JNI object monitors were no-ops, allowing font and model reads to overwrite the same shared Java byte array. The fixed Windows build completed 18,000 frames, reached the original 3D corridor/movement tutorial, and produced zero mismatches across 26,466 checked read/copy transfers. Linux runtime verification is in progress. Keyboard/mouse gameplay, PS4 sticks, audio and hardware GPU behavior still require validation.
 
 ## Windows compile verified
 
@@ -52,3 +52,13 @@ Run https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42
 A remaining data discrepancy is now localized: slasher.m3g object at position 85328 has length 1129 and correctly ends at 86462 in both traces. In the earlier clean capture, bytes at 86462 begin `02 18 00 00 00`; in extended attempt 2 they begin `39 11 12 39 2f`. Cache origin and cursor agree (86016 + 446), so the error involves buffer contents across a refill rather than this object's length arithmetic. The latter run makes an invalid seek to 792355796 yet reaches the corridor. Do not treat clean exit as proof that all assets decoded correctly.
 
 The next diagnostic extends actual stream-position logging and adds read/copy checksums to distinguish wrong file reads from JNI transfer corruption. It changes observation only.
+
+## Verified shared-buffer cause and repair
+
+Before the monitor fix, run https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42180292668 captured two read/copy checksum mismatches. Font loading (thread 1) and model loading (thread 8) wrote to the same Java byte array, handle 0x10040, data pointer 0x1e058560. The slasher read at end position 774144 had checksum f8395449, but its immediately following 4096-byte native copy had checksum 4f02868e. A font read/copy also differed. This directly identifies corruption between file read and JNI copy, rather than malformed original assets or object-length arithmetic.
+
+Commit `01fec5a` replaces the no-op MonitorEnter/MonitorExit bindings with per-object recursive pthread mutexes. Allocation/publication is protected by the VM object lock, which is released before blocking on a monitor. Invalid handles, unowned exits and lock failures report JNI failure. `e3cf941` adds the explicit errno header for Linux portability.
+
+After the fix, run https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42181159489 completed 18,000 frames with exit code zero. Its trace confirms successful MonitorEnter/Exit on the shared array, 26,466 comparable read/copy pairs with zero checksum differences, and no enormous skip requests. Frame f18000.png was visually inspected and shows the original textured corridor, player and movement tutorial. Evidence: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42181159489/artifacts/13486410990 .
+
+Linux run 42182135271 tests the same fix without the model-object trace wrappers; Windows run 42182135216 repeats verification with the portability header included. Pending results are not claimed as passes.
