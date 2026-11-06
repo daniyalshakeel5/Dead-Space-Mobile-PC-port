@@ -1,0 +1,56 @@
+name: Package tested Windows controller build
+on:
+  push:
+    branches: [work/deadspace-portable-runtime-2026-11-05]
+    paths: [packaging/windows-controller/**, .github/workflows/windows-controller-package.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  package:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-boot-runtime
+          run-id: 42228747637
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/controller-test
+      - name: Validate launcher with genuine APK in Windows PowerShell 5
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = "$env:RUNNER_TEMP/controller-test"
+          Copy-Item packaging/windows-controller/* $root
+          $tokens = $null; $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$root/Launch.ps1",[ref]$tokens,[ref]$errors) | Out-Null
+          if ($errors.Count) { throw ($errors | Out-String) }
+          gh release download apk-files-for-testing --repo $env:GITHUB_REPOSITORY --pattern 'Deas.Space.Mobile.Fixes.apk' --dir $env:RUNNER_TEMP
+          if ($LASTEXITCODE) { throw 'Real APK download failed' }
+          & powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File "$root/Launch.ps1" -Apk "$env:RUNNER_TEMP/Deas.Space.Mobile.Fixes.apk" -PrepareOnly
+          if ($LASTEXITCODE) { throw 'Real APK preparation failed' }
+          & powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File "$root/Launch.ps1" -PrepareOnly
+          if ($LASTEXITCODE) { throw 'Existing-install validation failed' }
+          if (!(Test-Path "$root/game/assets/published")) { throw 'Assets missing' }
+          if (!(Test-Path "$root/game/assets/var")) { throw 'Save directory missing' }
+      - name: Package executable and launcher without original APK assets
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = "$env:RUNNER_TEMP/controller-test"
+          $dest = "$env:RUNNER_TEMP/DeadSpaceMobile-Windows-Controller-Test"
+          New-Item -ItemType Directory $dest | Out-Null
+          Copy-Item packaging/windows-controller/* $dest
+          foreach ($file in @('DeadSpaceMobile-Win32.exe','SDL2.dll','libwinpthread-1.dll')) { Copy-Item "$root/$file" $dest }
+          Get-ChildItem $dest -File | Sort-Object Name | ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(),$_.Name } | Set-Content "$dest/SHA256SUMS.txt"
+          Compress-Archive -Path $dest -DestinationPath "$env:RUNNER_TEMP/DeadSpaceMobile-Windows-Controller-Test.zip" -CompressionLevel Optimal
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DeadSpaceMobile-Windows-Controller-Test
+          path: ${{ runner.temp }}/DeadSpaceMobile-Windows-Controller-Test.zip
+          retention-days: 7
