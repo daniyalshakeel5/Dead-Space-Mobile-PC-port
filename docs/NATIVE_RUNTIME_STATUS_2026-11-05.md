@@ -1,6 +1,6 @@
 # Native runtime status — November 5, 2026
 
-The startup model-corruption race has been identified and repaired: JNI object monitors were no-ops, allowing font and model reads to overwrite the same shared Java byte array. The fixed Windows build completed 18,000 frames, reached the original 3D corridor/movement tutorial, and produced zero mismatches across 26,466 checked read/copy transfers. Linux runtime verification is in progress. Keyboard/mouse gameplay, PS4 sticks, audio and hardware GPU behavior still require validation.
+The startup model-corruption race has been identified and repaired: JNI object monitors were no-ops, allowing font and model reads to overwrite the same shared Java byte array. The fixed Windows build completed 18,000 frames, reached the original 3D corridor/movement tutorial, and produced zero mismatches across 26,466 checked read/copy transfers. Linux also passed 18,000 frames without model-object trace wrappers, reached the same corridor/tutorial, and had zero mismatches across 26,466 checked transfers. Keyboard/mouse gameplay, PS4 sticks, audio and hardware GPU behavior still require validation.
 
 ## Windows compile verified
 
@@ -61,4 +61,4 @@ Commit `01fec5a` replaces the no-op MonitorEnter/MonitorExit bindings with per-o
 
 After the fix, run https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42181159489 completed 18,000 frames with exit code zero. Its trace confirms successful MonitorEnter/Exit on the shared array, 26,466 comparable read/copy pairs with zero checksum differences, and no enormous skip requests. Frame f18000.png was visually inspected and shows the original textured corridor, player and movement tutorial. Evidence: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42181159489/artifacts/13486410990 .
 
-Linux run 42182135271 tests the same fix without the model-object trace wrappers; Windows run 42182135216 repeats verification with the portability header included. Pending results are not claimed as passes.
+Linux run https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42182135271 passed 18,000 frames with exit code zero, zero model-object trace entries, successful JNI monitor calls, and zero mismatches across 26,466 read/copy checksum comparisons. The final frame f18000.png was visually inspected and shows the original corridor/player/movement tutorial. No enormous skip requests were present. Evidence: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42182135271/artifacts/13486705060 . Windows run 42182135216 is an additional repeat of the same monitor implementation with the explicit portability header.
