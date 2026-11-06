@@ -1,6 +1,6 @@
 # Native runtime status — November 5, 2026
 
-The startup model-corruption race has been identified and repaired: JNI object monitors were no-ops, allowing font and model reads to overwrite the same shared Java byte array. The fixed Windows build completed 18,000 frames, reached the original 3D corridor/movement tutorial, and produced zero mismatches across 26,466 checked read/copy transfers. Linux also passed 18,000 frames without model-object trace wrappers, reached the same corridor/tutorial, and had zero mismatches across 26,466 checked transfers. Keyboard/mouse gameplay, PS4 sticks, audio and hardware GPU behavior still require validation.
+The startup model-corruption race has been identified and repaired: JNI object monitors were no-ops, allowing font and model reads to overwrite the same shared Java byte array. The fixed Windows build completed 18,000 frames, reached the original 3D corridor/movement tutorial, and produced zero mismatches across 26,466 checked read/copy transfers. Linux also passed 18,000 frames without model-object trace wrappers, reached the same corridor/tutorial, and had zero mismatches across 26,466 checked transfers. Analog movement and camera look now work in real-game Windows and Linux tests using SDL virtual controller input. Physical PS4 hardware, combat actions, audio and hardware GPU behavior still require validation.
 
 ## Windows compile verified
 
@@ -70,4 +70,15 @@ Windows run 42225547379 completed two 24,000-frame tests with touch IDs 0 and 1.
 
 Earlier Windows run 42184709979 provided a working reference: a gradual ordinary mouse drag moved the player through the corridor to the look-controls tutorial. The following experiments therefore send gradual swipes. Run 42227866086 compares swipe rates before controller integration.
 
-Commit 5151cd6 adds normalized SDL controller polling, proportional left-stick movement, right-stick look independent of mouse capture, a radial dead zone, and device/focus release handling. Windows run 42228747637 and Linux run 42228867541 exercise it through an SDL virtual controller against the original game; screenshots still require review. Physical PS4 hardware has not been tested. See PC_CONTROLLER_CONTROLS.md for mappings and limits.
+Commit 5151cd6 adds normalized SDL controller polling, proportional left-stick movement, right-stick look independent of mouse capture, a radial dead zone, and device/focus release handling. Windows run 42228747637 and Linux run 42228867541 exercise it through an SDL virtual controller against the original game; screenshots have now been reviewed (results below). Physical PS4 hardware has not been tested. See PC_CONTROLLER_CONTROLS.md for mappings and limits.
+
+
+## Verified analog movement and camera look
+
+Windows run https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42228747637 passed both controller touch-ID variants. Default touch ID 1 evidence (artifact 13508695582) was downloaded and visually inspected: frame 18000 is the starting corridor; 18900 shows the player farther down the corridor; 19500 shows the first door and LOOK CONTROLS tutorial. Frames 20250 and 20700 show camera turning during overlapping left/right-stick input. The run completed 24,000 frames with exit code zero and zero mismatches across 26,466 comparable read/copy transfers.
+
+Linux run https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42228867541 used the same controller implementation and default touch ID 1. Artifact 13506264905 shows the same corridor progression and camera response, also with 24,000 completed frames, exit code zero, and zero mismatches across 26,466 transfers. These tests use the real original game and assets with SDL's virtual-controller input device; they do not verify physical DualShock 4 connectivity.
+
+The movement-only screenshot gate (frames 18000 to 19500, background crop excluding the tutorial/player) measured mean absolute differences of 49.339916 on Windows and 48.952775 on Linux. The previous failed fixed-offset movement measured 0.000010 and is rejected by the same check. Visual inspection establishes that the change is actual corridor traversal, rather than just an animated overlay. Both gradual keyboard swipe rates also passed in run 42227866086.
+
+Keep movement touch ID 1 as default, ordinary mouse touches as ID 0, and camera touches as ID 2. Walk/run tuning, sustained movement/reversal, combat, level transitions and physical controller testing remain open. This is an early gameplay milestone, not a complete campaign stability claim.
