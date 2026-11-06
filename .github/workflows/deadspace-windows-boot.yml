@@ -10,13 +10,17 @@ permissions:
 jobs:
   boot-windows:
     name: Boot genuine game on Windows with software OpenGL
+    strategy:
+      fail-fast: false
+      matrix:
+        attempt: [1, 2, 3]
     runs-on: windows-2022
     timeout-minutes: 25
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: windows-boot-runtime
-          run-id: 42098800665
+          run-id: 42099710126
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/dsboot
       - name: Prepare genuine assets and x86 OpenGL
@@ -87,6 +91,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: windows-real-boot-evidence
+          name: windows-real-boot-evidence-${{ matrix.attempt }}
           path: ${{ runner.temp }}/dsboot/evidence
           retention-days: 7
