@@ -58,6 +58,6 @@ Do not run different test switches simultaneously when comparing screenshots.
 Audio is intentionally not addressed in this build.
 This is an early test build, not a completed game port.
 
-Binary source commit: acd4c1800b7949841be7f5ac5d6c6fcb216ed95e
-Windows test: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42272714707
+Binary source commit: f5c9378fb18e5a83bee220be14b902d7151dfe96
+Windows test: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42280070096
 Development: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/pull/4

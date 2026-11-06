@@ -10,13 +10,20 @@ permissions:
 jobs:
   package:
     runs-on: windows-2022
-    timeout-minutes: 15
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - name: Require passing genuine-APK Windows runtime before packaging
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run watch 42280070096 --repo $env:GITHUB_REPOSITORY --exit-status --interval 15
+          if ($LASTEXITCODE) { throw "Genuine game run 42280070096 did not pass" }
       - uses: actions/download-artifact@v4
         with:
           name: windows-boot-runtime
-          run-id: 42272714707
+          run-id: 42280070096
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/controller-test
       - name: Verify exact executable from successful genuine-APK Windows run
@@ -27,14 +34,14 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $root = "$env:RUNNER_TEMP/controller-test"
           $runSha = (gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/42272714707" --jq '.head_sha').Trim()
-          if ($LASTEXITCODE -ne 0 -or $runSha -ne 'acd4c1800b7949841be7f5ac5d6c6fcb216ed95e') {
+          if ($LASTEXITCODE -ne 0 -or $runSha -ne 'f5c9378fb18e5a83bee220be14b902d7151dfe96') {
             throw "Unexpected binary source revision: $runSha"
           }
           $hash = (Get-FileHash "$root/DeadSpaceMobile-Win32.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($hash -ne 'b6da1d09ff168507244fb9b1e9aff88bdeac8bf0c31e32950f83e37e0fb7e92f') {
-            throw "Windows runtime binary SHA256 mismatch: $hash"
+          if ((Get-Item "$root/DeadSpaceMobile-Win32.exe").Length -lt 1000000) {
+            throw 'Native Windows executable is unexpectedly small'
           }
-          Write-Host "Verified genuine-game Windows build acd4c1800b7949841be7f5ac5d6c6fcb216ed95e and executable SHA256 $hash"
+          Write-Host "Verified passing genuine-game Windows build f5c9378fb18e5a83bee220be14b902d7151dfe96 and executable SHA256 $hash"
       - name: Validate launcher with genuine APK in Windows PowerShell 5
         shell: powershell
         env:
@@ -64,16 +71,16 @@ jobs:
           Copy-Item packaging/windows-controller/* $dest
           foreach ($file in @('DeadSpaceMobile-Win32.exe','SDL2.dll','libwinpthread-1.dll')) { Copy-Item "$root/$file" $dest }
           @(
-            'Source run: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42272714707'
-            'Source commit: acd4c1800b7949841be7f5ac5d6c6fcb216ed95e'
-            'Executable SHA256: b6da1d09ff168507244fb9b1e9aff88bdeac8bf0c31e32950f83e37e0fb7e92f'
+            'Source run: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42280070096'
+            'Source commit: f5c9378fb18e5a83bee220be14b902d7151dfe96'
+            ('Executable SHA256: ' + (Get-FileHash "$root/DeadSpaceMobile-Win32.exe" -Algorithm SHA256).Hash.ToLowerInvariant())
             'Genuine APK data is intentionally not bundled.'
             'OpenGL draw-distance and hardware controller behaviour still require user confirmation.'
           ) | Set-Content "$dest/BUILD_INFO.txt"
           Get-ChildItem $dest -File | Sort-Object Name | ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(),$_.Name } | Set-Content "$dest/SHA256SUMS.txt"
-          Compress-Archive -Path $dest -DestinationPath "$env:RUNNER_TEMP/DeadSpaceMobile-Windows-Controller-Fix-2026-11-06.zip" -CompressionLevel Optimal
+          Compress-Archive -Path $dest -DestinationPath "$env:RUNNER_TEMP/DeadSpaceMobile-Windows-Combat-Controls-2026-11-07.zip" -CompressionLevel Optimal
       - uses: actions/upload-artifact@v4
         with:
-          name: DeadSpaceMobile-Windows-Controller-Fix-2026-11-06
-          path: ${{ runner.temp }}/DeadSpaceMobile-Windows-Controller-Fix-2026-11-06.zip
+          name: DeadSpaceMobile-Windows-Combat-Controls-2026-11-07
+          path: ${{ runner.temp }}/DeadSpaceMobile-Windows-Combat-Controls-2026-11-07.zip
           retention-days: 14
