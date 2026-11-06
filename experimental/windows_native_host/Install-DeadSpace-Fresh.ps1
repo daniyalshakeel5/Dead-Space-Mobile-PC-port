@@ -143,9 +143,10 @@ if not exist "%~dp0..\userdata\var" (
 set "DS_WINDOW=1"
 set "DS_STEPS=create,surface,frame"
 set "DS_FRAMES=0"
-set "DS_NATIVE_BUFFERED_IO=1"
-set "DS_M3G_SERIALIZE=1"
-set "DS_MODELCACHE_NULL_SOURCE_RETURN=1"
+rem Use the original decoder with the repaired JNI monitors; clear legacy workarounds.
+set "DS_NATIVE_BUFFERED_IO="
+set "DS_M3G_SERIALIZE="
+set "DS_MODELCACHE_NULL_SOURCE_RETURN="
 set "DS_QUIET_JAVA=1"
 set "DS_ASSETS=%~dp0..\apk\assets"
 set "DS_DATA=%~dp0..\userdata"
