@@ -37,13 +37,13 @@ The baseline workflow verifies original library SHA-1 `64a3323cd3cc0c483a645b62a
 
 Further captures 42044380174 and 42045533809 still failed. The latter identifies the caller stream as DataInputStream (vtable read target `g_base + 0x324884`) wrapping another stream at offset +4. Before the slasher crash, Java received skip requests of -123,602,854 and +1,294,810,446 bytes. Those values are already implausible; simply permitting backward skips is not an established fix. The current capture does not dump the nested buffered stream's cursor/cache, which remains a useful next target. No reference clamping, fabricated models, or skipped decoder failures were introduced.
 
-## Next work
+## Current next work
 
-1. Inspect the stream/vtable capture and trace the first divergence from genuine model bytes.
-2. Fix the proven source of incorrect reads and rerun first boot through difficulty, intro and corridor. Verify screenshots, not just frame counts.
-3. Run the native Windows executable, then validate keyboard/mouse and the Xperia controller path with a physical PS4 controller.
+1. Verify analog controller movement and simultaneous camera look in the real game, then tune walking/running and reversal.
+2. Test DualShock 4 USB/Bluetooth hardware, combat actions, audio and hardware GPU performance.
+3. Continue beyond the first corridor and validate saves and level transitions.
 
-The archived agent's corridor result remains reported evidence until reproduced. Keep that distinction in subsequent handoffs.
+The startup investigation below is historical; its shared-buffer cause and verified repair are recorded at the end.
 
 ## November 6: corridor reached on Windows
 
@@ -62,3 +62,12 @@ Commit `01fec5a` replaces the no-op MonitorEnter/MonitorExit bindings with per-o
 After the fix, run https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42181159489 completed 18,000 frames with exit code zero. Its trace confirms successful MonitorEnter/Exit on the shared array, 26,466 comparable read/copy pairs with zero checksum differences, and no enormous skip requests. Frame f18000.png was visually inspected and shows the original textured corridor, player and movement tutorial. Evidence: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42181159489/artifacts/13486410990 .
 
 Linux run https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42182135271 passed 18,000 frames with exit code zero, zero model-object trace entries, successful JNI monitor calls, and zero mismatches across 26,466 read/copy checksum comparisons. The final frame f18000.png was visually inspected and shows the original corridor/player/movement tutorial. No enormous skip requests were present. Evidence: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42182135271/artifacts/13486705060 . Windows run 42182135216 is an additional repeat of the same monitor implementation with the explicit portability header.
+
+
+## November 6: input validation and controller implementation
+
+Windows run 42225547379 completed two 24,000-frame tests with touch IDs 0 and 1. Both had exit code zero and zero mismatches across 26,466 comparable read/copy transfers. Visual inspection shows that the immediate fixed-offset WASD drag still did not move the player, even with touch-down separated by a frame. Captured mouse look did turn the camera. Linux run 42226169499 also completed 24,000 frames with the same clean checksums and the same movement failure. These successful process results are not movement passes.
+
+Earlier Windows run 42184709979 provided a working reference: a gradual ordinary mouse drag moved the player through the corridor to the look-controls tutorial. The following experiments therefore send gradual swipes. Run 42227866086 compares swipe rates before controller integration.
+
+Commit 5151cd6 adds normalized SDL controller polling, proportional left-stick movement, right-stick look independent of mouse capture, a radial dead zone, and device/focus release handling. Windows run 42228747637 and Linux run 42228867541 exercise it through an SDL virtual controller against the original game; screenshots still require review. Physical PS4 hardware has not been tested. See PC_CONTROLLER_CONTROLS.md for mappings and limits.
