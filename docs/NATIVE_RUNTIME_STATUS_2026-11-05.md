@@ -1,6 +1,6 @@
 # Native runtime status — November 5, 2026
 
-The game is not yet independently verified as playable. Full native Windows compilation passes. One Windows run completed 3,600 frames through difficulty selection and the developer intro; a repeat of that same executable crashed during model loading. Linux model loading also remains unstable. Keyboard/mouse gameplay, PS4 sticks, audio and hardware GPU behavior still require runtime validation.
+The Windows diagnostic executable has now independently rendered the original 3D corridor and movement tutorial. Stability and controls are not yet fully verified. Full native Windows compilation passes. One Windows run completed 3,600 frames through difficulty selection and the developer intro; a repeat of that same executable crashed during model loading. Linux model loading also remains unstable. Keyboard/mouse gameplay, PS4 sticks, audio and hardware GPU behavior still require runtime validation.
 
 ## Windows compile verified
 
@@ -44,3 +44,11 @@ Further captures 42044380174 and 42045533809 still failed. The latter identifies
 3. Run the native Windows executable, then validate keyboard/mouse and the Xperia controller path with a physical PS4 controller.
 
 The archived agent's corridor result remains reported evidence until reproduced. Keep that distinction in subsequent handoffs.
+
+## November 6: corridor reached on Windows
+
+Run https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42179490573 reused the instrumented executable from 42099710126 in three independent Windows jobs. All three completed 18,000 frames with exit code zero. Frame f18000.png from attempt 2 was inspected: textured original corridor, player character and MOVEMENT CONTROLS tutorial are visible. This verifies corridor rendering, not keyboard/controller gameplay or a root-cause crash fix.
+
+A remaining data discrepancy is now localized: slasher.m3g object at position 85328 has length 1129 and correctly ends at 86462 in both traces. In the earlier clean capture, bytes at 86462 begin `02 18 00 00 00`; in extended attempt 2 they begin `39 11 12 39 2f`. Cache origin and cursor agree (86016 + 446), so the error involves buffer contents across a refill rather than this object's length arithmetic. The latter run makes an invalid seek to 792355796 yet reaches the corridor. Do not treat clean exit as proof that all assets decoded correctly.
+
+The next diagnostic extends actual stream-position logging and adds read/copy checksums to distinguish wrong file reads from JNI transfer corruption. It changes observation only.

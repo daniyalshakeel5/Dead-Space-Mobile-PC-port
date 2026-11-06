@@ -119,7 +119,7 @@ static int stream_read(JObj* o, u8* dst, int len) {
         strcmp(resource + strlen(resource) - 4, ".m3g") == 0;
     long begin = is_m3g ? ftell(fp) : -1;
     size_t n = fread(dst, 1, (size_t)len, fp);
-    if (is_m3g && o->extra++ < 3) {
+    if (is_m3g && o->extra++ < 256) {
         char h[40]={0};
         for (size_t ds_i=0; ds_i<n && ds_i<12; ds_i++)
             snprintf(h+3*ds_i, 4, "%02x ", (unsigned)dst[ds_i]);
@@ -141,6 +141,12 @@ static int stream_read(JObj* o, u8* dst, int len) {
                 "position=%ld eof=%d error=%d\n",
                 o->s ? o->s : "(unknown)", len, n,
                 ftell(fp), feof(fp), ferror(fp));
+    }
+    if (getenv("DS_IO_AUDIT") && len>=512) {
+        u32 hash=2166136261u;
+        for(size_t i=0;i<n;i++) hash=(hash^dst[i])*16777619u;
+        fprintf(stderr,"[JNI_IO_READ] tid=%lu resource=%s dest=%p length=%zu hash=%08x end=%ld\n",
+                (unsigned long)pthread_self(),resource,(void*)dst,n,hash,ftell(fp));
     }
     int result = n ? (int)n : -1;
     pthread_mutex_unlock(&g_objlock);
@@ -548,6 +554,11 @@ static u64 jni_ReleasePrimitiveArrayCritical(u32 r0,u32 r1,u32 r2,u32 r3,u32 sp)
     }
     RET(0);
 }
+static u32 ds_io_hash(const u8* p, u32 n) {
+    u32 h=2166136261u;
+    for(u32 i=0;i<n;i++) h=(h^p[i])*16777619u;
+    return h;
+}
 static u64 jni_ArrayRegionGet(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
     const char* n = sname(); tr(n); JObj* o = OBJ(r1); int esz = esz_of(n); u32 buf = *(u32*)P(sp);
     if (!o || o->kind != K_ARRAY || o->esz != esz || !o->p ||
@@ -559,6 +570,10 @@ static u64 jni_ArrayRegionGet(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
         RET(0);
     }
     memcpy(P(buf), (u8*)o->p + (size_t)r2 * esz, (size_t)r3 * esz);
+    if (getenv("DS_IO_AUDIT") && esz==1 && r3>=512) {
+        fprintf(stderr,"[JNI_IO_COPY] tid=%lu array=%08x offset=%u length=%u dest=%08x hash=%08x\n",
+                (unsigned long)pthread_self(),r1,r2,r3,buf,ds_io_hash(P(buf),r3));
+    }
     if (getenv("DS_ASSET_TRACE") && esz==1 && r3==12) {
         const u8* d=P(buf);
         fprintf(stderr, "[JNI_12_BYTE_READ] tid=%lu dest=%08x array=%08x off=%u bytes=",

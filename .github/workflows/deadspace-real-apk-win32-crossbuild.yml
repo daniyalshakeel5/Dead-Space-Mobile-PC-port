@@ -22,6 +22,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ -f /etc/apt/apt-mirrors.txt ]]; then
+            echo 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt
+          fi
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y \
             python3 python3-pyelftools gcc-mingw-w64-i686-posix \
@@ -130,10 +133,11 @@ jobs:
           $env:DS_NOVSYNC = '1'
           $env:DS_QUIET_JAVA = '1'
           $env:DS_ASSET_TRACE = '1'
+          $env:DS_IO_AUDIT = '1'
           $env:DS_STEPS = 'create,surface,frame'
-          $env:DS_FRAMES = '3600'
+          $env:DS_FRAMES = '18000'
           $env:DS_CLICKS = '600:640:675,1500:1145:668,2400:1145:668'
-          $env:DS_SHOT_EVERY = '30'
+          $env:DS_SHOT_EVERY = '150'
           $env:DS_SHOT_DIR = "$root/shots"
           $env:GALLIUM_DRIVER = 'llvmpipe'
           $env:LIBGL_ALWAYS_SOFTWARE = '1'
