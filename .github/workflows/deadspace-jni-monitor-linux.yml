@@ -1,4 +1,4 @@
-name: Linux gameplay input with separated movement touch events
+name: Linux gameplay with SDL analog controller input
 on:
   push:
     branches: [work/deadspace-portable-runtime-2026-11-05]
@@ -70,8 +70,7 @@ jobs:
           cd "$DS_ROOT/tools/out"
           # Baseline uses the translated routines directly. No optional
           # buffered-reader replacement or null-model recovery is enabled.
-          export DS_KEY_HOLDS='18500:19500:W,19800:19802:F1,20000:21000:A'
-          export DS_MOUSE_LOOK='20100:20300:2:0,20500:20700:0:1'
+          export DS_CONTROLLER_AXES='18500:19500:0:-32768:0:0,20000:20100:-32768:0:0:0,20100:20300:-32768:0:16384:0,20300:20500:-32768:0:0:0,20500:20700:-32768:0:0:8192,20700:21000:-32768:0:0:0'
           timeout --kill-after=20s 900s xvfb-run -a env \
             LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy \
             DS_WINDOW=1 DS_NOVSYNC=1 DS_QUIET_JAVA=1 DS_IO_AUDIT=1 DS_ASSET_TRACE=1 \
