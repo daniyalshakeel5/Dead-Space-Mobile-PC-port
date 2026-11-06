@@ -92,7 +92,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        input: [controller-id0, controller-id1]
+        input: [baseline, far-clip, fog-off]
     runs-on: windows-2022
     timeout-minutes: 25
     steps:
@@ -139,7 +139,11 @@ jobs:
           $env:DS_IO_AUDIT = '1'
           $env:DS_STEPS = 'create,surface,frame'
           $env:DS_FRAMES = '24000'
-          if ('${{ matrix.input }}' -eq 'controller-id0') { $env:DS_PC_MOVE_FINGER = '0' }
+          $env:DS_PC_MOVE_FINGER = '0'
+          $env:DS_RENDER_DIAG = '1'
+          $env:DS_INPUT_DIAG = '1'
+          if ('${{ matrix.input }}' -eq 'far-clip') { $env:DS_RENDER_MIN_FAR = '1200' }
+          if ('${{ matrix.input }}' -eq 'fog-off') { $env:DS_RENDER_NO_FOG = '1' }
           $env:DS_CONTROLLER_AXES = '18500:19500:0:-32768:0:0,20000:20100:-32768:0:0:0,20100:20300:-32768:0:16384:0,20300:20500:-32768:0:0:0,20500:20700:-32768:0:0:8192,20700:21000:-32768:0:0:0'
           $env:DS_CLICKS = '600:640:675,1500:1145:668,2400:1145:668'
           $env:DS_SHOT_EVERY = '150'
