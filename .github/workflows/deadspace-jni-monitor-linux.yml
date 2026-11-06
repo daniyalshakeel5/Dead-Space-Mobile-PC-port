@@ -1,4 +1,4 @@
-name: Linux genuine-game gameplay input verification
+name: Linux gameplay input with separated movement touch events
 on:
   push:
     branches: [work/deadspace-portable-runtime-2026-11-05]
