@@ -6,6 +6,47 @@ static inline float fxf(u32 w) { return (float)(s32)w * (1.0f / 65536.0f); }
 
 #include "gl_gen.c"
 
+/* Preserve the game's projection by default. DS_RENDER_DIAG records actual
+ * first-run/intro frusta; DS_RENDER_MIN_FAR optionally tests whether a short
+ * far clipping plane causes the Windows cutscene's missing background. This
+ * affects desktop clipping only, not native engine-side scene culling. */
+static void ds_forward_frustum(double left, double right, double bottom,
+                               double top, double near_z, double far_z) {
+    double original_far=far_z;
+    const char* min_env=getenv("DS_RENDER_MIN_FAR");
+    if(min_env && *min_env && isfinite(near_z) && isfinite(far_z) &&
+       near_z>0 && far_z>near_z) {
+        char* end=0; double min_far=strtod(min_env,&end);
+        if(end!=min_env && end && !*end && isfinite(min_far) && min_far>far_z)
+            far_z=min_far;
+    }
+    if(getenv("DS_RENDER_DIAG")) {
+        static double last_near=-1, last_far=-1, last_override=-1;
+        static int changes;
+        if(changes<160 && (fabs(last_near-near_z)>1e-4 ||
+                            fabs(last_far-original_far)>1e-3 ||
+                            fabs(last_override-far_z)>1e-3)) {
+            fprintf(stderr,"[RENDER_FRUSTUM] near=%.6g far=%.6g applied_far=%.6g left=%.6g right=%.6g bottom=%.6g top=%.6g\n",
+                    near_z,original_far,far_z,left,right,bottom,top);
+            last_near=near_z; last_far=original_far; last_override=far_z;
+            ++changes;
+        }
+    }
+    if(dgl_glFrustum) dgl_glFrustum(left,right,bottom,top,near_z,far_z);
+}
+IMP(glFrustumf) {
+    T(glFrustumf);
+    ds_forward_frustum(u2f(W(0)),u2f(W(1)),u2f(W(2)),
+                       u2f(W(3)),u2f(W(4)),u2f(W(5)));
+    RET(0);
+}
+IMP(glFrustumx) {
+    T(glFrustumx);
+    ds_forward_frustum(fxf(W(0)),fxf(W(1)),fxf(W(2)),
+                       fxf(W(3)),fxf(W(4)),fxf(W(5)));
+    RET(0);
+}
+
 // ---- state the shim needs to remember
 static u32 g_unpack_align = 4;
 IMP(glPixelStorei) {
@@ -19,7 +60,8 @@ IMP(glPixelStorei) {
 IMP(glEnable) {
     T(glEnable);
     if (!dgl_glEnable) RET(0);
-    if (r0 == 0x8D60) { dgl_glEnable(0x0C60); dgl_glEnable(0x0C61); dgl_glEnable(0x0C62); }   // GL_TEXTURE_GEN_STR_OES
+    if (r0 == 0x0B60 && getenv("DS_RENDER_NO_FOG")) { /* controlled visual A/B test: fog */ }
+    else if (r0 == 0x8D60) { dgl_glEnable(0x0C60); dgl_glEnable(0x0C61); dgl_glEnable(0x0C62); }   // GL_TEXTURE_GEN_STR_OES
     else dgl_glEnable(r0);
     RET(0);
 }
