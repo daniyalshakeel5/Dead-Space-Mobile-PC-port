@@ -5,8 +5,10 @@ static void host_pointer_id(int kind, int finger, float x, float y);
 static void host_key(int down, int keycode, int alt);     // Android key codes (defined in host.c)
 static SDL_Window* g_win; static SDL_GLContext g_ctx; static int g_w, g_h; static float g_sx = 1, g_sy = 1;
 
+static void pad_init(void);
 static int sdl_open(int w, int h) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER) != 0) { fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError()); return 0; }
+    pad_init();
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2); SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1); SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24); SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     g_win = SDL_CreateWindow("Dead Space", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h,
@@ -25,6 +27,13 @@ static int sdl_open(int w, int h) {
  * finger IDs allow movement, mouse look and ordinary menu touches together. */
 static int pc_w,pc_a,pc_s,pc_d,pc_shift,pc_capture,pc_move_active,pc_look_active;
 static int pc_fire,pc_aim;
+static SDL_GameController* pad;
+static SDL_JoystickID pad_id=-1;
+static SDL_Joystick* test_pad;
+static int pad_buttons[SDL_CONTROLLER_BUTTON_MAX];
+static int pad_focused=1;
+static void pad_release(void);
+static void pad_read(float* lx,float* ly,float* rx,float* ry);
 static int pc_move_finger(void) {
     const char* p=getenv("DS_PC_MOVE_FINGER");
     return p && !strcmp(p,"0") ? 0 : 1;
@@ -47,9 +56,13 @@ static void pc_set_capture(int enabled) {
 }
 static void pc_update(float dx,float dy) {
     float x=(float)(pc_d-pc_a),y=(float)(pc_s-pc_w);
-    float len=sqrtf(x*x+y*y);
-    if(len>0) {
-        x/=len; y/=len;
+    float len=sqrtf(x*x+y*y),lx=0,ly=0,rx=0,ry=0;
+    if(len>1) { x/=len; y/=len; }
+    pad_read(&lx,&ly,&rx,&ry);
+    if(lx!=0 || ly!=0) { x=lx; y=ly; }
+    /* Stick camera does not need desktop mouse capture. */
+    dx+=rx*4.0f; dy+=ry*4.0f;
+    if(x!=0 || y!=0) {
         float bx=g_w*.25f,by=g_h*(500.0f/720.0f);
         if(!pc_move_active) {
             /* The game must consume the down position before the drag.
@@ -72,7 +85,7 @@ static void pc_update(float dx,float dy) {
         host_pointer_id(2,pc_move_finger(),pc_move_x,pc_move_y); pc_move_active=0;
     }
     if(pc_look_active) { host_pointer_id(2,2,pc_look_x,pc_look_y); pc_look_active=0; }
-    if(pc_capture && (dx!=0 || dy!=0)) {
+    if((pc_capture || rx!=0 || ry!=0) && (dx!=0 || dy!=0)) {
         float bx=g_w*.75f,by=g_h*.50f;
         dx=fmaxf(-g_w*.20f,fminf(g_w*.20f,dx*g_sx));
         dy=fmaxf(-g_h*.40f,fminf(g_h*.40f,dy*g_sy));
@@ -108,6 +121,79 @@ static int map_button(int b, int* alt) {
         case SDL_CONTROLLER_BUTTON_DPAD_LEFT: return 21; case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: return 22;
     }
     return 0;
+}
+/* SDL normalizes DualShock 4 USB/Bluetooth and other mapped controllers.
+ * Only one device owns gameplay input; release it before adopting another. */
+static void pad_open(int index) {
+    if(pad || !SDL_IsGameController(index)) return;
+    pad=SDL_GameControllerOpen(index);
+    if(!pad) { fprintf(stderr,"[CONTROLLER] open failed: %s\n",SDL_GetError()); return; }
+    pad_id=SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(pad));
+    fprintf(stderr,"[CONTROLLER] connected: %s id=%d\n",SDL_GameControllerName(pad),(int)pad_id);
+}
+static void pad_init(void) {
+    if(getenv("DS_CONTROLLER_AXES")) {
+        int index=SDL_JoystickAttachVirtual(SDL_JOYSTICK_TYPE_GAMECONTROLLER,
+                                          SDL_CONTROLLER_AXIS_MAX,SDL_CONTROLLER_BUTTON_MAX,0);
+        if(index>=0) test_pad=SDL_JoystickOpen(index);
+        if(test_pad) {
+            SDL_JoystickSetVirtualAxis(test_pad,SDL_CONTROLLER_AXIS_TRIGGERLEFT,-32768);
+            SDL_JoystickSetVirtualAxis(test_pad,SDL_CONTROLLER_AXIS_TRIGGERRIGHT,-32768);
+        }
+        if(!test_pad) fprintf(stderr,"[INPUT_SCRIPT_ERROR] virtual controller: %s\n",SDL_GetError());
+    }
+    for(int i=0;i<SDL_NumJoysticks();i++) pad_open(i);
+}
+static void pad_release(void) {
+    for(int b=0;b<SDL_CONTROLLER_BUTTON_MAX;b++) if(pad_buttons[b]) {
+        int alt,k=map_button(b,&alt); if(k) host_key(0,k,alt);
+        pad_buttons[b]=0;
+    }
+    pc_release();
+}
+static void pad_stick(Sint16 rawx,Sint16 rawy,float* x,float* y) {
+    float ax=rawx/32768.0f,ay=rawy/32768.0f;
+    float length=sqrtf(ax*ax+ay*ay),deadzone=.18f;
+    if(length<=deadzone) { *x=*y=0; return; }
+    float magnitude=(fminf(length,1.0f)-deadzone)/(1.0f-deadzone);
+    *x=ax/length*magnitude; *y=ay/length*magnitude;
+}
+static void pad_read(float* lx,float* ly,float* rx,float* ry) {
+    if(!pad || !pad_focused || !SDL_GameControllerGetAttached(pad)) return;
+    pad_stick(SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_LEFTX),
+              SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_LEFTY),lx,ly);
+    pad_stick(SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_RIGHTX),
+              SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_RIGHTY),rx,ry);
+    for(int b=0;b<SDL_CONTROLLER_BUTTON_MAX;b++) {
+        int down=SDL_GameControllerGetButton(pad,(SDL_GameControllerButton)b)!=0;
+        /* L2/R2 alias the game's Xperia L1/R1 actions. */
+        if(b==SDL_CONTROLLER_BUTTON_LEFTSHOULDER)
+            down|=SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_TRIGGERLEFT)>8192;
+        if(b==SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)
+            down|=SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_TRIGGERRIGHT)>8192;
+        if(down!=pad_buttons[b]) {
+            int alt,k=map_button(b,&alt); if(k) host_key(down,k,alt);
+            pad_buttons[b]=down;
+        }
+    }
+}
+/* Virtual axes go through SDL's device/mapping/state pipeline, then the same
+ * polling path as hardware. The game executable and assets remain genuine. */
+static void pad_script(int frame) {
+    if(!test_pad) return;
+    int axes[4]={0,0,0,0};
+    const char* p=getenv("DS_CONTROLLER_AXES");
+    while(p && *p) {
+        int start,end,lx,ly,rx,ry,n=0;
+        if(sscanf(p,"%d:%d:%d:%d:%d:%d%n",&start,&end,&lx,&ly,&rx,&ry,&n)!=6 || !n) break;
+        if(frame>=start && frame<end) {
+            axes[0]=lx; axes[1]=ly; axes[2]=rx; axes[3]=ry;
+            if(frame==start) fprintf(stderr,"[INPUT_SCRIPT] controller frame=%d left=%d,%d right=%d,%d\n",frame,lx,ly,rx,ry);
+        }
+        p+=n; if(*p==',') ++p; else break;
+    }
+    for(int i=0;i<4;i++) SDL_JoystickSetVirtualAxis(test_pad,i,(Sint16)fmaxf(-32768,fminf(32767,axes[i])));
+    SDL_JoystickUpdate();
 }
 /* Optional real-game automation: enqueue ordinary SDL input events so tests
  * exercise the same mappings and pointer path as a physical keyboard/mouse.
@@ -166,7 +252,7 @@ static void sdl_script_input(int frame) {
 }
 // returns 0 when the user closed the window; *resized is set when the drawable size changed
 static int sdl_pump(int* resized) {
-    static int frame; sdl_script_input(++frame);
+    static int frame; sdl_script_input(++frame); pad_script(frame);
     SDL_Event e; float look_dx=0,look_dy=0; *resized = 0;
     while (SDL_PollEvent(&e)) {
         if (e.type == SDL_QUIT) { pc_release(); return 0; }
@@ -183,7 +269,7 @@ static int sdl_pump(int* resized) {
             int alt,k=map_scancode(sc,&alt); if(k) host_key(down,k,alt);
         }
         if(e.type==SDL_WINDOWEVENT && e.window.event==SDL_WINDOWEVENT_FOCUS_LOST) {
-            pc_set_capture(0); host_pointer(2,0,0);
+            pad_focused=0; pad_release(); pc_set_capture(0); host_pointer(2,0,0);
         }
         if(pc_capture && (e.type==SDL_MOUSEBUTTONDOWN || e.type==SDL_MOUSEBUTTONUP)) {
             int down=e.type==SDL_MOUSEBUTTONDOWN;
@@ -192,8 +278,13 @@ static int sdl_pump(int* resized) {
             continue;
         }
         if(pc_capture && e.type==SDL_MOUSEMOTION) { look_dx+=e.motion.xrel; look_dy+=e.motion.yrel; continue; }
-        if (e.type == SDL_CONTROLLERBUTTONDOWN || e.type == SDL_CONTROLLERBUTTONUP) { int alt, k = map_button(e.cbutton.button, &alt); if (k) host_key(e.type == SDL_CONTROLLERBUTTONDOWN, k, alt); }
-        if (e.type == SDL_CONTROLLERDEVICEADDED) SDL_GameControllerOpen(e.cdevice.which);
+        if(e.type==SDL_WINDOWEVENT && e.window.event==SDL_WINDOWEVENT_FOCUS_GAINED) pad_focused=1;
+        if(e.type==SDL_CONTROLLERDEVICEADDED) pad_open(e.cdevice.which);
+        if(e.type==SDL_CONTROLLERDEVICEREMOVED && e.cdevice.which==pad_id) {
+            pad_release(); SDL_GameControllerClose(pad); pad=NULL; pad_id=-1;
+            fprintf(stderr,"[CONTROLLER] disconnected\n");
+            for(int i=0;i<SDL_NumJoysticks();i++) pad_open(i);
+        }
         if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) host_pointer(0, (float)e.button.x * g_sx, (float)e.button.y * g_sy);
         if (e.type == SDL_MOUSEMOTION && (e.motion.state & SDL_BUTTON_LMASK)) host_pointer(1, (float)e.motion.x * g_sx, (float)e.motion.y * g_sy);
         if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) host_pointer(2, (float)e.button.x * g_sx, (float)e.button.y * g_sy);

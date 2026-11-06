@@ -92,7 +92,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        input: [swipe-slow, swipe-fast]
+        input: [controller-id0, controller-id1]
     runs-on: windows-2022
     timeout-minutes: 25
     steps:
@@ -139,13 +139,8 @@ jobs:
           $env:DS_IO_AUDIT = '1'
           $env:DS_STEPS = 'create,surface,frame'
           $env:DS_FRAMES = '24000'
-          if ('${{ matrix.input }}' -ne 'mouse') {
-            if ('${{ matrix.input }}' -eq 'swipe-fast') { $env:DS_PC_MOVE_FAST = '1' }
-            $env:DS_KEY_HOLDS = '18500:19500:W,19800:19802:F1,20000:21000:A'
-            $env:DS_MOUSE_LOOK = '20100:20300:2:0,20500:20700:0:1'
-          } else {
-            $env:DS_MOUSE_DRAGS = '18500:19500:320:500:320:250,20000:21000:320:500:550:500'
-          }
+          if ('${{ matrix.input }}' -eq 'controller-id0') { $env:DS_PC_MOVE_FINGER = '0' }
+          $env:DS_CONTROLLER_AXES = '18500:19500:0:-32768:0:0,20000:20100:-32768:0:0:0,20100:20300:-32768:0:16384:0,20300:20500:-32768:0:0:0,20500:20700:-32768:0:0:8192,20700:21000:-32768:0:0:0'
           $env:DS_CLICKS = '600:640:675,1500:1145:668,2400:1145:668'
           $env:DS_SHOT_EVERY = '150'
           $env:DS_SHOT_DIR = "$root/shots"
