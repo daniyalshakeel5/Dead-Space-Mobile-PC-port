@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 
 enum { K_NONE, K_CLASS, K_STRING, K_OBJECT, K_ARRAY, K_OBJARR, K_ASSETMGR, K_STREAM, K_AFD };
-typedef struct { u8 kind; u8 esz; char* s; void* p; u32 n; u32 extra; } JObj;
+typedef struct { u8 kind; u8 esz; char* s; void* p; u32 n; u32 extra; pthread_mutex_t* monitor; } JObj;
 #define OBJ_CHUNK 1024
 static JObj* g_chunk[4096]; static u32 g_nobjs; /* published with release/acquire */
 static pthread_mutex_t g_objlock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;       // object table, class cache and Java-side state
@@ -487,6 +487,38 @@ static u64 jni_GetVersion(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr("JNI:GetV
 static u64 jni_FindClass(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr("JNI:FindClass"); RET(class_handle(P(r1))); }
 static u64 jni_GetObjectClass(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr(sname()); RET(class_handle(cls_of(r1))); }
 static u64 jni_ref(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr(sname()); RET(r1); }
+/* JNI object monitors are recursive and shared by every reference to an
+ * object. Handles are stable for this VM's lifetime, so the monitor stays
+ * valid while a thread owns it or waits for it. Never wait under g_objlock. */
+static u64 jni_monitor(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
+    const char* name=sname(); tr(name);
+    int enter=strstr(name,"MonitorEnter")!=NULL;
+    JObj* o=OBJ(r1);
+    if(!o) { g_exception=1; RET((u32)-1); }
+    pthread_mutex_lock(&g_objlock);
+    if(enter && !o->monitor) {
+        pthread_mutex_t* m=malloc(sizeof *m);
+        pthread_mutexattr_t attr;
+        int rc=m ? pthread_mutexattr_init(&attr) : ENOMEM;
+        if(!rc) {
+            rc=pthread_mutexattr_settype(&attr,PTHREAD_MUTEX_RECURSIVE);
+            if(!rc) rc=pthread_mutex_init(m,&attr);
+            pthread_mutexattr_destroy(&attr);
+        }
+        if(rc) { free(m); pthread_mutex_unlock(&g_objlock); g_exception=1; RET((u32)-1); }
+        o->monitor=m;
+    }
+    pthread_mutex_t* m=o->monitor;
+    pthread_mutex_unlock(&g_objlock);
+    int rc=m ? (enter ? pthread_mutex_lock(m) : pthread_mutex_unlock(m)) : EPERM;
+    if(getenv("DS_IO_AUDIT")) {
+        static __thread unsigned reports;
+        if(reports++<128) fprintf(stderr,"[JNI_MONITOR] tid=%lu method=%s object=%08x result=%d\n",
+            (unsigned long)pthread_self(),name,r1,rc);
+    }
+    if(rc) g_exception=1;
+    RET(rc ? (u32)-1 : 0);
+}
 static u64 jni_noop(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr(sname()); RET(0); }
 static u64 jni_exc_check(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr(sname()); RET(g_exception ? 1 : 0); }
 static u64 jni_exc_clear(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr(sname()); g_exception = 0; RET(0); }
@@ -702,7 +734,8 @@ static void build_jni(void) {
         else if (!strcmp(n, "GetStringChars")) f = jni_GetStringChars;
         else if (!strcmp(n, "ReleaseStringChars")) f = jni_ReleaseStringChars;
         else if (!strcmp(n, "PopLocalFrame")) f = jni_PopLocalFrame;
-        else if (!strcmp(n, "PushLocalFrame") || !strcmp(n, "MonitorEnter") || !strcmp(n, "MonitorExit") || !strcmp(n, "EnsureLocalCapacity")) f = jni_noop;
+        else if (!strcmp(n, "MonitorEnter") || !strcmp(n, "MonitorExit")) f = jni_monitor;
+        else if (!strcmp(n, "PushLocalFrame") || !strcmp(n, "EnsureLocalCapacity")) f = jni_noop;
         else if (!strcmp(n, "NewStringUTF")) f = jni_NewStringUTF;
         else if (!strcmp(n, "GetStringUTFChars")) f = jni_GetStringUTFChars;
         else if (!strcmp(n, "ReleaseStringUTFChars")) f = jni_noop;
