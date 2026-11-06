@@ -88,17 +88,17 @@ static void pad_swipe_tick(void) {
     ++pad_swipe_phase;
 }
 static void pad_physical_touch(const SDL_Event* e) {
-    if (!pad || e->ctouch.which!=pad_id || e->ctouch.touchpad!=0)
+    if (!pad || e->ctouchpad.which!=pad_id || e->ctouchpad.touchpad!=0)
         return;
     if(e->type==SDL_CONTROLLERTOUCHPADDOWN) {
         if(!pad_physical_touch_down) {
             pad_physical_touch_down=1;
-            pad_physical_touch_finger=e->ctouch.finger;
-            pad_physical_x0=pad_physical_x1=e->ctouch.x;
-            pad_physical_y0=pad_physical_y1=e->ctouch.y;
+            pad_physical_touch_finger=e->ctouchpad.finger;
+            pad_physical_x0=pad_physical_x1=e->ctouchpad.x;
+            pad_physical_y0=pad_physical_y1=e->ctouchpad.y;
         }
-    } else if(pad_physical_touch_down && e->ctouch.finger==pad_physical_touch_finger) {
-        pad_physical_x1=e->ctouch.x; pad_physical_y1=e->ctouch.y;
+    } else if(pad_physical_touch_down && e->ctouchpad.finger==pad_physical_touch_finger) {
+        pad_physical_x1=e->ctouchpad.x; pad_physical_y1=e->ctouchpad.y;
         if(e->type==SDL_CONTROLLERTOUCHPADUP) {
             float dx=pad_physical_x1-pad_physical_x0;
             float dy=pad_physical_y1-pad_physical_y0;
