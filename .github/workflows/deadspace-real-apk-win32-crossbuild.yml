@@ -92,7 +92,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        input: [keyboard-id0, keyboard-id1]
+        input: [swipe-slow, swipe-fast]
     runs-on: windows-2022
     timeout-minutes: 25
     steps:
@@ -140,7 +140,7 @@ jobs:
           $env:DS_STEPS = 'create,surface,frame'
           $env:DS_FRAMES = '24000'
           if ('${{ matrix.input }}' -ne 'mouse') {
-            if ('${{ matrix.input }}' -eq 'keyboard-id0') { $env:DS_PC_MOVE_FINGER = '0' }
+            if ('${{ matrix.input }}' -eq 'swipe-fast') { $env:DS_PC_MOVE_FAST = '1' }
             $env:DS_KEY_HOLDS = '18500:19500:W,19800:19802:F1,20000:21000:A'
             $env:DS_MOUSE_LOOK = '20100:20300:2:0,20500:20700:0:1'
           } else {

@@ -50,16 +50,23 @@ static void pc_update(float dx,float dy) {
     float len=sqrtf(x*x+y*y);
     if(len>0) {
         x/=len; y/=len;
-        float bx=g_w*.25f,by=g_h*.70f;
+        float bx=g_w*.25f,by=g_h*(500.0f/720.0f);
         if(!pc_move_active) {
             /* The game must consume the down position before the drag.
              * Same-frame down/move can lose the joystick's anchor. */
             pc_move_x=bx; pc_move_y=by;
             host_pointer_id(0,pc_move_finger(),bx,by); pc_move_active=1;
         } else {
-            pc_move_x=bx+x*g_w*.16f;
-            pc_move_y=by+y*g_h*(pc_shift ? .35f : .20f);
-            host_pointer_id(1,pc_move_finger(),pc_move_x,pc_move_y);
+            /* Advance through a swipe instead of teleporting to its end.
+             * Match the real mouse drag used by the gameplay regression. */
+            float speed=getenv("DS_PC_MOVE_FAST") ? 1.0f : .25f;
+            if(pc_shift) speed*=2.0f;
+            pc_move_x+=x*speed*g_w/1280.0f;
+            pc_move_y+=y*speed*g_h/720.0f;
+            if(fabsf(pc_move_x-bx)>g_w*.20f || fabsf(pc_move_y-by)>g_h*.35f) {
+                host_pointer_id(2,pc_move_finger(),pc_move_x,pc_move_y);
+                pc_move_active=0;
+            } else host_pointer_id(1,pc_move_finger(),pc_move_x,pc_move_y);
         }
     } else if(pc_move_active) {
         host_pointer_id(2,pc_move_finger(),pc_move_x,pc_move_y); pc_move_active=0;
