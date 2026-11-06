@@ -72,13 +72,13 @@ same("glActiveTexture", "glAlphaFunc", "glBindBuffer", "glBindTexture", "glBlend
      "glTexEnvfv", "glTexEnvi", "glTexEnviv", "glTexImage2D", "glTexParameterf", "glTexParameterfv", "glTexParameteri",
      "glTexParameteriv", "glTexSubImage2D", "glTranslatef", "glVertexPointer", "glViewport", "glIsEnabled")
 S += [
- ("glClearDepthf", "f", "glClearDepth"), ("glDepthRangef", "ff", "glDepthRange"), ("glFrustumf", "ffffff", "glFrustum"),
+ ("glClearDepthf", "f", "glClearDepth"), ("glDepthRangef", "ff", "glDepthRange"), 
  ("glOrthof", "ffffff", "glOrtho"),
  ("glBlendFuncSeparateOES", "uuuu", "glBlendFuncSeparate"), ("glBlendEquationOES", "u", "glBlendEquation"),
  ("glBlendEquationSeparateOES", "uu", "glBlendEquationSeparate"),
  # fixed point
  ("glAlphaFuncx", "ux", "glAlphaFunc"), ("glClearColorx", "xxxx", "glClearColor"), ("glClearDepthx", "x", "glClearDepth"),
- ("glColor4x", "xxxx", "glColor4f"), ("glDepthRangex", "xx", "glDepthRange"), ("glFrustumx", "xxxxxx", "glFrustum"),
+ ("glColor4x", "xxxx", "glColor4f"), ("glDepthRangex", "xx", "glDepthRange"), 
  ("glLightx", "uux", "glLightf"), ("glLineWidthx", "x", "glLineWidth"), ("glLoadMatrixx", "p", "@loadmatrixx"),
  ("glMaterialx", "uux", "glMaterialf"), ("glMultMatrixx", "p", "@multmatrixx"), ("glMultiTexCoord4x", "uxxxx", "glMultiTexCoord4f"),
  ("glNormal3x", "xxx", "glNormal3f"), ("glOrthox", "xxxxxx", "glOrtho"), ("glPointParameterx", "ux", "glPointParameterf"),
