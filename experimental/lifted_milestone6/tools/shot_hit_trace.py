@@ -78,7 +78,7 @@ def patch(out: Path) -> list[str]:
         info.append(f"instrumented {name} at RVA 0x{rva} in {f.name}")
     # Crucial: PlasmaCutter::onFire does NOT call Weapon::performRaycast
     # for its actual shots. It directly calls original physics f_0023e12c
-    # twice, using the callback result at sp+28. Instrument those exact
+    # five times (three cutting beams plus additional ray checks), using the callback result at sp+28. Instrument those exact
     # call sites without changing the ray, filtering, or collision physics.
     fire_name = "u64 f_001f6344("
     ray_call = (
@@ -98,9 +98,9 @@ def patch(out: Path) -> list[str]:
         raise RuntimeError(f"PlasmaCutter::onFire found {len(fire_matches)} times")
     f,source,begin,finish=fire_matches[0]
     body=source[begin:finish]
-    if body.count(ray_call)!=2:
+    if body.count(ray_call)!=5:
         raise RuntimeError(
-            f"Expected exactly 2 original plasma-cutter physics-ray calls, "
+            f"Expected exactly 5 original plasma-cutter physics-ray calls, "
             f"found {body.count(ray_call)}; refusing to guess"
         )
     trace=(
@@ -117,6 +117,6 @@ def patch(out: Path) -> list[str]:
     # Replace both native-authentic call sites; no modification of state.
     body=body.replace(ray_call,trace)
     changes[f]=source[:begin]+body+source[finish:]
-    info.append("instrumented two real PlasmaCutter physics-ray calls and result callbacks")
+    info.append("instrumented all five native PlasmaCutter physics-ray calls and result callbacks")
     for file,content in changes.items():file.write_text(content)
     return info
