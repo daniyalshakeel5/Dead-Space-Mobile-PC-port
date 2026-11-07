@@ -29,6 +29,10 @@ PROBES = {
      "WeaponPlasmaCutter::onFire",
      'if(getenv("DS_AIM_DIAG")) fprintf(stderr,"[AIM_FIRE] plasma-cutter onFire weapon=%08x\\n",r0);'
  ),
+ "0023e12c": (
+     "Original physics world ray-test entry (called directly by PlasmaCutter::onFire)",
+     'if(getenv("DS_AIM_DIAG")) { static unsigned n; if(++n<=120) fprintf(stderr,"[AIM_PHYSICS_WORLD_RAY] world=%08x from=%08x to=%08x callback=%08x count=%u\\n",r0,r1,r2,r3,n); }'
+ ),
  "001eec34": (
      "Weapon::performRaycast",
      'if(getenv("DS_AIM_DIAG")) { fprintf(stderr,"[AIM_RAYCAST] result=%08x from=%08x to=%08x\\n",r0,r1,r2); if(r1 && r2) fprintf(stderr,"[AIM_RAY_SEGMENT] origin=(%.4f,%.4f,%.4f) endpoint=(%.4f,%.4f,%.4f)\\n",u2f(LD32(r1+0u)),u2f(LD32(r1+4u)),u2f(LD32(r1+8u)),u2f(LD32(r2+0u)),u2f(LD32(r2+4u)),u2f(LD32(r2+8u))); }'
@@ -72,5 +76,47 @@ def patch(out: Path) -> list[str]:
         content=content[:brace+1]+'\n'+probe+content[brace+1:]
         changes[f]=content
         info.append(f"instrumented {name} at RVA 0x{rva} in {f.name}")
+    # Crucial: PlasmaCutter::onFire does NOT call Weapon::performRaycast
+    # for its actual shots. It directly calls original physics f_0023e12c
+    # twice, using the callback result at sp+28. Instrument those exact
+    # call sites without changing the ray, filtering, or collision physics.
+    fire_name = "u64 f_001f6344("
+    ray_call = (
+        "  { u64 rv = f_0023e12c(r0, r1, r2, r3, sp);"
+        " r0 = (u32)rv; r1 = (u32)(rv>>32); }"
+    )
+    fire_matches=[]
+    for f in files:
+        source=changes.get(f)
+        if source is None: source=f.read_text()
+        begin=source.find(fire_name)
+        if begin<0:continue
+        finish=source.find("\\nu64 f_", begin+len(fire_name))
+        if finish<0:finish=len(source)
+        fire_matches.append((f,source,begin,finish))
+    if len(fire_matches)!=1:
+        raise RuntimeError(f"PlasmaCutter::onFire found {len(fire_matches)} times")
+    f,source,begin,finish=fire_matches[0]
+    body=source[begin:finish]
+    if body.count(ray_call)!=2:
+        raise RuntimeError(
+            f"Expected exactly 2 original plasma-cutter physics-ray calls, "
+            f"found {body.count(ray_call)}; refusing to guess"
+        )
+    trace=(
+        '  if(getenv("DS_AIM_DIAG")) { '
+        'static unsigned n; ++n; '
+        'fprintf(stderr,"[AIM_SHOT_RAY] shot_ray=%u world=%08x start=(%.5f,%.5f,%.5f) end=(%.5f,%.5f,%.5f) callback=%08x\\\\n",'
+        'n,r0,u2f(LD32(r1)),u2f(LD32(r1+4u)),u2f(LD32(r1+8u)),'
+        'u2f(LD32(r2)),u2f(LD32(r2+4u)),u2f(LD32(r2+8u)),r3); }\\n'
+        +ray_call+'\\n'
+        '  if(getenv("DS_AIM_DIAG")) fprintf(stderr,'
+        '"[AIM_SHOT_RESULT] hit_object=%08x callback_result=%08x\\\\n",'
+        'LD32(sp+28u),LD32(sp+20u));'
+    )
+    # Replace both native-authentic call sites; no modification of state.
+    body=body.replace(ray_call,trace)
+    changes[f]=source[:begin]+body+source[finish:]
+    info.append("instrumented two real PlasmaCutter physics-ray calls and result callbacks")
     for file,content in changes.items():file.write_text(content)
     return info
