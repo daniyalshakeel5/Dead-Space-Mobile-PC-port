@@ -80,3 +80,32 @@ The original starfield file `texture_env_generic_starfield.m3g` is present
 in genuine APK reads, but the intro's background is still black in prior
 captures. `DS_SKY_DIAG=1` traces OpenGL cube-map binding/texture uploads/
 draw counters. This is research instrumentation, **not a skybox fix**.
+
+## 2026-11-07 right-stick regression and real-game camera A/B
+
+The physical PS4 controller test found that changing right-stick gestures
+from Android module TouchScreen (1000) to TouchPad (1100) **disabled look**
+on this exact `libDeadSpace.so` APK, although another game's Vita port
+used TouchPad. The CI logs only confirmed bridge delivery, not camera motion.
+That inference was wrong; this regression is confirmed by the user.
+
+The new default is `DS_CAMERA_MODE=drag`: the right stick uses the
+formerly responsive TouchScreen module and a **continuous gesture** (one
+DOWN, repeated MOVE, one UP at neutral). The old code issued repeated
+DOWN/MOVE/UP every frame; those small taps could be interpreted as firing.
+No changes to the user's verified left-stick movement or physical touchpad
+melee/stomp paths are made.
+
+For diagnosis the same executable supports:
+- `DS_CAMERA_MODE=drag` (default; sustained touchscreen look)
+- `DS_CAMERA_MODE=move-only` (MOVE without touchscreen DOWN; no tap)
+- `DS_CAMERA_MODE=pulse` (old responsive look, but may cause repeated firing,
+  use ONLY for controlled A/B tests)
+- `DS_CAMERA_MODE=touchpad` (nonresponsive regression baseline).
+
+The genuine-APK Windows CI captures the *same* cutscene/gameplay scene at
+fixed frames with stationary player and scripted right-stick motion for
+drag/move-only/pulse. A successful frame loop or input event alone does not
+establish actual camera movement; compare screenshots around 20,100–20,900
+and check that aimed/non-aimed panning does not accidentally shoot. Real
+hardware behavior needs confirmation.

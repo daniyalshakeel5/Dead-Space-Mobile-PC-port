@@ -42,6 +42,35 @@ static int pc_move_finger(void) {
     return p && !strcmp(p,"1") ? 1 : 0;
 }
 static float pc_move_x,pc_move_y,pc_look_x,pc_look_y;
+/* The Fixes APK does not rotate the view through TouchPad module 1100
+ * (physical Windows test). Test native TouchScreen camera drag without
+ * repeated pointer-down/up events. All alternatives are diagnostics. */
+enum { DS_CAM_DRAG=0, DS_CAM_MOVE_ONLY=1, DS_CAM_PULSE=2, DS_CAM_TOUCHPAD=3 };
+static int pc_camera_mode(void) {
+    const char* p=getenv("DS_CAMERA_MODE");
+    if(p && !strcmp(p,"move-only")) return DS_CAM_MOVE_ONLY;
+    if(p && !strcmp(p,"pulse")) return DS_CAM_PULSE;
+    if(p && !strcmp(p,"touchpad")) return DS_CAM_TOUCHPAD;
+    return DS_CAM_DRAG;
+}
+static unsigned pc_look_downs,pc_look_moves,pc_look_ups;
+static const char* pc_camera_mode_name(void) {
+    static const char* names[]={"drag","move-only","pulse","touchpad"};
+    return names[pc_camera_mode()];
+}
+static void pc_look_event(int kind,float x,float y) {
+    if(kind==0) ++pc_look_downs;
+    if(kind==1) ++pc_look_moves;
+    if(kind==2) ++pc_look_ups;
+    if(pc_camera_mode()==DS_CAM_TOUCHPAD)
+        host_touchpad_id(kind,2,x,y);
+    else host_pointer_id(kind,2,x,y);
+    if(getenv("DS_INPUT_DIAG") && (kind==0 || kind==2 ||
+       (kind==1 && pc_look_moves%120==0)))
+        fprintf(stderr,"[CAMERA_EVENT] mode=%s action=%d x=%.2f y=%.2f downs=%u moves=%u ups=%u\n",
+                pc_camera_mode_name(),kind,x,y,
+                pc_look_downs,pc_look_moves,pc_look_ups);
+}
 static unsigned pc_input_trace_frames;
 /* Context-sensitive bindings use the genuine game's JNI keyboard/touch.
  * State is independent so triggers never accidentally release each other. */
@@ -130,7 +159,7 @@ static void pad_special_release(void) {
 }
 static void pc_release(void) {
     if(pc_move_active) host_pointer_id(2,pc_move_finger(),pc_move_x,pc_move_y);
-    if(pc_look_active) host_touchpad_id(2,2,pc_look_x,pc_look_y);
+    if(pc_look_active) pc_look_event(2,pc_look_x,pc_look_y);
     if(pc_fire) host_key(0,103,0);
     if(pc_aim) host_key(0,102,0);
     pc_w=pc_a=pc_s=pc_d=pc_shift=pc_move_active=pc_look_active=pc_fire=pc_aim=0;
@@ -177,16 +206,43 @@ static void pc_update(float dx,float dy) {
     } else if(pc_move_active) {
         host_pointer_id(2,pc_move_finger(),pc_move_x,pc_move_y); pc_move_active=0;
     }
-    if(pc_look_active) { host_touchpad_id(2,2,pc_look_x,pc_look_y); pc_look_active=0; }
+    int look_mode=pc_camera_mode();
+    if((look_mode==DS_CAM_PULSE || look_mode==DS_CAM_TOUCHPAD) && pc_look_active) {
+        /* Diagnostic compatibility paths send one short gesture per frame. */
+        pc_look_event(2,pc_look_x,pc_look_y);
+        pc_look_active=0;
+    }
     if((pc_capture || rx!=0 || ry!=0) && (dx!=0 || dy!=0)) {
-        float bx=g_w*.75f,by=g_h*.50f;
+        float bx=g_w*.55f,by=g_h*.50f;
         dx=fmaxf(-g_w*.20f,fminf(g_w*.20f,dx*g_sx));
         dy=fmaxf(-g_h*.40f,fminf(g_h*.40f,dy*g_sy));
-        /* The game has distinct touchscreen and touchpad module IDs.
-         * Using touchscreen here was firing weapons during camera pans. */
-        host_touchpad_id(0,2,bx,by);
-        pc_look_x=bx+dx; pc_look_y=by+dy;
-        host_touchpad_id(1,2,pc_look_x,pc_look_y); pc_look_active=1;
+        if(look_mode==DS_CAM_DRAG) {
+            /* One sustained drag, not a series of taps: touch DOWN only
+             * when the stick starts, MOVE while held, UP at neutral.
+             * In the original pulse approach every tiny DOWN/UP was
+             * interpreted as a shot while panning. */
+            if(!pc_look_active) {
+                pc_look_x=bx; pc_look_y=by;
+                pc_look_event(0,pc_look_x,pc_look_y);
+                pc_look_active=1;
+            }
+            pc_look_x=fmaxf(g_w*.06f,fminf(g_w*.94f,pc_look_x+dx));
+            pc_look_y=fmaxf(g_h*.06f,fminf(g_h*.94f,pc_look_y+dy));
+            pc_look_event(1,pc_look_x,pc_look_y);
+        } else {
+            pc_look_x=bx+dx;
+            pc_look_y=by+dy;
+            if(look_mode!=DS_CAM_MOVE_ONLY)
+                pc_look_event(0,bx,by);
+            pc_look_event(1,pc_look_x,pc_look_y);
+            pc_look_active=look_mode!=DS_CAM_MOVE_ONLY;
+        }
+    } else if(pc_look_active) {
+        pc_look_event(2,pc_look_x,pc_look_y);
+        pc_look_active=0;
+        if(getenv("DS_INPUT_DIAG"))
+            fprintf(stderr,"[CAMERA_STATS] mode=%s downs=%u moves=%u ups=%u\n",
+                    pc_camera_mode_name(),pc_look_downs,pc_look_moves,pc_look_ups);
     }
 }
 // Default PC bindings, modelled on the Xperia Play layout. Each entry: SDL scancode -> Android key code (+alt flag).
