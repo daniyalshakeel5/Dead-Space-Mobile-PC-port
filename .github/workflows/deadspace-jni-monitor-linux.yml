@@ -74,7 +74,7 @@ jobs:
           timeout --kill-after=20s 900s xvfb-run -a env \
             LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy \
             DS_WINDOW=1 DS_NOVSYNC=1 DS_QUIET_JAVA=1 DS_INPUT_DIAG=1 DS_TOUCHSCREEN=1 DS_TOUCH_FULLSCREEN=0 \
-            DS_MODEL=LinuxTouch DS_MANUFACTURER=Generic DS_RENDER_MIN_FAR=1200 DS_REANIMATED_TOUCH=1 \
+            DS_MODEL=LinuxTouch DS_MANUFACTURER=Generic DS_RENDER_MIN_FAR=1200 DS_REANIMATED_TOUCH=1 DS_AIM_DIAG=1 \
             DS_DATA="$DS_ROOT/apk/assets" DS_ASSETS="$DS_ROOT/apk/assets" \
             DS_STEPS=create,surface,frame DS_FRAMES=24000 \
             DS_TOUCH_GESTURES="$DS_TOUCH_GESTURES" \
@@ -90,6 +90,9 @@ jobs:
           grep -q 'REANIMATED_TOUCH_PATCH 0007b810' "$DS_ROOT/logs/generation.log" || exit 9
           grep -q 'REANIMATED_TOUCH_PATCH 0007aefc' "$DS_ROOT/logs/generation.log" || exit 10
           grep -q 'REANIMATED_TOUCH_PATCH 0006a908' "$DS_ROOT/logs/generation.log" || exit 11
+          grep -q 'AIM_HIT_TRACE instrumented GameObjectShootSwitch::onHit' "$DS_ROOT/logs/generation.log" || exit 12
+          grep -q '\[AIM_SURFACE\]' "$DS_ROOT/logs/runtime.log" || exit 13
+          grep -q '\[AIM_VIEWPORT\]' "$DS_ROOT/logs/runtime.log" || exit 14
           grep -q '\[LINUX_TOUCH\] kind=0 slot=0' "$DS_ROOT/logs/runtime.log" || exit 3
           grep -q '\[LINUX_TOUCH\] kind=0 slot=1' "$DS_ROOT/logs/runtime.log" || exit 4
           grep -q '\[LINUX_TOUCH\] kind=2 slot=0' "$DS_ROOT/logs/runtime.log" || exit 5

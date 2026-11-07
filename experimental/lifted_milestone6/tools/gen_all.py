@@ -95,6 +95,11 @@ def main():
     for desc in patch_reanimated_touch(__import__("pathlib").Path(OUT),
                                       __import__("pathlib").Path(SO)):
         print("REANIMATED_TOUCH_PATCH", desc)
+    # Instrument authentic projectile and shootable fuse callbacks without
+    # modifying their arguments or gameplay. Logging is opt-in at runtime.
+    from shot_hit_trace import patch as patch_shot_hit
+    for desc in patch_shot_hit(__import__("pathlib").Path(OUT)):
+        print("AIM_HIT_TRACE", desc)
     tot = sum(os.path.getsize(f"{OUT}/{x}") for x in os.listdir(OUT))
     print(f"{len(ok)} lifted, {len(unlifted)} unlifted stubs, {len(imps)} imports, {idx} chunks, {tot/1e6:.1f} MB of C")
 

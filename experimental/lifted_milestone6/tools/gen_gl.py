@@ -140,6 +140,8 @@ def main(out):
         done.add(gname)
         o.append(f"IMP({gname}) {{\n  T({gname});\n")
         # Genuine game sky/starfield diagnostics, disabled by default.
+        if gname == "glViewport":
+            o.append("  ds_aim_viewport((s32)W(0),(s32)W(1),(s32)W(2),(s32)W(3));\n")
         if gname == "glBindTexture":
             o.append("  ds_sky_diag_bind(W(0), W(1));\n")
         elif gname == "glTexImage2D":

@@ -74,3 +74,14 @@ Actual interaction-circle coverage must be verified on your touchscreen.
 To revert to the previous touch behaviour:
   DS_REANIMATED_TOUCH=0 ./Play-Dead-Space-Touch.sh --windowed
 Reanimated author: GINESTR0, https://github.com/GINESTR0/DeadSpaceReanimated
+
+SHOT/CAMERA DIAGNOSTICS (no changes to shooting logic)
+To test a fuse without your window's title bar interfering with the
+actual 16:9 renderer, start the game in fullscreen:
+  DS_AIM_DIAG=1 ./Play-Dead-Space-Touch.sh
+If you must use the windowed desktop, record its SDL drawable aspect, too:
+  DS_AIM_DIAG=1 ./Play-Dead-Space-Touch.sh --windowed
+Logs contain [AIM_SURFACE], [AIM_VIEWPORT], [AIM_CAMERA_ASPECT],
+[AIM_PROJECTILE_SIM] and [AIM_FUSE_HIT]. If the fuse is shot while
+[AIM_FUSE_HIT] is absent, it is NOT safe to declare the shoot-switch
+collision callback has fired. Gameplay hit logic remains unchanged.

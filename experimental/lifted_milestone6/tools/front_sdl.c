@@ -82,8 +82,14 @@ static int sdl_open(int w, int h) {
     gl_load_all(SDL_GL_GetProcAddress);
     SDL_GL_GetDrawableSize(g_win, &g_w, &g_h);
     ds_touch_output_h = g_h > 0 ? (u32)g_h : 480u;
+    ds_touch_output_w = g_w > 0 ? (u32)g_w : 854u;
     { int ww, wh; SDL_GetWindowSize(g_win, &ww, &wh); g_sx = (float)g_w / ww; g_sy = (float)g_h / wh; }
     printf("window %dx%d, GL_RENDERER=%s\n", g_w, g_h, dgl_glGetString ? (const char*)dgl_glGetString(0x1F01) : "?");
+    if(getenv("DS_AIM_DIAG")) {
+        int ww,wh; SDL_GetWindowSize(g_win,&ww,&wh);
+        fprintf(stderr,"[AIM_SURFACE] window=%dx%d drawable=%dx%d drawable-aspect=%.8g requested-window=%dx%d\n",
+                ww,wh,g_w,g_h,g_h?((double)g_w/g_h):0.0,w,h);
+    }
     if(touch_enabled()) {
         fprintf(stderr,
             "[LINUX_TOUCH] direct SDL multi-touch enabled; drawable=%dx%d; synthetic mouse disabled\n",g_w,g_h);
@@ -637,7 +643,7 @@ static int sdl_pump(int* resized) {
         if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) host_pointer_id(2,mouse_id, (float)e.button.x * g_sx, (float)e.button.y * g_sy);
         if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
             int w, h; SDL_GL_GetDrawableSize(g_win, &w, &h);
-            if (w != g_w || h != g_h) { g_w = w; g_h = h; ds_touch_output_h = h>0?(u32)h:480u; *resized = 1; int ww, wh; SDL_GetWindowSize(g_win, &ww, &wh); g_sx = (float)w / ww; g_sy = (float)h / wh; }
+            if (w != g_w || h != g_h) { g_w = w; g_h = h; ds_touch_output_h = h>0?(u32)h:480u; ds_touch_output_w=w>0?(u32)w:854u; *resized = 1; int ww, wh; SDL_GetWindowSize(g_win, &ww, &wh); g_sx = (float)w / ww; g_sy = (float)h / wh; }
         }
     }
     pc_update(look_dx,look_dy);

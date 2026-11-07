@@ -83,6 +83,19 @@ static void ds_sky_diag_draw(void) {
         fprintf(stderr,"[SKY_GL] drawcalls=%u cubemap-binds=%u faces=%u current-target=%#x\n",
                 ds_sky_draws,ds_sky_cube_binds,ds_sky_cube_images,ds_sky_bound_target);
 }
+/* Compare actual GL viewport with SDL drawable + JNI surface dimensions.
+ * No viewport modification: diagnose missed shot/aim target alignment. */
+static void ds_aim_viewport(s32 x,s32 y,s32 w,s32 h) {
+    if(!getenv("DS_AIM_DIAG")) return;
+    static s32 ox=-1,oy=-1,ow=-1,oh=-1;
+    static unsigned count;
+    if(count<48 && (x!=ox || y!=oy || w!=ow || h!=oh)) {
+        fprintf(stderr,"[AIM_VIEWPORT] gl=%d,%d %dx%d drawable=%ux%u gl-aspect=%.8g drawable-aspect=%.8g\n",
+                x,y,w,h,ds_touch_output_w,ds_touch_output_h,
+                h?((double)w/h):0.0,ds_touch_output_h?((double)ds_touch_output_w/ds_touch_output_h):0.0);
+        ox=x;oy=y;ow=w;oh=h;count++;
+    }
+}
 #include "gl_gen.c"
 
 /* Preserve the game's projection by default. DS_RENDER_DIAG records actual

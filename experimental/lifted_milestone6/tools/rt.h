@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <setjmp.h>
 typedef uint8_t u8; typedef int8_t s8; typedef uint16_t u16; typedef int16_t s16;
 typedef uint32_t u32; typedef int32_t s32; typedef uint64_t u64; typedef int64_t s64;
@@ -41,6 +42,7 @@ static inline u32 clz32(u32 x) { return x ? (u32)__builtin_clz(x) : 32; }
 /* Actual GL drawable height, set by SDL. Reanimated scales 2011 taps
  * for dense displays; keep the original 480p behaviour as baseline. */
 extern u32 ds_touch_output_h;
+extern u32 ds_touch_output_w;
 static inline float ds_reanimated_touch_scale(void) {
     const char* enabled=getenv("DS_REANIMATED_TOUCH");
     if(!enabled || !*enabled || !strcmp(enabled,"0")) return 1.0f;

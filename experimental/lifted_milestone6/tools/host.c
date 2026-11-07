@@ -34,6 +34,7 @@ typedef struct { u32 offset, info; } Rel;
 
 u32 g_base;
 u32 ds_touch_output_h = 480u; /* real drawable height for native touch hit radius */
+u32 ds_touch_output_w = 854u; /* native projection/aim diagnosis */
 static u32 g_top;
 static fn_t* dispatch;                       // one slot per 4 bytes of image
 #define STUB_SLOTS 4096
