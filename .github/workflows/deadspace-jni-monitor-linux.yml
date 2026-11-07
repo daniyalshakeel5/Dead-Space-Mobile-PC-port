@@ -70,7 +70,7 @@ jobs:
           cd "$DS_ROOT/tools/out"
           # These are genuine SDL_FINGER* events entering the game's native
           # TouchSurfaceAndroid JNI code, not fake assets/game logic.
-          export DS_TOUCH_GESTURES='600:602:0:640:675:640:675,1500:1502:0:1145:668:1145:668,2400:2402:0:1145:668:1145:668,18500:19400:0:300:515:300:340,18800:19500:1:985:425:1120:420,19800:19812:0:880:360:880:360,20500:20530:0:225:260:225:70,20700:20730:0:225:70:225:260'
+          export DS_TOUCH_GESTURES='600:602:0:640:675:640:675,1500:1502:0:1145:668:1145:668,2400:2402:0:1145:668:1145:668,18500:19400:0:300:515:300:340,18800:19500:1:985:425:1120:420,19800:19812:0:880:360:880:360,20500:20530:0:225:260:225:70,20700:20730:0:225:70:225:260,21400:21404:1:995:450:995:450,21600:21604:1:995:450:995:450'
           timeout --kill-after=20s 900s xvfb-run -a env \
             LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy \
             DS_WINDOW=1 DS_NOVSYNC=1 DS_QUIET_JAVA=1 DS_INPUT_DIAG=1 DS_TOUCHSCREEN=1 DS_TOUCH_FULLSCREEN=0 \
@@ -91,6 +91,10 @@ jobs:
           grep -q 'REANIMATED_TOUCH_PATCH 0007aefc' "$DS_ROOT/logs/generation.log" || exit 10
           grep -q 'REANIMATED_TOUCH_PATCH 0006a908' "$DS_ROOT/logs/generation.log" || exit 11
           grep -q 'AIM_HIT_TRACE instrumented GameObjectShootSwitch::onHit' "$DS_ROOT/logs/generation.log" || exit 12
+          grep -q 'AIM_HIT_TRACE instrumented WeaponPlasmaCutter::onFire' "$DS_ROOT/logs/generation.log" || exit 15
+          grep -q 'AIM_HIT_TRACE instrumented Weapon::performRaycast' "$DS_ROOT/logs/generation.log" || exit 16
+          echo 'Real-game shooting diagnostic events (presence depends on game state):'
+          grep -E '\[AIM_(SURFACE|VIEWPORT|CAMERA_ASPECT|FIRE|RAYCAST|RAY_HIT|IMPACT|POST_HIT|FUSE_HIT)\]' "$DS_ROOT/logs/runtime.log" | tail -n 70 || true
           grep -q '\[AIM_SURFACE\]' "$DS_ROOT/logs/runtime.log" || exit 13
           grep -q '\[AIM_VIEWPORT\]' "$DS_ROOT/logs/runtime.log" || exit 14
           grep -q '\[LINUX_TOUCH\] kind=0 slot=0' "$DS_ROOT/logs/runtime.log" || exit 3
