@@ -91,7 +91,7 @@ def patch(out: Path) -> list[str]:
         if source is None: source=f.read_text()
         begin=source.find(fire_name)
         if begin<0:continue
-        finish=source.find("\\nu64 f_", begin+len(fire_name))
+        finish=source.find("\nu64 f_", begin+len(fire_name))
         if finish<0:finish=len(source)
         fire_matches.append((f,source,begin,finish))
     if len(fire_matches)!=1:
@@ -106,12 +106,12 @@ def patch(out: Path) -> list[str]:
     trace=(
         '  if(getenv("DS_AIM_DIAG")) { '
         'static unsigned n; ++n; '
-        'fprintf(stderr,"[AIM_SHOT_RAY] shot_ray=%u world=%08x start=(%.5f,%.5f,%.5f) end=(%.5f,%.5f,%.5f) callback=%08x\\\\n",'
+        'fprintf(stderr,"[AIM_SHOT_RAY] shot_ray=%u world=%08x start=(%.5f,%.5f,%.5f) end=(%.5f,%.5f,%.5f) callback=%08x\\n",'
         'n,r0,u2f(LD32(r1)),u2f(LD32(r1+4u)),u2f(LD32(r1+8u)),'
-        'u2f(LD32(r2)),u2f(LD32(r2+4u)),u2f(LD32(r2+8u)),r3); }\\n'
-        +ray_call+'\\n'
+        'u2f(LD32(r2)),u2f(LD32(r2+4u)),u2f(LD32(r2+8u)),r3); }\n'
+        +ray_call+'\n'
         '  if(getenv("DS_AIM_DIAG")) fprintf(stderr,'
-        '"[AIM_SHOT_RESULT] hit_object=%08x callback_result=%08x\\\\n",'
+        '"[AIM_SHOT_RESULT] hit_object=%08x callback_result=%08x\\n",'
         'LD32(sp+28u),LD32(sp+20u));'
     )
     # Replace both native-authentic call sites; no modification of state.
