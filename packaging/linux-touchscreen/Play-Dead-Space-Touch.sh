@@ -45,7 +45,9 @@ if [[ ! -s "$SO" || ! -d "$ASSETS/published" ]]; then
     APK="${APK/#\~/$HOME}"
     [[ -s "$APK" ]] || die "APK not found: $APK"
     command -v unzip >/dev/null 2>&1 || die "unzip required for first launch."
-    unzip -Z1 "$APK" | grep -Fxq "lib/armeabi/libDeadSpace.so" ||
+    # Fully consume archive listing so grep cannot make unzip hit SIGPIPE
+    # under set -o pipefail when the library appears early in a large APK.
+    unzip -Z1 "$APK" | grep -Fx "lib/armeabi/libDeadSpace.so" >/dev/null ||
         die "APK has no expected lib/armeabi/libDeadSpace.so; Xperia APK is not interchangeable."
     mkdir -p "$GAME"
     # Copy ONLY the user's own library and assets, leaving any old saves intact.
