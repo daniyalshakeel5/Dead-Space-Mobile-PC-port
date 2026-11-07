@@ -1,0 +1,117 @@
+name: Linux gameplay with SDL analog controller input
+on:
+  push:
+    branches: [work/deadspace-portable-runtime-2026-11-05]
+    paths: [.github/workflows/deadspace-jni-monitor-linux.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-game:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [current]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native i686 dependencies
+        run: |
+          sudo dpkg --add-architecture i386
+          if [[ -f /etc/apt/apt-mirrors.txt ]]; then
+            echo 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt
+          fi
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 update -qq
+          sudo apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386 libsdl2-2.0-0:i386 libgl1-mesa-dri:i386 libgl1:i386 xvfb xauth libarchive-tools
+          # Extract target headers without installing unrelated i386 GUI
+          # development tools that conflict with the runner's host packages.
+          mkdir -p "$RUNNER_TEMP/sdl-dev"
+          cd "$RUNNER_TEMP/sdl-dev"
+          apt-get download libsdl2-dev:i386
+          dpkg-deb -x ./*.deb "$RUNNER_TEMP/sdl-prefix"
+          echo "SDL_PREFIX=$RUNNER_TEMP/sdl-prefix" >> "$GITHUB_ENV"
+          python3 -m venv "$RUNNER_TEMP/py"
+          "$RUNNER_TEMP/py/bin/pip" install pyelftools Pillow
+          echo "$RUNNER_TEMP/py/bin" >> "$GITHUB_PATH"
+      - name: Prepare genuine APK and selected source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE: ${{ matrix.source }}
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/baseline"
+          mkdir -p "$root/download" "$root/apk" "$root/logs" "$root/shots"
+          gh release download apk-files-for-testing -R "$GITHUB_REPOSITORY" --pattern 'Deas.Space.Mobile.Fixes.apk' --dir "$root/download"
+          unzip -q "$root/download/Deas.Space.Mobile.Fixes.apk" -d "$root/apk"
+          sha1sum "$root/apk/lib/armeabi/libDeadSpace.so" | tee "$root/logs/identity.txt"
+          [[ "$(sha1sum "$root/apk/lib/armeabi/libDeadSpace.so" | cut -d' ' -f1)" == 64a3323cd3cc0c483a645b62af8508624163ba9b ]]
+          cp -a experimental/lifted_milestone6/tools "$root/tools"
+          # Both variants use the exact asset/data arrangement reported by
+          # the other agent. Each matrix job has its own writable directory.
+          mkdir -p "$root/apk/assets/var"
+          echo "DS_ROOT=$root" >> "$GITHUB_ENV"
+      - name: Translate and compile original game functions
+        run: |
+          set -euo pipefail
+          cd "$DS_ROOT/tools"
+          export DS_TEXTUREPACK_DIAG=0
+          export DS_SO="$DS_ROOT/apk/lib/armeabi/libDeadSpace.so"
+          python3 gen_all.py > "$DS_ROOT/logs/generation.log" 2>&1
+          cd out
+          DS_BUILD_JOBS=3 SDL_CFLAGS="-I$SDL_PREFIX/usr/include/SDL2 -I$SDL_PREFIX/usr/include/i386-linux-gnu" SDL_LIBS="/usr/lib/i386-linux-gnu/libSDL2-2.0.so.0" bash build.sh > "$DS_ROOT/logs/build.log" 2>&1
+          file dspc_sdl | tee "$DS_ROOT/logs/executable.txt"
+      - name: Run real first boot through difficulty and intro
+        env:
+          SOURCE: ${{ matrix.source }}
+        run: |
+          set +e
+          set -uo pipefail
+          cd "$DS_ROOT/tools/out"
+          # Baseline uses the translated routines directly. No optional
+          # buffered-reader replacement or null-model recovery is enabled.
+          export DS_CONTROLLER_AXES='18500:19500:0:-32768:0:0,20000:20100:-32768:0:0:0,20100:20300:-32768:0:16384:0,20300:20500:-32768:0:0:0,20500:20700:-32768:0:0:8192,20700:21000:-32768:0:0:0'
+          timeout --kill-after=20s 900s xvfb-run -a env \
+            LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy \
+            DS_WINDOW=1 DS_NOVSYNC=1 DS_QUIET_JAVA=1 DS_IO_AUDIT=1 DS_ASSET_TRACE=1 \
+            DS_DATA="$DS_ROOT/apk/assets" DS_ASSETS="$DS_ROOT/apk/assets" \
+            DS_STEPS=create,surface,frame DS_FRAMES=24000 \
+            DS_CLICKS="600:640:675,1500:1145:668,2400:1145:668" \
+            DS_SHOT_EVERY=150 DS_SHOT_DIR="$DS_ROOT/shots" \
+            DS_SHOT="23990:$DS_ROOT/shots/final.ppm" \
+            ./dspc_sdl "$DS_ROOT/apk/lib/armeabi/libDeadSpace.so" > "$DS_ROOT/logs/runtime.log" 2>&1
+          code=$?
+          echo "$code" > "$DS_ROOT/logs/exit-code.txt"
+          tail -n 100 "$DS_ROOT/logs/runtime.log"
+          [[ $code == 0 ]] && grep -q '^ran frames' "$DS_ROOT/logs/runtime.log"
+      - name: Preserve visual and crash evidence
+        if: always()
+        run: |
+          root="$RUNNER_TEMP/baseline"
+          mkdir -p "$root/evidence"
+          for name in runtime build generation; do
+            if [[ -f "$root/logs/$name.log" ]]; then tail -n 500 "$root/logs/$name.log" > "$root/evidence/$name-tail.log"; fi
+          done
+          cp "$root/logs/runtime.log" "$root/evidence/" 2>/dev/null || true
+          cp "$root/logs/identity.txt" "$root/logs/executable.txt" "$root/logs/exit-code.txt" "$root/evidence/" 2>/dev/null || true
+          if [[ -f "$root/logs/runtime.log" && -f "$root/tools/out/dspc_sdl" ]]; then
+            grep -m1 'backtrace (use nm' "$root/logs/runtime.log" | grep -oE '0x[0-9a-fA-F]+' |
+              xargs -r addr2line -a -f -C -e "$root/tools/out/dspc_sdl" > "$root/evidence/backtrace.txt" || true
+          fi
+          cat "$root/evidence/runtime-tail.log" "$root/evidence/backtrace.txt" 2>/dev/null || true
+          python3 - "$root" <<'PY'
+          import pathlib, sys
+          if not list((pathlib.Path(sys.argv[1]) / "shots").glob("*.ppm")):
+              sys.exit(0)
+          from PIL import Image
+          root = pathlib.Path(sys.argv[1])
+          for path in (root / "shots").glob("*.ppm"):
+              with Image.open(path) as image:
+                  image.save(root / "evidence" / (path.stem + ".png"))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-gameplay-input-evidence
+          path: ${{ runner.temp }}/baseline/evidence
+          retention-days: 7

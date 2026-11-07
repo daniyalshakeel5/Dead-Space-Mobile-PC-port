@@ -4,7 +4,127 @@
 #define W(i) ((i) == 0 ? r0 : (i) == 1 ? r1 : (i) == 2 ? r2 : (i) == 3 ? r3 : ((u32*)P(sp))[(i) - 4])
 static inline float fxf(u32 w) { return (float)(s32)w * (1.0f / 65536.0f); }
 
+
+/* The game's intro does not appear to call glFrustumf/x. It loads complete
+ * projection matrices, so capture that real path before altering culling.
+ * Normal rendering is unchanged; the flags below enable controlled A/B runs. */
+static u32 ds_matrix_mode=0x1700; /* GL_MODELVIEW */
+static void ds_matrix_mode_set(u32 mode) { ds_matrix_mode=mode; }
+static const float* ds_matrix_filter(const float* src, float dst[16], const char* call) {
+    if(!src || ds_matrix_mode!=0x1701) return src; /* GL_PROJECTION */
+    int diag=getenv("DS_RENDER_DIAG")!=NULL;
+    const char* env=getenv("DS_RENDER_MIN_FAR");
+    double a=src[10],b=src[14],near_z=0,far_z=0;
+    int perspective = fabsf(src[11]+1.0f)<0.015f && fabsf(src[15])<0.015f;
+    int valid = perspective && fabs(a-1.0)>1e-8 && fabs(a+1.0)>1e-8 &&
+                isfinite(a) && isfinite(b);
+    if(valid) {
+        near_z=b/(a-1.0);
+        far_z=b/(a+1.0);
+        valid=isfinite(near_z)&&isfinite(far_z)&&near_z>0&&far_z>near_z;
+    }
+    if(diag) {
+        static unsigned reports;
+        static double last_far=-1,last_near=-1;
+        if(reports<100 && (reports<12 || fabs(far_z-last_far)>0.01 ||
+                            fabs(near_z-last_near)>0.001)) {
+            fprintf(stderr,"[RENDER_MATRIX] %s mode=%#x valid=%d near=%.8g far=%.8g m10=%.8g m11=%.8g m14=%.8g m15=%.8g\n",
+                    call,ds_matrix_mode,valid,near_z,far_z,a,src[11],b,src[15]);
+            reports++; last_far=far_z;last_near=near_z;
+        }
+    }
+    if(valid && env && *env) {
+        char* end=0; double minimum=strtod(env,&end);
+        if(end!=env && end && *end=='\0' && isfinite(minimum) &&
+           minimum>far_z && minimum>near_z) {
+            memcpy(dst,src,16*sizeof(float));
+            dst[10]=(float)(-(minimum+near_z)/(minimum-near_z));
+            dst[14]=(float)(-(2.0*minimum*near_z)/(minimum-near_z));
+            if(diag) {
+                static int logged;
+                if(!logged++) fprintf(stderr,"[RENDER_MATRIX_FAR] %s original=%.8g expanded=%.8g\n",call,far_z,minimum);
+            }
+            return dst;
+        }
+    }
+    return src;
+}
+/* Diagnostics only: starfield M3G bytes have been read from the genuine
+ * APK, but the background is absent. Count GL texture/cubemap use and draws
+ * before changing the renderer or inventing a replacement backdrop. */
+static int ds_sky_diag_enabled(void) {
+    static int enabled=-1;
+    if(enabled<0) enabled=getenv("DS_SKY_DIAG")!=NULL;
+    return enabled;
+}
+static unsigned ds_sky_cube_binds, ds_sky_cube_images, ds_sky_draws;
+static u32 ds_sky_bound_target;
+static void ds_sky_diag_bind(u32 target, u32 texture) {
+    if(!ds_sky_diag_enabled()) return;
+    ds_sky_bound_target=target;
+    if(target==0x8513 && ds_sky_cube_binds++<12)
+        fprintf(stderr,"[SKY_GL] bind-cubemap texture=%u count=%u\n",
+                texture, ds_sky_cube_binds);
+}
+static void ds_sky_diag_image(u32 target, u32 width, u32 height) {
+    if(!ds_sky_diag_enabled()) return;
+    if(target>=0x8515 && target<=0x851A) {
+        ++ds_sky_cube_images;
+        if(ds_sky_cube_images<=16)
+            fprintf(stderr,"[SKY_GL] cubemap-face target=%#x size=%ux%u count=%u\n",
+                    target,width,height,ds_sky_cube_images);
+    }
+}
+static void ds_sky_diag_draw(void) {
+    if(!ds_sky_diag_enabled()) return;
+    ++ds_sky_draws;
+    if(ds_sky_draws==1000 || ds_sky_draws==10000 ||
+       ds_sky_draws==100000 || ds_sky_draws==1000000)
+        fprintf(stderr,"[SKY_GL] drawcalls=%u cubemap-binds=%u faces=%u current-target=%#x\n",
+                ds_sky_draws,ds_sky_cube_binds,ds_sky_cube_images,ds_sky_bound_target);
+}
 #include "gl_gen.c"
+
+/* Preserve the game's projection by default. DS_RENDER_DIAG records actual
+ * first-run/intro frusta; DS_RENDER_MIN_FAR optionally tests whether a short
+ * far clipping plane causes the Windows cutscene's missing background. This
+ * affects desktop clipping only, not native engine-side scene culling. */
+static void ds_forward_frustum(double left, double right, double bottom,
+                               double top, double near_z, double far_z) {
+    double original_far=far_z;
+    const char* min_env=getenv("DS_RENDER_MIN_FAR");
+    if(min_env && *min_env && isfinite(near_z) && isfinite(far_z) &&
+       near_z>0 && far_z>near_z) {
+        char* end=0; double min_far=strtod(min_env,&end);
+        if(end!=min_env && end && !*end && isfinite(min_far) && min_far>far_z)
+            far_z=min_far;
+    }
+    if(getenv("DS_RENDER_DIAG")) {
+        static double last_near=-1, last_far=-1, last_override=-1;
+        static int changes;
+        if(changes<160 && (fabs(last_near-near_z)>1e-4 ||
+                            fabs(last_far-original_far)>1e-3 ||
+                            fabs(last_override-far_z)>1e-3)) {
+            fprintf(stderr,"[RENDER_FRUSTUM] near=%.6g far=%.6g applied_far=%.6g left=%.6g right=%.6g bottom=%.6g top=%.6g\n",
+                    near_z,original_far,far_z,left,right,bottom,top);
+            last_near=near_z; last_far=original_far; last_override=far_z;
+            ++changes;
+        }
+    }
+    if(dgl_glFrustum) dgl_glFrustum(left,right,bottom,top,near_z,far_z);
+}
+IMP(glFrustumf) {
+    T(glFrustumf);
+    ds_forward_frustum(u2f(W(0)),u2f(W(1)),u2f(W(2)),
+                       u2f(W(3)),u2f(W(4)),u2f(W(5)));
+    RET(0);
+}
+IMP(glFrustumx) {
+    T(glFrustumx);
+    ds_forward_frustum(fxf(W(0)),fxf(W(1)),fxf(W(2)),
+                       fxf(W(3)),fxf(W(4)),fxf(W(5)));
+    RET(0);
+}
 
 // ---- state the shim needs to remember
 static u32 g_unpack_align = 4;
@@ -19,7 +139,9 @@ IMP(glPixelStorei) {
 IMP(glEnable) {
     T(glEnable);
     if (!dgl_glEnable) RET(0);
-    if (r0 == 0x8D60) { dgl_glEnable(0x0C60); dgl_glEnable(0x0C61); dgl_glEnable(0x0C62); }   // GL_TEXTURE_GEN_STR_OES
+    if (r0 == 0x0B44 && getenv("DS_RENDER_NO_CULL")) { /* diagnostic: backface culling */ }
+    else if (r0 == 0x0B60 && getenv("DS_RENDER_NO_FOG")) { /* diagnostic: fog */ }
+    else if (r0 == 0x8D60) { dgl_glEnable(0x0C60); dgl_glEnable(0x0C61); dgl_glEnable(0x0C62); }   // GL_TEXTURE_GEN_STR_OES
     else dgl_glEnable(r0);
     RET(0);
 }
@@ -167,6 +289,7 @@ static u8* etc1_decode(const u8* src, int w, int h) {
 IMP(glCompressedTexImage2D) {
     T(glCompressedTexImage2D);
     u32 target = r0, level = r1, fmt = r2, w = r3, h = W(4), size = W(6); const u8* data = (const u8*)P(W(7));
+    ds_sky_diag_image(target,w,h);
     if (fmt == 0x8D64) {
         if (dgl_glTexImage2D && data) {
             u8* rgb = etc1_decode(data, (int)w, (int)h);

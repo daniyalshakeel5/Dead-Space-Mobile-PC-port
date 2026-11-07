@@ -1,0 +1,200 @@
+name: Dead Space Mobile — actual APK full native Win32 game compilation
+on:
+  push:
+    branches: [work/deadspace-portable-runtime-2026-11-05]
+    paths:
+      - .github/workflows/deadspace-real-apk-win32-crossbuild.yml
+      - experimental/lifted_milestone6/tools/**
+      - experimental/windows_native_host/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile-actual-game-win32:
+    name: Translate real ARM ELF and compile all game functions to native PE32
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    steps:
+      - name: Checkout Windows native host and portable original-code translator
+        uses: actions/checkout@v4
+      - name: Install real MinGW-w64 x86 compiler and ELF translator dependencies
+        timeout-minutes: 12
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f /etc/apt/apt-mirrors.txt ]]; then
+            echo 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt
+          fi
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y \
+            python3 python3-pyelftools gcc-mingw-w64-i686-posix \
+            binutils-mingw-w64-i686 unzip curl tar file
+      - name: Retrieve the actual released APK, not a synthetic fixture
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/deadspace-real-win32"
+          mkdir -p "$dir/apk" "$dir/tools"
+          gh release download apk-files-for-testing \
+            --repo daniyalshakeel5/Dead-Space-Mobile-PC-port \
+            --pattern 'Deas.Space.Mobile.Fixes.apk' --dir "$dir"
+          original="$dir/Deas.Space.Mobile.Fixes.apk"
+          [[ -s "$original" ]] || { echo 'ACTUAL WINDOWS FAIL: real APK missing'; exit 20; }
+          unzip -qq "$original" -d "$dir/apk"
+          [[ -s "$dir/apk/lib/armeabi/libDeadSpace.so" ]] || exit 21
+          [[ -d "$dir/apk/assets/published" ]] || exit 22
+          echo "ACTUAL_WINDOWS_APK_SHA256=$(sha256sum "$original" | cut -d ' ' -f 1)"
+          cp -a experimental/lifted_milestone6/tools/. "$dir/tools/"
+          cp experimental/windows_native_host/win32_substrate.{c,h} "$dir/tools/"
+      - name: Compile the REAL original Dead Space game to Win32 PE32
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/deadspace-real-win32"
+          cd "$dir/tools"
+          export DS_SO="$dir/apk/lib/armeabi/libDeadSpace.so"
+          DS_TEXTUREPACK_DIAG=0 python3 gen_all.py
+          [[ -s out/fn_058.c && -s out/fn_055.c ]] ||
+            { echo 'ACTUAL WINDOWS FAIL: genuine decoded game source missing'; exit 23; }
+          echo "REAL_GAME_TRANSLATED_FUNCTION_CHUNKS=$(find out -maxdepth 1 -name 'fn_*.c' | wc -l)"
+          bash build_win32_lifted.sh "$dir"
+          test -s "$dir/windows-build/DeadSpaceMobile-Win32.exe"
+          file "$dir/windows-build/DeadSpaceMobile-Win32.exe"
+          file "$dir/windows-build/DeadSpaceMobile-Win32.exe" | grep -q 'PE32 executable'
+          sha256sum "$dir/windows-build/DeadSpaceMobile-Win32.exe"
+          echo "ACTUAL WINDOWS PASS: all game functions linked into real native Win32 PE32."
+          echo "Native Windows boot runs next; assets stay on the test runners."
+      - name: Report actual Windows native game compiler failure
+        if: failure()
+        shell: bash
+        run: |
+          dir="$RUNNER_TEMP/deadspace-real-win32"
+          if [[ -f "$dir/windows-build/compile-windows.log" ]]; then
+            echo '==== REAL GAME BUILD ERROR, LAST 140 LINES ===='
+            tail -n 140 "$dir/windows-build/compile-windows.log"
+          fi
+          find "$dir/tools/out" -maxdepth 1 -name 'fn_*.o' 2>/dev/null | wc -l || true
+      - name: Transfer native executable to Windows boot runner
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-boot-runtime
+          retention-days: 1
+          path: |
+            ${{ runner.temp }}/deadspace-real-win32/windows-build/DeadSpaceMobile-Win32.exe
+            ${{ runner.temp }}/deadspace-real-win32/windows-build/SDL2.dll
+            ${{ runner.temp }}/deadspace-real-win32/windows-build/libwinpthread-1.dll
+          if-no-files-found: error
+  boot-windows:
+    name: Boot genuine game on Windows with software OpenGL
+    needs: compile-actual-game-win32
+    strategy:
+      fail-fast: false
+      matrix:
+        input: [camera-drag, camera-move-only, camera-pulse]
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-boot-runtime
+          path: ${{ runner.temp }}/dsboot
+      - name: Prepare genuine assets and x86 OpenGL
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = "$env:RUNNER_TEMP/dsboot"
+          New-Item -ItemType Directory -Force "$root/evidence", "$root/shots" | Out-Null
+          gh release download apk-files-for-testing --repo $env:GITHUB_REPOSITORY --pattern 'Deas.Space.Mobile.Fixes.apk' --dir $root
+          if ($LASTEXITCODE) { throw 'APK download failed' }
+          7z x "$root/Deas.Space.Mobile.Fixes.apk" "-o$root/apk" -y | Out-Null
+          if ($LASTEXITCODE) { throw 'APK extraction failed' }
+          $identity = (Get-FileHash "$root/apk/lib/armeabi/libDeadSpace.so" -Algorithm SHA1).Hash.ToLower()
+          if ($identity -ne '64a3323cd3cc0c483a645b62af8508624163ba9b') { throw 'Wrong game library' }
+          $identity | Set-Content "$root/evidence/library-sha1.txt"
+          New-Item -ItemType Directory -Force "$root/apk/assets/var" | Out-Null
+          gh release download 26.2.6 --repo mmozeiko/build-mesa --pattern 'mesa-llvmpipe-x86-26.2.6.7z' --dir $root
+          if ($LASTEXITCODE) { throw 'Mesa download failed' }
+          7z x "$root/mesa-llvmpipe-x86-26.2.6.7z" "-o$root/mesa" -y | Out-Null
+          if ($LASTEXITCODE) { throw 'Mesa extraction failed' }
+          $gl = Get-ChildItem "$root/mesa" -Recurse -Filter opengl32.dll | Select-Object -First 1
+          if (!$gl) { Get-ChildItem "$root/mesa" -Recurse | Select-Object FullName; throw 'x86 Mesa DLL missing' }
+          Copy-Item "$($gl.DirectoryName)/*.dll" $root -Force
+          Get-ChildItem $root -Filter '*.dll' | Select-Object Name,Length | Out-File "$root/evidence/dlls.txt"
+          python -m pip install --quiet Pillow
+      - name: Launch native Windows game and record boot
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = ("$env:RUNNER_TEMP/dsboot" -replace '\\','/')
+          $env:DS_ASSETS = "$root/apk/assets"
+          $env:DS_DATA = $env:DS_ASSETS
+          $env:DS_WINDOW = '1'
+          $env:DS_NOVSYNC = '1'
+          $env:DS_QUIET_JAVA = '1'
+          $env:DS_ASSET_TRACE = '1'
+          $env:DS_IO_AUDIT = '1'
+          $env:DS_STEPS = 'create,surface,frame'
+          $env:DS_FRAMES = '24000'
+          $env:DS_PC_MOVE_FINGER = '0'
+          $env:DS_RENDER_DIAG = '1'
+          $env:DS_INPUT_DIAG = '1'
+          $env:DS_SKY_DIAG = '1'
+          # The original Fixes APK ignored native TouchPad camera input on
+          # physical PS4 hardware. Compare SCREEN drag, move-only, and original
+          # tap-per-frame mode against REAL game screenshots. All tests use
+          # the same proven exterior projection correction.
+          $env:DS_RENDER_MIN_FAR = '1200'
+          $env:DS_CAMERA_MODE = ('${{ matrix.input }}' -replace '^camera-', '')
+          $env:DS_CONTROLLER_AXES = '18500:19500:0:-32768:0:0,20100:20600:0:0:16384:0,20700:20900:0:0:0:16384'
+          # Real APK with mapped SDL controller inputs: R1 melee, R2 stomp,
+          # Cross context tap, L2 aim + R2 fire, Options pause.
+          $env:DS_CONTROLLER_BUTTONS = '21400:21412:rightshoulder,21800:21806:a,23500:23508:start'
+          # Exercise native up/down swipe delivery with genuine game files.
+          $env:DS_PAD_SWIPES = '21200:-1,21300:1'
+          $env:DS_CONTROLLER_TRIGGERS = '21600:21620:-32768:32767,22000:22300:32767:-32768,22100:22150:32767:32767'
+          $env:DS_CLICKS = '600:640:675,1500:1145:668,2400:1145:668'
+          $env:DS_SHOT_EVERY = '150'
+          $env:DS_SHOT_DIR = "$root/shots"
+          $env:GALLIUM_DRIVER = 'llvmpipe'
+          $env:LIBGL_ALWAYS_SOFTWARE = '1'
+          $env:SDL_AUDIODRIVER = 'dummy'
+          $p = Start-Process "$root/DeadSpaceMobile-Win32.exe" -WorkingDirectory $root -ArgumentList "`"$root/apk/lib/armeabi/libDeadSpace.so`"" -PassThru -RedirectStandardOutput "$root/evidence/stdout.log" -RedirectStandardError "$root/evidence/stderr.log"
+          if (!$p.WaitForExit(900000)) {
+            Stop-Process -Id $p.Id -Force
+            'TIMEOUT after 900 seconds' | Set-Content "$root/evidence/exit-code.txt"
+            throw 'Windows game hung'
+          }
+          $p.Refresh()
+          $p.ExitCode | Set-Content "$root/evidence/exit-code.txt"
+          Get-Content "$root/evidence/stdout.log" -Tail 80
+          Get-Content "$root/evidence/stderr.log" -Tail 100
+          if ($p.ExitCode -ne 0) { throw "Windows game exited with $($p.ExitCode)" }
+          if (!(Select-String -Path "$root/evidence/stdout.log" -Pattern '^ran frames')) { throw 'Frame loop did not complete' }
+          $stderr = "$root/evidence/stderr.log"
+          if (!(Select-String -Path $stderr -Pattern '\[CAMERA_EVENT\]')) { throw 'No camera pointer event reached genuine game input bridge' }
+          $cameraDowns = @((Select-String -Path $stderr -Pattern '\[CAMERA_EVENT\].*action=0')).Count
+          Write-Host "Camera mode $env:DS_CAMERA_MODE, trace down events: $cameraDowns"
+          if ($env:DS_CAMERA_MODE -eq 'drag' -and $cameraDowns -gt 3) {
+            throw 'Camera drag is still spamming native touchscreen DOWN events'
+          }
+          if (!(Select-String -Path $stderr -Pattern '\[PAD_SWIPE\].*plasma-saw-up')) { throw 'Upward plasma-saw swipe was not delivered' }
+          if (!(Select-String -Path $stderr -Pattern '\[PAD_SWIPE\].*stomp-down')) { throw 'Downward stomp swipe was not delivered' }
+          if (!(Select-String -Path $stderr -Pattern '\[SKY_GL\]')) { throw 'Sky/starfield GL diagnostic counters were not produced' }
+      - name: Convert captured game frames
+        if: always()
+        shell: pwsh
+        run: |
+          $root = "$env:RUNNER_TEMP/dsboot"
+          python -c "from pathlib import Path; from PIL import Image; import sys; r=Path(sys.argv[1]); [(Image.open(p).save(r/'evidence'/(p.stem+'.png'))) for p in (r/'shots').glob('*.ppm')]" $root
+          Get-Content "$root/evidence/stdout.log" -Tail 80 -ErrorAction SilentlyContinue
+          Get-Content "$root/evidence/stderr.log" -Tail 100 -ErrorAction SilentlyContinue
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-input-evidence-${{ matrix.input }}
+          path: ${{ runner.temp }}/dsboot/evidence
+          retention-days: 7

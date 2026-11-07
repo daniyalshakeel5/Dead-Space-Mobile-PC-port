@@ -1,0 +1,192 @@
+name: Dead Space Mobile fresh Windows installer kit
+on:
+  push:
+    branches: [work/deadspace-windows-lifted-host-2026-11-04]
+    paths:
+      - experimental/windows_native_host/Install-DeadSpace-Fresh.ps1
+      - experimental/windows_native_host/Build-DeadSpace-Windows.ps1
+      - experimental/windows_native_host/Build-DeadSpace-Windows.cmd
+      - experimental/windows_native_host/Install Dead Space Mobile.cmd
+      - experimental/windows_native_host/README-TEST-WINDOWS.txt
+      - experimental/windows_native_host/Repair-DeadSpace-Windows.ps1
+      - experimental/windows_native_host/Repair Dead Space Windows.cmd
+      - experimental/windows_native_host/Diagnose-DeadSpace-Crash.ps1
+      - experimental/windows_native_host/Diagnose Dead Space Crash.cmd
+      - experimental/windows_native_host/Inspect-DeadSpace-ModelCache.ps1
+      - experimental/windows_native_host/Inspect Dead Space Model Cache.cmd
+      - experimental/lifted_milestone6/tools/**
+      - .github/workflows/windows-private-game-build-kit.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-fresh-install-test:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Windows PowerShell scripts parse on PowerShell 5 and PowerShell 7
+        shell: pwsh
+        run: |
+          $files = @(
+             'experimental/windows_native_host/Install-DeadSpace-Fresh.ps1',
+             'experimental/windows_native_host/Build-DeadSpace-Windows.ps1',
+             'experimental/windows_native_host/Repair-DeadSpace-Windows.ps1',
+             'experimental/windows_native_host/Diagnose-DeadSpace-Crash.ps1',
+             'experimental/windows_native_host/Inspect-DeadSpace-ModelCache.ps1'
+          )
+          foreach($p in $files) {
+             $tokens = $null
+             $errors = $null
+             [System.Management.Automation.Language.Parser]::ParseFile(
+               (Resolve-Path $p).Path, [ref]$tokens, [ref]$errors) | Out-Null
+             if ($errors.Count) { throw ("Parse failed: " + $p + "`n" + ($errors | Out-String)) }
+             Write-Host "PASS PowerShell syntax: $p"
+          }
+      - name: Extract local ModelCache source without copying private game to CI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'dspc-modelcache-test'
+          $out = Join-Path $root 'tools\out'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $f = @(
+            '#include "protos.h"',
+            'u64 f_000629b4(u32 r0,u32 r1,u32 r2,u32 r3,u32 sp) { /* ModelCache::loadNodeUncached */',
+            '  u32 ea = sp + 52u;',
+            '  r3 = LD32(ea);',
+            '  { u64 rv = f_0027e644(r0,r1,r2,r3,sp); }',
+            '  r7 = LD32(ea);',
+            '}',
+            'u64 f_000629c0(u32 r0,u32 r1,u32 r2,u32 r3,u32 sp) { return 0; }'
+          )
+          Set-Content -Path (Join-Path $out 'fn_003.c') -Value $f -Encoding UTF8
+          Set-Content -Path (Join-Path $out 'fn_020.c') -Value @(
+            '#include "protos.h"',
+            'u64 f_0027e644(u32 r0,u32 r1,u32 r2,u32 r3,u32 sp) {',
+            '  return 0;',
+            '}'
+          ) -Encoding UTF8
+          $env:DS_DIAG_QUIET = '1'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'experimental/windows_native_host/Inspect-DeadSpace-ModelCache.ps1' -InstallDir $root
+          if ($LASTEXITCODE -ne 0) { throw "ModelCache source extraction failed" }
+          $report = Join-Path $root 'windows-build\logs\modelcache-source-context.txt'
+          if (!(Test-Path $report)) { throw 'Source report missing' }
+          $s = [IO.File]::ReadAllText($report)
+          foreach($expect in @('f_000629b4','f_0027e644','sp + 52u','LD32(ea)')) {
+            if (!$s.Contains($expect)) { throw "Source extraction dropped $expect" }
+          }
+          if ($s.Contains('f_000629c0')) { throw 'Source extractor included unrelated C function' }
+          Write-Host 'PASS: local ModelCache and helper source extraction, no game files'
+      - name: Create a synthetic owned-APK fixture and exercise full fresh extraction
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $fixture = Join-Path $env:RUNNER_TEMP 'deadspace-fixture.apk'
+          $zip = [IO.Compression.ZipFile]::Open($fixture, [IO.Compression.ZipArchiveMode]::Create)
+          try {
+            $arm = New-Object byte[] 128
+            $arm[0]=0x7f; $arm[1]=0x45; $arm[2]=0x4c; $arm[3]=0x46
+            $arm[4]=1; $arm[5]=1; $arm[18]=40
+            $e = $zip.CreateEntry('lib/armeabi/libDeadSpace.so')
+            $stream = $e.Open(); try { $stream.Write($arm,0,$arm.Length) } finally { $stream.Dispose() }
+            $e = $zip.CreateEntry('assets/EAMCore.ini')
+            $stream = $e.Open(); try {
+              $b=[Text.Encoding]::UTF8.GetBytes('[fixture]' + [Environment]::NewLine)
+              $stream.Write($b,0,$b.Length)
+            } finally { $stream.Dispose() }
+            $e = $zip.CreateEntry('assets/var/settings.sb')
+            $stream = $e.Open(); try { $stream.WriteByte(1) } finally { $stream.Dispose() }
+          } finally { $zip.Dispose() }
+          $root = Join-Path $env:RUNNER_TEMP 'DeadSpaceFreshProject'
+          $kit = Join-Path $env:RUNNER_TEMP 'fresh-test-kit'
+          New-Item -ItemType Directory -Force (Join-Path $kit 'tools') | Out-Null
+          Copy-Item 'experimental/lifted_milestone6/tools/*' (Join-Path $kit 'tools') -Force
+          Copy-Item 'experimental/windows_native_host/win32_substrate.*' (Join-Path $kit 'tools') -Force
+          Copy-Item 'experimental/windows_native_host/Install-DeadSpace-Fresh.ps1' $kit -Force
+          $installer = Join-Path $kit 'Install-DeadSpace-Fresh.ps1'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -ApkPath $fixture -InstallDir $root -PrepareOnly
+          if ($LASTEXITCODE -ne 0) { throw "Fresh extraction installer failed ($LASTEXITCODE)" }
+          foreach($path in @('apk/lib/armeabi/libDeadSpace.so','apk/assets/EAMCore.ini','apk/assets/var/settings.sb','tools/gen_all.py','tools/lift.py','tools/overrides.py','tools/texturepack_fault_guard.py','tools/modelcache_empty_vector.py','tools/object3d_duplicate_probe.py','tools/host.c','tools/build_win32_lifted.sh','tools/windows_lifted_compat.h','original-elf-sha256.txt')) {
+            if (!(Test-Path (Join-Path $root $path))) { throw "Missing extracted file: $path" }
+          }
+          Write-Host 'PASS fresh APK extraction, ELF validation, and translator + native Windows source installation'
+          # An existing installation is not silently overwritten.
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -ApkPath $fixture -InstallDir $root -PrepareOnly
+          if ($LASTEXITCODE -eq 0) { throw "Installer incorrectly overwrote a nonempty project" }
+          Write-Host 'PASS existing game project protected against accidental overwrite'
+          $global:LASTEXITCODE = 0 # expected rejection is not a CI failure
+      - name: Reject incompatible Xperia library and ZIP path traversal
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $installer = Join-Path $env:RUNNER_TEMP 'fresh-test-kit/Install-DeadSpace-Fresh.ps1'
+          foreach ($case in @('xperia','traversal')) {
+            $file = Join-Path $env:RUNNER_TEMP ($case+'.apk')
+            $zip = [IO.Compression.ZipFile]::Open($file,[IO.Compression.ZipArchiveMode]::Create)
+            try {
+              $e=$zip.CreateEntry('assets/EAMCore.ini'); $s=$e.Open(); $s.Dispose()
+              $name=if($case -eq 'xperia') {'lib/armeabi/libEAMGameDeadSpace.so'} else {'lib/armeabi/libDeadSpace.so'}
+              $e=$zip.CreateEntry($name); $s=$e.Open();$s.WriteByte(42);$s.Dispose()
+              if ($case -eq 'traversal') {
+                $e=$zip.CreateEntry('../escape.txt');$s=$e.Open();$s.WriteByte(42);$s.Dispose()
+              }
+            } finally { $zip.Dispose() }
+            $destination=Join-Path $env:RUNNER_TEMP ($case+'-dest')
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -ApkPath $file -InstallDir $destination -PrepareOnly
+            if ($LASTEXITCODE -eq 0) { throw "Unsafe archive accepted: $case" }
+            if (Test-Path $destination) { throw "Unsafe archive wrote to install directory: $case" }
+            Write-Host "PASS rejected $case before extraction"
+            $global:LASTEXITCODE = 0 # expected rejection is not a CI failure
+          }
+  bash-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate translators and native Windows compiler script
+        run: |
+          bash -n experimental/lifted_milestone6/tools/build_win32_lifted.sh
+          python3 -m py_compile experimental/lifted_milestone6/tools/gen_all.py experimental/lifted_milestone6/tools/lift.py experimental/lifted_milestone6/tools/overrides.py experimental/lifted_milestone6/tools/texturepack_fault_guard.py
+          python3 -m py_compile experimental/lifted_milestone6/tools/modelcache_empty_vector.py
+          python3 -m py_compile experimental/lifted_milestone6/tools/object3d_duplicate_probe.py
+          python3 -m unittest discover -s tests -p 'test_object3d_duplicate_probe.py' -v
+          python3 -m unittest discover -s tests -p 'test_modelcache_empty_vector.py' -v
+  package-kit:
+    needs: [windows-fresh-install-test, bash-check]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage complete source-only fresh Windows installer
+        run: |
+          mkdir -p package/tools
+          src=experimental/lifted_milestone6/tools
+          for f in rt.h host.c jni_vm.c threads.c libc_files.c gl_shim.c front_sdl.c build.sh build_win32_lifted.sh gen_all.py gen_gl.py lift.py overrides.py jninames.py texturepack_fault_guard.py modelcache_empty_vector.py object3d_duplicate_probe.py native_buffered_input.py m3g_loader_serialization.py modelcache_null_duplicate_recovery.py windows_lifted_compat.h win32_bionic_openflags.h win32_import_bridge.h win32_missing_imports.c win32_missing_gles.c; do
+            test -s "$src/$f"
+            cp "$src/$f" package/tools/
+          done
+          cp experimental/windows_native_host/win32_substrate.c package/tools/
+          cp experimental/windows_native_host/win32_substrate.h package/tools/
+          cp experimental/windows_native_host/Install-DeadSpace-Fresh.ps1 package/
+          cp experimental/windows_native_host/Build-DeadSpace-Windows.ps1 package/
+          cp experimental/windows_native_host/Build-DeadSpace-Windows.cmd package/
+          cp 'experimental/windows_native_host/Install Dead Space Mobile.cmd' package/
+          cp experimental/windows_native_host/README-TEST-WINDOWS.txt package/
+          cp experimental/windows_native_host/Repair-DeadSpace-Windows.ps1 package/
+          cp 'experimental/windows_native_host/Repair Dead Space Windows.cmd' package/
+          cp experimental/windows_native_host/Diagnose-DeadSpace-Crash.ps1 package/
+          cp 'experimental/windows_native_host/Diagnose Dead Space Crash.cmd' package/
+          cp experimental/windows_native_host/Inspect-DeadSpace-ModelCache.ps1 package/
+          cp 'experimental/windows_native_host/Inspect Dead Space Model Cache.cmd' package/
+          if find package -type f | grep -E '\.(apk|so|m3g|ogg|dex|bin)$'; then
+             echo "Refusing to publish original EA binaries/assets"; exit 1
+          fi
+          echo "PASS: complete ARM-to-C translator + Win32 host kit (no EA data)"
+          find package -type f -printf '%P\n' | sort
+      - name: Upload tested fresh install kit
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeadSpaceMobile-FRESH-Windows-Installer
+          path: package/
+          if-no-files-found: error
+          retention-days: 30

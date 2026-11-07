@@ -72,13 +72,13 @@ same("glActiveTexture", "glAlphaFunc", "glBindBuffer", "glBindTexture", "glBlend
      "glTexEnvfv", "glTexEnvi", "glTexEnviv", "glTexImage2D", "glTexParameterf", "glTexParameterfv", "glTexParameteri",
      "glTexParameteriv", "glTexSubImage2D", "glTranslatef", "glVertexPointer", "glViewport", "glIsEnabled")
 S += [
- ("glClearDepthf", "f", "glClearDepth"), ("glDepthRangef", "ff", "glDepthRange"), ("glFrustumf", "ffffff", "glFrustum"),
+ ("glClearDepthf", "f", "glClearDepth"), ("glDepthRangef", "ff", "glDepthRange"), 
  ("glOrthof", "ffffff", "glOrtho"),
  ("glBlendFuncSeparateOES", "uuuu", "glBlendFuncSeparate"), ("glBlendEquationOES", "u", "glBlendEquation"),
  ("glBlendEquationSeparateOES", "uu", "glBlendEquationSeparate"),
  # fixed point
  ("glAlphaFuncx", "ux", "glAlphaFunc"), ("glClearColorx", "xxxx", "glClearColor"), ("glClearDepthx", "x", "glClearDepth"),
- ("glColor4x", "xxxx", "glColor4f"), ("glDepthRangex", "xx", "glDepthRange"), ("glFrustumx", "xxxxxx", "glFrustum"),
+ ("glColor4x", "xxxx", "glColor4f"), ("glDepthRangex", "xx", "glDepthRange"), 
  ("glLightx", "uux", "glLightf"), ("glLineWidthx", "x", "glLineWidth"), ("glLoadMatrixx", "p", "@loadmatrixx"),
  ("glMaterialx", "uux", "glMaterialf"), ("glMultMatrixx", "p", "@multmatrixx"), ("glMultiTexCoord4x", "uxxxx", "glMultiTexCoord4f"),
  ("glNormal3x", "xxx", "glNormal3f"), ("glOrthox", "xxxxxx", "glOrtho"), ("glPointParameterx", "ux", "glPointParameterf"),
@@ -139,9 +139,21 @@ def main(out):
         if gname in done: continue
         done.add(gname)
         o.append(f"IMP({gname}) {{\n  T({gname});\n")
+        # Genuine game sky/starfield diagnostics, disabled by default.
+        if gname == "glBindTexture":
+            o.append("  ds_sky_diag_bind(W(0), W(1));\n")
+        elif gname == "glTexImage2D":
+            o.append("  ds_sky_diag_image(W(0), W(3), W(4));\n")
+        elif gname in ("glDrawElements", "glDrawArrays"):
+            o.append("  ds_sky_diag_draw();\n")
         if dname.startswith("@"):                         # fixed-point matrices: 16 x 16.16 -> float[16]
             fn = "glLoadMatrixf" if dname == "@loadmatrixx" else "glMultMatrixf"
-            o.append(f"  if (dgl_{fn}) {{ float m[16]; const s32* s = (const s32*)P(r0); for (int i = 0; i < 16; i++) m[i] = fxf((u32)s[i]); dgl_{fn}(m); }}\n  RET(0);\n}}\n")
+            o.append(f"  if (dgl_{fn}) {{ float m[16], patched[16]; const s32* s = (const s32*)P(r0); for (int i = 0; i < 16; i++) m[i] = fxf((u32)s[i]); dgl_{fn}(ds_matrix_filter(m, patched, \"{gname}\")); }}\n  RET(0);\n}}\n")
+            continue
+        if gname == "glMatrixMode":
+            o.append("  ds_matrix_mode_set(r0);\n")
+        if gname in ("glLoadMatrixf", "glMultMatrixf"):
+            o.append(f'  if (dgl_{dname}) {{ float patched[16]; dgl_{dname}(ds_matrix_filter((const float*)P(r0), patched, "{gname}")); }}\n  RET(0);\n}}\n')
             continue
         r, dps = D[dname]
         if len(gps) != len(dps): raise SystemExit(f"arity mismatch {gname}")

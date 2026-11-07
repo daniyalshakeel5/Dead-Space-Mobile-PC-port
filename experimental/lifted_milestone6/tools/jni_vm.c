@@ -1,11 +1,12 @@
 // jni_vm.c - a tiny fake Java VM for the translated game (included by host.c).
 // JNIEnv/JavaVM function tables, object handles, strings, arrays, calls into "Java" methods that the
 // game expects from Android (AssetManager, InputStream, delegates ...). Unknown Java methods are logged.
+#include <errno.h>
 #include <dirent.h>
 #include <sys/stat.h>
 
 enum { K_NONE, K_CLASS, K_STRING, K_OBJECT, K_ARRAY, K_OBJARR, K_ASSETMGR, K_STREAM, K_AFD };
-typedef struct { u8 kind; u8 esz; char* s; void* p; u32 n; u32 extra; } JObj;
+typedef struct { u8 kind; u8 esz; char* s; void* p; u32 n; u32 extra; pthread_mutex_t* monitor; } JObj;
 #define OBJ_CHUNK 1024
 static JObj* g_chunk[4096]; static u32 g_nobjs; /* published with release/acquire */
 static pthread_mutex_t g_objlock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;       // object table, class cache and Java-side state
@@ -109,7 +110,7 @@ static int ds_asset_name_compare(const void* aa, const void* bb) {
  * Never write outside the guest byte[] when a malformed JNI argument arrives. */
 static int stream_read(JObj* o, u8* dst, int len) {
     if (len == 0) return 0;
-    if (len < 0 || !o || !o->p || !dst) return -1;
+    if (len < 0 || !o || !dst) return -1;
     pthread_mutex_lock(&g_objlock);
     if (!o->p) { pthread_mutex_unlock(&g_objlock); return -1; }
     FILE* fp = (FILE*)o->p;
@@ -119,7 +120,7 @@ static int stream_read(JObj* o, u8* dst, int len) {
         strcmp(resource + strlen(resource) - 4, ".m3g") == 0;
     long begin = is_m3g ? ftell(fp) : -1;
     size_t n = fread(dst, 1, (size_t)len, fp);
-    if (is_m3g && o->extra++ < 3) {
+    if (is_m3g && o->extra++ < 256) {
         char h[40]={0};
         for (size_t ds_i=0; ds_i<n && ds_i<12; ds_i++)
             snprintf(h+3*ds_i, 4, "%02x ", (unsigned)dst[ds_i]);
@@ -142,6 +143,12 @@ static int stream_read(JObj* o, u8* dst, int len) {
                 o->s ? o->s : "(unknown)", len, n,
                 ftell(fp), feof(fp), ferror(fp));
     }
+    if (getenv("DS_IO_AUDIT") && len>=512) {
+        u32 hash=2166136261u;
+        for(size_t i=0;i<n;i++) hash=(hash^dst[i])*16777619u;
+        fprintf(stderr,"[JNI_IO_READ] tid=%lu resource=%s dest=%p length=%zu hash=%08x end=%ld\n",
+                (unsigned long)pthread_self(),resource,(void*)dst,n,hash,ftell(fp));
+    }
     int result = n ? (int)n : -1;
     pthread_mutex_unlock(&g_objlock);
     return result;
@@ -156,7 +163,7 @@ static int stream_byte_array_ok(JObj* b, s32 offset, s32 count) {
  * old shim incorrectly reported bytes skipped beyond the resource's length.
  * The native M3G decoder relies on accurate stream positioning. */
 static u64 stream_skip(JObj* stream, u64 requested_raw) {
-    if (!stream || !stream->p) { g_exception = 1; return 0; }
+    if (!stream) { g_exception = 1; return 0; }
     s64 requested = (s64)requested_raw;
     if (getenv("DS_ASSET_TRACE")) {
         static __thread unsigned ds_skip_logs;
@@ -165,22 +172,23 @@ static u64 stream_skip(JObj* stream, u64 requested_raw) {
                     stream->s ? stream->s : "", (long long)requested);
     }
     if (requested <= 0) return 0;
+    pthread_mutex_lock(&g_objlock);
+    if (!stream->p) { g_exception = 1; pthread_mutex_unlock(&g_objlock); return 0; }
     FILE* fp = (FILE*)stream->p;
-    flockfile(fp);
     long start = ftell(fp);
     if (start < 0 || fseek(fp, 0, SEEK_END) != 0) {
-        g_exception = 1; funlockfile(fp); return 0;
+        g_exception = 1; pthread_mutex_unlock(&g_objlock); return 0;
     }
     long end = ftell(fp);
     if (end < 0 || fseek(fp, start, SEEK_SET) != 0) {
-        g_exception = 1; funlockfile(fp); return 0;
+        g_exception = 1; pthread_mutex_unlock(&g_objlock); return 0;
     }
     u64 available = end > start ? (u64)(end - start) : 0;
     u64 actual = (u64)requested < available ? (u64)requested : available;
     if (fseek(fp, start + (long)actual, SEEK_SET) != 0) {
-        g_exception = 1; funlockfile(fp); return 0;
+        g_exception = 1; pthread_mutex_unlock(&g_objlock); return 0;
     }
-    funlockfile(fp);
+    pthread_mutex_unlock(&g_objlock);
     if (getenv("DS_ASSET_TRACE") && (u64)requested != actual)
         fprintf(stderr,
             "[JAVA_STREAM_SKIP_CLAMP] requested=%llu actual=%llu at=%ld file_size=%ld\n",
@@ -261,18 +269,18 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
             return 0;
         }
         if (!strcmp(nm, "available")) {
-            if (!so->p) { g_exception = 1; return 0; }
+            pthread_mutex_lock(&g_objlock);
+            if (!so->p) { g_exception = 1; pthread_mutex_unlock(&g_objlock); return 0; }
             FILE* fp = (FILE*)so->p;
-            flockfile(fp);
             long cur = ftell(fp);
             if (cur < 0 || fseek(fp, 0, SEEK_END) != 0) {
-                g_exception = 1; funlockfile(fp); return 0;
+                g_exception = 1; pthread_mutex_unlock(&g_objlock); return 0;
             }
             long end = ftell(fp);
             if (fseek(fp, cur, SEEK_SET) != 0 || end < 0) {
-                g_exception = 1; funlockfile(fp); return 0;
+                g_exception = 1; pthread_mutex_unlock(&g_objlock); return 0;
             }
-            funlockfile(fp);
+            pthread_mutex_unlock(&g_objlock);
             return end > cur ? (u32)(end - cur) : 0;
         }
         if (!strcmp(nm, "skip")) return stream_skip(so, a[0].j);
@@ -342,8 +350,25 @@ static u64 java_invoke(const Mid* m, u32 self, const char* kinds, int n, JArg* a
     if (!strcmp(c, "com/ea/blast/PowerManagerAndroid")) return 0;
     if (!strcmp(c, "com/ea/blast/TouchSurfaceAndroid") && !strcmp(nm, "IsTouchScreenMultiTouch")) return 1;
     if (!strcmp(c, "com/ea/blast/GetAppDataDirectoryDelegate") && !strcmp(m->sig, "()Ljava/lang/String;")) {
-        const char* d = getenv("DS_DATA") ? getenv("DS_DATA") : "userdata"; mkdir(d, 0755);
+        const char* d = getenv("DS_DATA") ? getenv("DS_DATA") : "userdata";
+        if (mkdir(d, 0755) != 0 && errno != EEXIST)
+            fprintf(stderr, "[APP_STORAGE_ERROR] create root %s errno=%d\n", d, errno);
         char full[4096]; if (!realpath(d, full)) snprintf(full, sizeof full, "%s", d);
+#ifdef _WIN32
+        /* Android's first-launch files live in <appdata>/var. The donor APK
+         * contains no initial settings/level-save files, and the Windows
+         * launcher intentionally sets DS_DATA to the existing asset root for
+         * resource-path compatibility. Create only the directory; the game
+         * owns and generates its actual binary save file contents. */
+        char var_dir[4096];
+        int nv = snprintf(var_dir, sizeof var_dir, "%s/var", full);
+        if (nv < 0 || (size_t)nv >= sizeof var_dir)
+            fprintf(stderr, "[APP_STORAGE_ERROR] save directory path too long\n");
+        else if (mkdir(var_dir, 0755) != 0 && errno != EEXIST)
+            fprintf(stderr, "[APP_STORAGE_ERROR] mkdir %s errno=%d\n", var_dir, errno);
+        else
+            fprintf(stderr, "[APP_STORAGE_READY] var_dir=%s\n", var_dir);
+#endif
         if (getenv("DS_ASSET_TRACE")) fprintf(stderr, "[JAVA_APP_STORAGE] %s -> %s\n", nm, full);
         return new_obj(K_STRING, full, 0, 0);
     }
@@ -360,8 +385,25 @@ static const char* sname(void) { return stub_names[g_stub_idx]; }
  * starting a game. This tests file ownership only; actual game boot remains
  * a separate required CI gate using the user's original APK. */
 static int ds_test_asset_streams(void) {
-    char root[]="/tmp/dspc-jni-stream-XXXXXX", path[256];
+    char path[4096];
+#ifdef _WIN32
+    char base[MAX_PATH], root[MAX_PATH];
+    DWORD n = GetTempPathA(sizeof base, base);
+    if (!n || n >= sizeof base) return 2;
+    unsigned attempt;
+    for (attempt = 0; attempt < 128; ++attempt) {
+        int len = snprintf(root, sizeof root, "%sdspc-jni-%lu-%lu-%u",
+                           base, (unsigned long)GetCurrentProcessId(),
+                           (unsigned long)GetTickCount(), attempt);
+        if (len < 0 || (size_t)len >= sizeof root) return 2;
+        if (CreateDirectoryA(root, NULL)) break;
+        if (GetLastError() != ERROR_ALREADY_EXISTS) return 2;
+    }
+    if (attempt == 128) return 2;
+#else
+    char root[]="/tmp/dspc-jni-stream-XXXXXX";
     if (!mkdtemp(root)) { perror("mkdtemp"); return 2; }
+#endif
     snprintf(path, sizeof path, "%s/%s", root, "probe.dat");
     FILE* seed=fopen(path, "wb");
     if (!seed) { perror("fopen"); rmdir(root); return 2; }
@@ -454,6 +496,38 @@ static u64 jni_GetVersion(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr("JNI:GetV
 static u64 jni_FindClass(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr("JNI:FindClass"); RET(class_handle(P(r1))); }
 static u64 jni_GetObjectClass(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr(sname()); RET(class_handle(cls_of(r1))); }
 static u64 jni_ref(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr(sname()); RET(r1); }
+/* JNI object monitors are recursive and shared by every reference to an
+ * object. Handles are stable for this VM's lifetime, so the monitor stays
+ * valid while a thread owns it or waits for it. Never wait under g_objlock. */
+static u64 jni_monitor(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
+    const char* name=sname(); tr(name);
+    int enter=strstr(name,"MonitorEnter")!=NULL;
+    JObj* o=OBJ(r1);
+    if(!o) { g_exception=1; RET((u32)-1); }
+    pthread_mutex_lock(&g_objlock);
+    if(enter && !o->monitor) {
+        pthread_mutex_t* m=malloc(sizeof *m);
+        pthread_mutexattr_t attr;
+        int rc=m ? pthread_mutexattr_init(&attr) : ENOMEM;
+        if(!rc) {
+            rc=pthread_mutexattr_settype(&attr,PTHREAD_MUTEX_RECURSIVE);
+            if(!rc) rc=pthread_mutex_init(m,&attr);
+            pthread_mutexattr_destroy(&attr);
+        }
+        if(rc) { free(m); pthread_mutex_unlock(&g_objlock); g_exception=1; RET((u32)-1); }
+        o->monitor=m;
+    }
+    pthread_mutex_t* m=o->monitor;
+    pthread_mutex_unlock(&g_objlock);
+    int rc=m ? (enter ? pthread_mutex_lock(m) : pthread_mutex_unlock(m)) : EPERM;
+    if(getenv("DS_IO_AUDIT")) {
+        static __thread unsigned reports;
+        if(reports++<128) fprintf(stderr,"[JNI_MONITOR] tid=%lu method=%s object=%08x result=%d\n",
+            (unsigned long)pthread_self(),name,r1,rc);
+    }
+    if(rc) g_exception=1;
+    RET(rc ? (u32)-1 : 0);
+}
 static u64 jni_noop(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr(sname()); RET(0); }
 static u64 jni_exc_check(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr(sname()); RET(g_exception ? 1 : 0); }
 static u64 jni_exc_clear(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) { tr(sname()); g_exception = 0; RET(0); }
@@ -521,6 +595,11 @@ static u64 jni_ReleasePrimitiveArrayCritical(u32 r0,u32 r1,u32 r2,u32 r3,u32 sp)
     }
     RET(0);
 }
+static u32 ds_io_hash(const u8* p, u32 n) {
+    u32 h=2166136261u;
+    for(u32 i=0;i<n;i++) h=(h^p[i])*16777619u;
+    return h;
+}
 static u64 jni_ArrayRegionGet(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
     const char* n = sname(); tr(n); JObj* o = OBJ(r1); int esz = esz_of(n); u32 buf = *(u32*)P(sp);
     if (!o || o->kind != K_ARRAY || o->esz != esz || !o->p ||
@@ -532,6 +611,10 @@ static u64 jni_ArrayRegionGet(u32 r0, u32 r1, u32 r2, u32 r3, u32 sp) {
         RET(0);
     }
     memcpy(P(buf), (u8*)o->p + (size_t)r2 * esz, (size_t)r3 * esz);
+    if (getenv("DS_IO_AUDIT") && esz==1 && r3>=512) {
+        fprintf(stderr,"[JNI_IO_COPY] tid=%lu array=%08x offset=%u length=%u dest=%08x hash=%08x\n",
+                (unsigned long)pthread_self(),r1,r2,r3,buf,ds_io_hash(P(buf),r3));
+    }
     if (getenv("DS_ASSET_TRACE") && esz==1 && r3==12) {
         const u8* d=P(buf);
         fprintf(stderr, "[JNI_12_BYTE_READ] tid=%lu dest=%08x array=%08x off=%u bytes=",
@@ -660,7 +743,8 @@ static void build_jni(void) {
         else if (!strcmp(n, "GetStringChars")) f = jni_GetStringChars;
         else if (!strcmp(n, "ReleaseStringChars")) f = jni_ReleaseStringChars;
         else if (!strcmp(n, "PopLocalFrame")) f = jni_PopLocalFrame;
-        else if (!strcmp(n, "PushLocalFrame") || !strcmp(n, "MonitorEnter") || !strcmp(n, "MonitorExit") || !strcmp(n, "EnsureLocalCapacity")) f = jni_noop;
+        else if (!strcmp(n, "MonitorEnter") || !strcmp(n, "MonitorExit")) f = jni_monitor;
+        else if (!strcmp(n, "PushLocalFrame") || !strcmp(n, "EnsureLocalCapacity")) f = jni_noop;
         else if (!strcmp(n, "NewStringUTF")) f = jni_NewStringUTF;
         else if (!strcmp(n, "GetStringUTFChars")) f = jni_GetStringUTFChars;
         else if (!strcmp(n, "ReleaseStringUTFChars")) f = jni_noop;
