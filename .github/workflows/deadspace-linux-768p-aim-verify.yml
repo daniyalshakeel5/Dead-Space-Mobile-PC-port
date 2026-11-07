@@ -1,0 +1,164 @@
+name: Native Linux 1366x768 — aim, viewport and fuse hit diagnostics
+on:
+  push:
+    branches: [work/deadspace-linux-touchscreen-2026-11-07]
+    paths: [.github/workflows/deadspace-linux-768p-aim-verify.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-game:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [current]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native i686 dependencies
+        run: |
+          sudo dpkg --add-architecture i386
+          if [[ -f /etc/apt/apt-mirrors.txt ]]; then
+            echo 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt
+          fi
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 update -qq
+          sudo apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386 libsdl2-2.0-0:i386 libgl1-mesa-dri:i386 libgl1:i386 xvfb xauth unzip zip file python3-venv libstdc++6:i386
+          # Extract target headers without installing unrelated i386 GUI
+          # development tools that conflict with the runner's host packages.
+          mkdir -p "$RUNNER_TEMP/sdl-dev"
+          cd "$RUNNER_TEMP/sdl-dev"
+          apt-get download libsdl2-dev:i386
+          dpkg-deb -x ./*.deb "$RUNNER_TEMP/sdl-prefix"
+          echo "SDL_PREFIX=$RUNNER_TEMP/sdl-prefix" >> "$GITHUB_ENV"
+          python3 -m venv "$RUNNER_TEMP/py"
+          "$RUNNER_TEMP/py/bin/pip" install pyelftools Pillow
+          echo "$RUNNER_TEMP/py/bin" >> "$GITHUB_PATH"
+      - name: Prepare genuine APK and selected source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE: ${{ matrix.source }}
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/baseline"
+          mkdir -p "$root/download" "$root/apk" "$root/logs" "$root/shots"
+          gh release download apk-files-for-testing -R "$GITHUB_REPOSITORY" --pattern 'Deas.Space.Mobile.Fixes.apk' --dir "$root/download"
+          unzip -q "$root/download/Deas.Space.Mobile.Fixes.apk" -d "$root/apk"
+          sha1sum "$root/apk/lib/armeabi/libDeadSpace.so" | tee "$root/logs/identity.txt"
+          [[ "$(sha1sum "$root/apk/lib/armeabi/libDeadSpace.so" | cut -d' ' -f1)" == 64a3323cd3cc0c483a645b62af8508624163ba9b ]]
+          cp -a experimental/lifted_milestone6/tools "$root/tools"
+          # Both variants use the exact asset/data arrangement reported by
+          # the other agent. Each matrix job has its own writable directory.
+          mkdir -p "$root/apk/assets/var"
+          echo "DS_ROOT=$root" >> "$GITHUB_ENV"
+      - name: Translate and compile original game functions
+        run: |
+          set -euo pipefail
+          cd "$DS_ROOT/tools"
+          export DS_TEXTUREPACK_DIAG=0
+          export DS_SO="$DS_ROOT/apk/lib/armeabi/libDeadSpace.so"
+          python3 gen_all.py > "$DS_ROOT/logs/generation.log" 2>&1
+          cd out
+          DS_BUILD_JOBS=3 SDL_CFLAGS="-I$SDL_PREFIX/usr/include/SDL2 -I$SDL_PREFIX/usr/include/i386-linux-gnu" SDL_LIBS="/usr/lib/i386-linux-gnu/libSDL2-2.0.so.0" bash build.sh > "$DS_ROOT/logs/build.log" 2>&1
+          file dspc_sdl | tee "$DS_ROOT/logs/executable.txt"
+      - name: Run genuine first boot, tutorial and two simultaneous Linux touchscreen fingers
+        env:
+          SOURCE: ${{ matrix.source }}
+        run: |
+          set +e
+          set -uo pipefail
+          cd "$DS_ROOT/tools/out"
+          # These are genuine SDL_FINGER* events entering the game's native
+          # TouchSurfaceAndroid JNI code, not fake assets/game logic.
+          export DS_TOUCH_GESTURES='600:602:0:683:720:683:720,1500:1502:0:1222:713:1222:713,2400:2402:0:1222:713:1222:713,18500:19400:0:320:549:320:363,18800:19500:1:1051:453:1195:448,19800:19812:0:939:384:939:384,20500:20530:0:240:277:240:75,20700:20730:0:240:75:240:277,21400:21404:1:1062:480:1062:480,21600:21604:1:1062:480:1062:480'
+          timeout --kill-after=20s 900s xvfb-run -a -s "-screen 0 1600x900x24" env \
+            LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy \
+            DS_WINDOW=1 DS_NOVSYNC=1 DS_QUIET_JAVA=1 DS_INPUT_DIAG=1 DS_TOUCHSCREEN=1 DS_TOUCH_FULLSCREEN=0 \
+            DS_WIDTH=1366 DS_HEIGHT=768 \
+            DS_MODEL=LinuxTouch DS_MANUFACTURER=Generic DS_RENDER_MIN_FAR=1200 DS_REANIMATED_TOUCH=1 DS_AIM_DIAG=1 \
+            DS_DATA="$DS_ROOT/apk/assets" DS_ASSETS="$DS_ROOT/apk/assets" \
+            DS_STEPS=create,surface,frame DS_FRAMES=24000 \
+            DS_TOUCH_GESTURES="$DS_TOUCH_GESTURES" \
+            DS_SHOT_EVERY=600 DS_SHOT_DIR="$DS_ROOT/shots" \
+            DS_SHOT="23990:$DS_ROOT/shots/final.ppm" \
+            ./dspc_sdl "$DS_ROOT/apk/lib/armeabi/libDeadSpace.so" > "$DS_ROOT/logs/runtime.log" 2>&1
+          code=$?
+          echo "$code" > "$DS_ROOT/logs/exit-code.txt"
+          tail -n 100 "$DS_ROOT/logs/runtime.log"
+          [[ $code == 0 ]] && grep -q '^ran frames' "$DS_ROOT/logs/runtime.log" || exit 1
+          grep -q '\[LINUX_TOUCH\] direct SDL multi-touch enabled' "$DS_ROOT/logs/runtime.log" || exit 2
+          grep -q '\[REANIMATED_TOUCH\] enabled=1' "$DS_ROOT/logs/runtime.log" || exit 8
+          grep -q 'REANIMATED_TOUCH_PATCH 0007b810' "$DS_ROOT/logs/generation.log" || exit 9
+          grep -q 'REANIMATED_TOUCH_PATCH 0007aefc' "$DS_ROOT/logs/generation.log" || exit 10
+          grep -q 'REANIMATED_TOUCH_PATCH 0006a908' "$DS_ROOT/logs/generation.log" || exit 11
+          grep -q 'AIM_HIT_TRACE instrumented GameObjectShootSwitch::onHit' "$DS_ROOT/logs/generation.log" || exit 12
+          grep -q 'AIM_HIT_TRACE instrumented WeaponPlasmaCutter::onFire' "$DS_ROOT/logs/generation.log" || exit 15
+          grep -q 'AIM_HIT_TRACE instrumented Weapon::performRaycast' "$DS_ROOT/logs/generation.log" || exit 16
+          echo 'Real-game shooting diagnostic events (presence depends on game state):'
+          grep -E '\[AIM_(SURFACE|VIEWPORT|CAMERA_ASPECT|FIRE|RAYCAST|RAY_HIT|IMPACT|POST_HIT|FUSE_HIT)\]' "$DS_ROOT/logs/runtime.log" | tail -n 70 || true
+          grep -q '\[AIM_SURFACE\]' "$DS_ROOT/logs/runtime.log" || exit 13
+          grep -q '\[AIM_VIEWPORT\]' "$DS_ROOT/logs/runtime.log" || exit 14
+          grep -Eq '\[AIM_SURFACE\].*drawable=1366x768' "$DS_ROOT/logs/runtime.log" || { echo 'FAIL: SDL drawable differs from 1366x768'; exit 17; }
+          grep -Eq '\[AIM_VIEWPORT\].*gl=0,0 1366x768' "$DS_ROOT/logs/runtime.log" || { echo 'FAIL: game GL viewport differs from 1366x768'; exit 18; }
+          grep -q '\[AIM_CAMERA_ASPECT\]' "$DS_ROOT/logs/runtime.log" || { echo 'FAIL: missing camera aspect diagnostic'; exit 19; }
+          echo '[AIM_NATIVE_RESOLUTION] SDL/game OpenGL agree on 1366x768'
+          grep -E '\[AIM_(SURFACE|VIEWPORT|CAMERA_ASPECT|FIRE|RAYCAST|RAY_HIT|FUSE_HIT)\]' "$DS_ROOT/logs/runtime.log" | tail -n 50 || true
+          grep -q '\[LINUX_TOUCH\] kind=0 slot=0' "$DS_ROOT/logs/runtime.log" || exit 3
+          grep -q '\[LINUX_TOUCH\] kind=0 slot=1' "$DS_ROOT/logs/runtime.log" || exit 4
+          grep -q '\[LINUX_TOUCH\] kind=2 slot=0' "$DS_ROOT/logs/runtime.log" || exit 5
+          grep -q '\[LINUX_TOUCH\] kind=2 slot=1' "$DS_ROOT/logs/runtime.log" || exit 6
+          echo "PASS genuine game running with simultaneous SDL touch contacts"
+      - name: Make asset-free native Linux touchscreen test package
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          dest="$RUNNER_TEMP/DeadSpaceMobile-Linux-Touchscreen"
+          mkdir -p "$dest"
+          cp "$DS_ROOT/tools/out/dspc_sdl" "$dest/"
+          cp packaging/linux-touchscreen/* "$dest/"
+          chmod +x "$dest/dspc_sdl" "$dest/Play-Dead-Space-Touch.sh"
+          bash -n "$dest/Play-Dead-Space-Touch.sh"
+          file "$dest/dspc_sdl" | grep -q 'ELF 32-bit'
+          (cd "$dest" && sha256sum dspc_sdl Play-Dead-Space-Touch.sh README-LINUX-TOUCH.txt > SHA256SUMS.txt)
+          printf 'Source commit: %s\nReal game verified: SHA1 64a3323cd3cc0c483a645b62af8508624163ba9b\nNo original game assets included.\n' "$GITHUB_SHA" > "$dest/BUILD_INFO.txt"
+          (cd "$RUNNER_TEMP" && zip -qr DeadSpaceMobile-Linux-Touchscreen-i686.zip DeadSpaceMobile-Linux-Touchscreen)
+          unzip -t "$RUNNER_TEMP/DeadSpaceMobile-Linux-Touchscreen-i686.zip" | tail -n 2
+
+      - name: Preserve visual and crash evidence
+        if: always()
+        run: |
+          root="$RUNNER_TEMP/baseline"
+          mkdir -p "$root/evidence"
+          for name in runtime build generation; do
+            if [[ -f "$root/logs/$name.log" ]]; then tail -n 500 "$root/logs/$name.log" > "$root/evidence/$name-tail.log"; fi
+          done
+          cp "$root/logs/runtime.log" "$root/evidence/" 2>/dev/null || true
+          cp "$root/logs/identity.txt" "$root/logs/executable.txt" "$root/logs/exit-code.txt" "$root/evidence/" 2>/dev/null || true
+          if [[ -f "$root/logs/runtime.log" && -f "$root/tools/out/dspc_sdl" ]]; then
+            grep -m1 'backtrace (use nm' "$root/logs/runtime.log" | grep -oE '0x[0-9a-fA-F]+' |
+              xargs -r addr2line -a -f -C -e "$root/tools/out/dspc_sdl" > "$root/evidence/backtrace.txt" || true
+          fi
+          cat "$root/evidence/runtime-tail.log" "$root/evidence/backtrace.txt" 2>/dev/null || true
+          python3 - "$root" <<'PY'
+          import pathlib, sys
+          if not list((pathlib.Path(sys.argv[1]) / "shots").glob("*.ppm")):
+              sys.exit(0)
+          from PIL import Image
+          root = pathlib.Path(sys.argv[1])
+          for path in (root / "shots").glob("*.ppm"):
+              with Image.open(path) as image:
+                  image.save(root / "evidence" / (path.stem + ".png"))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: genuine-apk-linux-768p-aim-evidence
+          path: ${{ runner.temp }}/baseline/evidence
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: DeadSpaceMobile-Linux-Touchscreen-i686-768p-diagnostic
+          path: ${{ runner.temp }}/DeadSpaceMobile-Linux-Touchscreen-i686.zip
+          retention-days: 14
