@@ -16,7 +16,7 @@ Windows 10/11, an x86-compatible PC and desktop OpenGL 2.1 are expected.
 
 CONTROLS
 Left stick: movement (confirmed on physical PS4 controller)
-Right stick: camera look via separate native TouchPad module (no firing taps)
+Right stick: sustained native touchscreen CAMERA DRAG (not repetitive action taps).
 Options: pause (Android BACK, verified on previous Circle mapping)
 Circle: intentionally not bound to pause; future Kinesis context mapping
 Cross: centre-screen touchscreen tap and DPAD_CENTER for doors/objects
@@ -49,6 +49,14 @@ show movement to the first door and camera look during overlapping sticks.
 The Windows executable was tested with Mesa software OpenGL; your physical
 GPU and PS4 USB/Bluetooth connection still need testing. Audio, combat,
 long sessions, level transitions and campaign completion are not verified.
+The previous TouchPad module 1100 mapping disabled right-stick look on the user's
+PS4 controller; that route must not be treated as verified. The camera now
+uses continuous TouchScreen dragging: one DOWN, repeated MOVEs, one UP.
+The diagnostic modes are selectable in PowerShell:
+  .\\Launch.ps1 -CameraMode drag         (default, intended safe look)
+  .\\Launch.ps1 -CameraMode move-only    (MOVE with no tap; experimental)
+  .\\Launch.ps1 -CameraMode pulse        (old look, MAY FIRE while looking)
+The same genuine-APK build is tested with all three camera modes.
 The game reads texture_env_generic_starfield.m3g from the original APK, but
 its background is still missing in captured opening-cutscene frames. Do NOT
 consider the skybox fixed by the expanded far plane. Enable SkyDiagnostics to
@@ -68,6 +76,6 @@ Do not run different test switches simultaneously when comparing screenshots.
 Audio is intentionally not addressed in this build.
 This is an early test build, not a completed game port.
 
-Binary source commit: 649769c89ac05085b6ebeca4c17b1bb7e91d77d2
-Windows test: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42286940055
+Binary source commit: 765a16fc6d0e91d436511a2834b637cf511deedd
+Windows test: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42356168351
 Development: https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/pull/4

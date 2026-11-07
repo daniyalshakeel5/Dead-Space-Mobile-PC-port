@@ -1,4 +1,4 @@
-param([string]$Apk, [switch]$PrepareOnly, [switch]$RenderDiagnostics, [switch]$InputDiagnostics, [switch]$SkyDiagnostics, [switch]$DisableFog, [switch]$DisableCull, [switch]$OriginalFarPlane, [double]$RenderMinFar = 1200)
+param([string]$Apk, [switch]$PrepareOnly, [switch]$RenderDiagnostics, [switch]$InputDiagnostics, [switch]$SkyDiagnostics, [switch]$DisableFog, [switch]$DisableCull, [switch]$OriginalFarPlane, [double]$RenderMinFar = 1200, [ValidateSet('drag','move-only','pulse','touchpad')][string]$CameraMode='drag')
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $expected = '64a3323cd3cc0c483a645b62af8508624163ba9b'
@@ -61,6 +61,8 @@ try {
     $env:DS_STEPS = 'create,surface,frame'
     $env:DS_FRAMES = '0'
     $env:DS_QUIET_JAVA = '1'
+    $env:DS_CAMERA_MODE = $CameraMode
+    if ($CameraMode -eq 'pulse') { Write-Warning 'Diagnostic old look mode: tapping repeatedly can fire weapons while turning.' }
     if ($RenderDiagnostics) { $env:DS_RENDER_DIAG = '1' }
     if ($InputDiagnostics) { $env:DS_INPUT_DIAG = '1' }
     if ($SkyDiagnostics) { $env:DS_SKY_DIAG = '1' }
@@ -76,11 +78,11 @@ try {
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
     $stdout = Join-Path $logs "$stamp-stdout.log"
     $stderr = Join-Path $logs "$stamp-stderr.log"
-    Write-Host 'Starting Dead Space Mobile. Left stick: move. Right stick: look.'
+    Write-Host "Starting Dead Space Mobile. Left stick: move. Right stick: $CameraMode camera mode."
     Write-Host 'Close the game window to exit. Logs are saved in the logs folder.'
     $process = Start-Process -FilePath (Join-Path $root 'DeadSpaceMobile-Win32.exe') -WorkingDirectory $root -ArgumentList ('"' + $so + '"') -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -Wait
     $code = $process.ExitCode
-    @("Exit code: $code", "Build: 649769c89ac05085b6ebeca4c17b1bb7e91d77d2", "Time: $(Get-Date -Format o)") | Set-Content (Join-Path $logs "$stamp-result.txt")
+    @("Exit code: $code", "Build: 765a16fc6d0e91d436511a2834b637cf511deedd", "Time: $(Get-Date -Format o)") | Set-Content (Join-Path $logs "$stamp-result.txt")
     if ($code -ne 0) { throw "Game exited with code $code. Please send the files in logs." }
 } catch {
     $_ | Out-String | Tee-Object -FilePath (Join-Path $logs 'launcher-error.txt') | Write-Host
