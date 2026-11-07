@@ -2,6 +2,7 @@
 #pragma once
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 #include <setjmp.h>
 typedef uint8_t u8; typedef int8_t s8; typedef uint16_t u16; typedef int16_t s16;
 typedef uint32_t u32; typedef int32_t s32; typedef uint64_t u64; typedef int64_t s64;
@@ -37,6 +38,23 @@ static inline u32 clz32(u32 x) { return x ? (u32)__builtin_clz(x) : 32; }
 
 // ---- VFP helpers (VFP registers are modelled as u32 V[32]; D<n> = V[2n] (low), V[2n+1] (high))
 #include <math.h>
+/* Actual GL drawable height, set by SDL. Reanimated scales 2011 taps
+ * for dense displays; keep the original 480p behaviour as baseline. */
+extern u32 ds_touch_output_h;
+static inline float ds_reanimated_touch_scale(void) {
+    const char* enabled=getenv("DS_REANIMATED_TOUCH");
+    if(!enabled || !*enabled || !strcmp(enabled,"0")) return 1.0f;
+    float scale=(float)ds_touch_output_h / 480.0f;
+    if(scale<1.0f) scale=1.0f;
+    if(scale>3.0f) scale=3.0f; /* prevent distant accidental interactions */
+    return scale;
+}
+static inline u32 ds_reanimated_tap_px(u32 value,u32 original_2011_px) {
+    /* Preserve other game versions/unknown settings rather than patching
+     * unrelated values. The original lib uses 10 and 30 pixels. */
+    if(value!=original_2011_px) return value;
+    return (u32)((float)value*ds_reanimated_touch_scale()+0.5f);
+}
 static inline float  u2f(u32 x) { float f; memcpy(&f, &x, 4); return f; }
 static inline u32    f2u(float f) { u32 x; memcpy(&x, &f, 4); return x; }
 static inline double u2d(u32 lo, u32 hi) { u64 b = ((u64)hi << 32) | lo; double d; memcpy(&d, &b, 8); return d; }
