@@ -1,0 +1,57 @@
+name: Inspect original game interaction-circle and tap-hit functions
+on:
+  push:
+    branches: [work/deadspace-linux-touchscreen-2026-11-07]
+    paths: [.github/workflows/deadspace-ui-hitbox-function-audit.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-ui-hit-functions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate genuine game's translated C and locate hit-test function bodies
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/apk"
+          gh release download apk-files-for-testing -R "$GITHUB_REPOSITORY" \
+            -p 'Deas.Space.Mobile.Fixes.apk' -D "$RUNNER_TEMP/apk"
+          python3 -m venv "$RUNNER_TEMP/py"
+          "$RUNNER_TEMP/py/bin/pip" install -q pyelftools
+          export PATH="$RUNNER_TEMP/py/bin:$PATH"
+          unzip -p "$RUNNER_TEMP/apk/Deas.Space.Mobile.Fixes.apk" lib/armeabi/libDeadSpace.so > "$RUNNER_TEMP/libDeadSpace.so"
+          [[ "$(sha1sum "$RUNNER_TEMP/libDeadSpace.so" | cut -d' ' -f1)" == 64a3323cd3cc0c483a645b62af8508624163ba9b ]]
+          cd experimental/lifted_milestone6/tools
+          DS_SO="$RUNNER_TEMP/libDeadSpace.so" DS_TEXTUREPACK_DIAG=0 python3 gen_all.py > "$RUNNER_TEMP/gen.log" 2>&1
+          tail -n 3 "$RUNNER_TEMP/gen.log"
+          python3 - <<'PY'
+          import pathlib,re
+          targets={
+            '0006a908':'Hud::doSpecialAction_InteractionWithObjects',
+            '0006ab98':'Hud::onEvent',
+            '0006c400':'Hud::renderHUDInteract',
+            '0007aefc':'InputForwarderTaps::getRecentReleasePointer(int,int)',
+            '0007b810':'InputForwarderTaps::onEvent',
+            '0007cbf0':'InputForwarderTaps helper',
+            '00082000':'InputSchemeInteractions::onEvent'
+          }
+          root=pathlib.Path('out')
+          for ident,name in targets.items():
+              target='u64 f_'+ident+'('
+              chunks=[]
+              for p in root.glob('fn_*.c'):
+                  txt=p.read_text()
+                  i=txt.find(target)
+                  if i>=0:
+                      j=txt.find('\nu64 f_',i+len(target))
+                      chunks.append((str(p),txt[i:j if j>=0 else len(txt)]))
+              print('TARGET',ident,name,'found',len(chunks))
+              for file,code in chunks:
+                  print('BEGIN_FUNCTION',ident,name,file,'length',len(code))
+                  print(code[:16500])
+                  print('END_FUNCTION',ident)
+          PY
