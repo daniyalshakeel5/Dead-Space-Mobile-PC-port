@@ -36,10 +36,10 @@ done
 
 if [[ ! -s "$SO" || ! -d "$ASSETS/published" ]]; then
     if [[ -z "$APK" ]] && command -v zenity >/dev/null 2>&1 && [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
-        APK="$(zenity --file-selection --title='Select your original Dead Space Mobile APK' --file-filter='Android packages | *.apk' 2>/dev/null || true)"
+        APK="$(zenity --file-selection --title='Select Dead Space Mobile Fixes or Reanimated v1.3 APK' --file-filter='Android packages | *.apk' 2>/dev/null || true)"
     fi
     if [[ -z "$APK" ]]; then
-        warn "Select your original Deas.Space.Mobile.Fixes.apk (it will not be bundled or redistributed)."
+        warn "Select your own original Fixes APK or DeadSpaceReanimated-1.3.apk (no game files are bundled)."
         read -r -p "Full path to APK: " APK
     fi
     APK="${APK/#\~/$HOME}"
@@ -47,12 +47,31 @@ if [[ ! -s "$SO" || ! -d "$ASSETS/published" ]]; then
     command -v unzip >/dev/null 2>&1 || die "unzip required for first launch."
     # Fully consume archive listing so grep cannot make unzip hit SIGPIPE
     # under set -o pipefail when the library appears early in a large APK.
-    unzip -Z1 "$APK" | grep -Fx "lib/armeabi/libDeadSpace.so" >/dev/null ||
-        die "APK has no expected lib/armeabi/libDeadSpace.so; Xperia APK is not interchangeable."
     mkdir -p "$GAME"
-    # Copy ONLY the user's own library and assets, leaving any old saves intact.
-    unzip -qn "$APK" 'lib/armeabi/libDeadSpace.so' 'assets/*' -d "$GAME" ||
-        die "Could not extract original game assets."
+    if unzip -Z1 "$APK" | grep -Fx 'lib/armeabi/libDeadSpace.so' >/dev/null; then
+        # Original 2011/Fixes donor (confirmed same 32-bit game library).
+        unzip -qn "$APK" 'lib/armeabi/libDeadSpace.so' 'assets/*' -d "$GAME" ||
+            die "Could not extract original game assets."
+        warn "[DONOR] Original Dead Space Mobile/Fixes APK"
+    elif unzip -Z1 "$APK" | grep -Fx 'assets/game/libDeadSpace32.so' >/dev/null; then
+        # Ginestro's Reanimated v1.3 embeds the *identical* 2011 ARM ELF and
+        # all 1,729 original published files under assets/game/. Its ARM64
+        # Android runtime and separate HD KTX pack are not Linux-x86 code.
+        warn "[DONOR] Dead Space Reanimated APK (native x86 runtime recreates fixes)"
+        stage="$(mktemp -d "$GAME/.reanimated.XXXXXXXX")"
+        trap 'rm -rf -- "$stage"' EXIT
+        unzip -qn "$APK" 'assets/game/assets/*' -d "$stage" ||
+            die "Could not unpack Reanimated's original game data."
+        mkdir -p "$GAME/assets" "$GAME/lib/armeabi"
+        cp -an "$stage/assets/game/assets/." "$GAME/assets/" ||
+            die "Could not install Reanimated's game asset tree."
+        unzip -p "$APK" 'assets/game/libDeadSpace32.so' > "$SO" ||
+            die "Could not extract Reanimated's original 32-bit game library."
+        rm -rf -- "$stage"
+        trap - EXIT
+    else
+        die "Unsupported APK: supply original Fixes or DeadSpaceReanimated-1.3.apk. Xperia Play uses a different library."
+    fi
 fi
 [[ -s "$SO" && -d "$ASSETS/published" ]] || die "Incomplete original game assets."
 ACTUAL="$(sha1sum "$SO" | awk '{print $1}')"
