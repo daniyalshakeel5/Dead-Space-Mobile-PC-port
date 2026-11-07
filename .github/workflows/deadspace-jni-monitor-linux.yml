@@ -1,8 +1,8 @@
-name: Linux gameplay with SDL analog controller input
+name: Native Linux touchscreen — genuine APK 24000-frame build
 on:
   push:
-    branches: [work/deadspace-portable-runtime-2026-11-05]
-    paths: [.github/workflows/deadspace-jni-monitor-linux.yml]
+    branches: [work/deadspace-linux-touchscreen-2026-11-07]
+    paths: [.github/workflows/deadspace-jni-monitor-linux.yml, experimental/lifted_milestone6/tools/**, packaging/linux-touchscreen/**]
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,7 +23,7 @@ jobs:
             echo 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt
           fi
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 update -qq
-          sudo apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386 libsdl2-2.0-0:i386 libgl1-mesa-dri:i386 libgl1:i386 xvfb xauth libarchive-tools
+          sudo apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386 libsdl2-2.0-0:i386 libgl1-mesa-dri:i386 libgl1:i386 xvfb xauth unzip zip file python3-venv libstdc++6:i386
           # Extract target headers without installing unrelated i386 GUI
           # development tools that conflict with the runner's host packages.
           mkdir -p "$RUNNER_TEMP/sdl-dev"
@@ -61,29 +61,53 @@ jobs:
           cd out
           DS_BUILD_JOBS=3 SDL_CFLAGS="-I$SDL_PREFIX/usr/include/SDL2 -I$SDL_PREFIX/usr/include/i386-linux-gnu" SDL_LIBS="/usr/lib/i386-linux-gnu/libSDL2-2.0.so.0" bash build.sh > "$DS_ROOT/logs/build.log" 2>&1
           file dspc_sdl | tee "$DS_ROOT/logs/executable.txt"
-      - name: Run real first boot through difficulty and intro
+      - name: Run genuine first boot, tutorial and two simultaneous Linux touchscreen fingers
         env:
           SOURCE: ${{ matrix.source }}
         run: |
           set +e
           set -uo pipefail
           cd "$DS_ROOT/tools/out"
-          # Baseline uses the translated routines directly. No optional
-          # buffered-reader replacement or null-model recovery is enabled.
-          export DS_CONTROLLER_AXES='18500:19500:0:-32768:0:0,20000:20100:-32768:0:0:0,20100:20300:-32768:0:16384:0,20300:20500:-32768:0:0:0,20500:20700:-32768:0:0:8192,20700:21000:-32768:0:0:0'
+          # These are genuine SDL_FINGER* events entering the game's native
+          # TouchSurfaceAndroid JNI code, not fake assets/game logic.
+          export DS_TOUCH_GESTURES='600:602:0:640:675:640:675,1500:1502:0:1145:668:1145:668,2400:2402:0:1145:668:1145:668,18500:19400:0:300:515:300:340,18800:19500:1:985:425:1120:420,19800:19812:0:880:360:880:360,20500:20530:0:225:260:225:70,20700:20730:0:225:70:225:260'
           timeout --kill-after=20s 900s xvfb-run -a env \
             LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy \
-            DS_WINDOW=1 DS_NOVSYNC=1 DS_QUIET_JAVA=1 DS_IO_AUDIT=1 DS_ASSET_TRACE=1 \
+            DS_WINDOW=1 DS_NOVSYNC=1 DS_QUIET_JAVA=1 DS_INPUT_DIAG=1 DS_TOUCHSCREEN=1 DS_TOUCH_FULLSCREEN=0 \
+            DS_MODEL=LinuxTouch DS_MANUFACTURER=Generic DS_RENDER_MIN_FAR=1200 \
             DS_DATA="$DS_ROOT/apk/assets" DS_ASSETS="$DS_ROOT/apk/assets" \
             DS_STEPS=create,surface,frame DS_FRAMES=24000 \
-            DS_CLICKS="600:640:675,1500:1145:668,2400:1145:668" \
-            DS_SHOT_EVERY=150 DS_SHOT_DIR="$DS_ROOT/shots" \
+            DS_TOUCH_GESTURES="$DS_TOUCH_GESTURES" \
+            DS_SHOT_EVERY=600 DS_SHOT_DIR="$DS_ROOT/shots" \
             DS_SHOT="23990:$DS_ROOT/shots/final.ppm" \
             ./dspc_sdl "$DS_ROOT/apk/lib/armeabi/libDeadSpace.so" > "$DS_ROOT/logs/runtime.log" 2>&1
           code=$?
           echo "$code" > "$DS_ROOT/logs/exit-code.txt"
           tail -n 100 "$DS_ROOT/logs/runtime.log"
-          [[ $code == 0 ]] && grep -q '^ran frames' "$DS_ROOT/logs/runtime.log"
+          [[ $code == 0 ]] && grep -q '^ran frames' "$DS_ROOT/logs/runtime.log" || exit 1
+          grep -q '\[LINUX_TOUCH\] direct SDL multi-touch enabled' "$DS_ROOT/logs/runtime.log" || exit 2
+          grep -q '\[LINUX_TOUCH\] kind=0 slot=0' "$DS_ROOT/logs/runtime.log" || exit 3
+          grep -q '\[LINUX_TOUCH\] kind=0 slot=1' "$DS_ROOT/logs/runtime.log" || exit 4
+          grep -q '\[LINUX_TOUCH\] kind=2 slot=0' "$DS_ROOT/logs/runtime.log" || exit 5
+          grep -q '\[LINUX_TOUCH\] kind=2 slot=1' "$DS_ROOT/logs/runtime.log" || exit 6
+          echo "PASS genuine game running with simultaneous SDL touch contacts"
+      - name: Make asset-free native Linux touchscreen test package
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          dest="$RUNNER_TEMP/DeadSpaceMobile-Linux-Touchscreen"
+          mkdir -p "$dest"
+          cp "$DS_ROOT/tools/out/dspc_sdl" "$dest/"
+          cp packaging/linux-touchscreen/* "$dest/"
+          chmod +x "$dest/dspc_sdl" "$dest/Play-Dead-Space-Touch.sh"
+          bash -n "$dest/Play-Dead-Space-Touch.sh"
+          file "$dest/dspc_sdl" | grep -q 'ELF 32-bit'
+          (cd "$dest" && sha256sum dspc_sdl Play-Dead-Space-Touch.sh README-LINUX-TOUCH.txt > SHA256SUMS.txt)
+          printf 'Source commit: %s\nReal game verified: SHA1 64a3323cd3cc0c483a645b62af8508624163ba9b\nNo original game assets included.\n' "$GITHUB_SHA" > "$dest/BUILD_INFO.txt"
+          (cd "$RUNNER_TEMP" && zip -qr DeadSpaceMobile-Linux-Touchscreen-i686.zip DeadSpaceMobile-Linux-Touchscreen)
+          unzip -t "$RUNNER_TEMP/DeadSpaceMobile-Linux-Touchscreen-i686.zip" | tail -n 2
+
       - name: Preserve visual and crash evidence
         if: always()
         run: |
@@ -112,6 +136,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: linux-gameplay-input-evidence
+          name: genuine-apk-linux-touchscreen-evidence
           path: ${{ runner.temp }}/baseline/evidence
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: DeadSpaceMobile-Linux-Touchscreen-i686
+          path: ${{ runner.temp }}/DeadSpaceMobile-Linux-Touchscreen-i686.zip
+          retention-days: 14

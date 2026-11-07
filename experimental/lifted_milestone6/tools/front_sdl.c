@@ -6,14 +6,75 @@ static void host_touchpad_id(int kind, int finger, float x, float y);
 static void host_key(int down, int keycode, int alt);     // Android key codes (defined in host.c)
 static SDL_Window* g_win; static SDL_GLContext g_ctx; static int g_w, g_h; static float g_sx = 1, g_sy = 1;
 
+/* Linux touchscreen mode consumes SDL_FINGER* directly, without inventing
+ * joystick/key events. Off on Windows/desktop mouse builds. */
+static int touch_enabled(void) {
+    static int enabled=-1;
+    if(enabled<0) { const char *p=getenv("DS_TOUCHSCREEN"); enabled=p && strcmp(p,"0")!=0; }
+    return enabled;
+}
+#define DS_TOUCH_SLOTS 10
+static struct {
+    SDL_TouchID device;
+    SDL_FingerID finger;
+    float x, y;
+    int active;
+} ds_touch[DS_TOUCH_SLOTS];
+static unsigned ds_touch_downs, ds_touch_moves, ds_touch_ups, ds_touch_dups;
+static int ds_touch_slot(SDL_TouchID device, SDL_FingerID finger) {
+    for(int i=0;i<DS_TOUCH_SLOTS;i++)
+        if(ds_touch[i].active && ds_touch[i].device==device && ds_touch[i].finger==finger) return i;
+    return -1;
+}
+static void ds_touch_release_all(void) {
+    for(int i=0;i<DS_TOUCH_SLOTS;i++) if(ds_touch[i].active) {
+        host_pointer_id(2,i,ds_touch[i].x,ds_touch[i].y);
+        ds_touch[i].active=0;
+    }
+}
+static void ds_touch_input(const SDL_TouchFingerEvent* f) {
+    int kind=f->type==SDL_FINGERDOWN?0:f->type==SDL_FINGERMOTION?1:2;
+    int slot=ds_touch_slot(f->touchId,f->fingerId);
+    if(kind==0) {
+        if(slot>=0) { ds_touch_dups++; return; }
+        for(int i=0;i<DS_TOUCH_SLOTS;i++) if(!ds_touch[i].active) { slot=i; break; }
+        if(slot<0) { fprintf(stderr,"[LINUX_TOUCH] warning: exhausted touch slots\n"); return; }
+        ds_touch[slot].active=1;
+        ds_touch[slot].device=f->touchId;
+        ds_touch[slot].finger=f->fingerId;
+    } else if(slot<0) {
+        return; /* Never send an unmatched MOVE/UP to the original game. */
+    }
+    float x=fmaxf(0.0f,fminf((float)g_w,f->x*g_w));
+    float y=fmaxf(0.0f,fminf((float)g_h,f->y*g_h));
+    ds_touch[slot].x=x; ds_touch[slot].y=y;
+    host_pointer_id(kind,slot,x,y);
+    if(kind==0) ds_touch_downs++;
+    if(kind==1) ds_touch_moves++;
+    if(kind==2) { ds_touch_ups++; ds_touch[slot].active=0; }
+    if(getenv("DS_INPUT_DIAG") && (kind!=1 || ds_touch_moves%120==1))
+        fprintf(stderr,"[LINUX_TOUCH] kind=%d slot=%d x=%.1f y=%.1f down=%u move=%u up=%u active=%d\n",
+                kind,slot,x,y,ds_touch_downs,ds_touch_moves,ds_touch_ups,
+                ds_touch[slot].active);
+}
 static void pad_init(void);
 static int sdl_open(int w, int h) {
+    if(touch_enabled()) {
+        /* SDL would otherwise synthesize an additional mouse click from
+         * each physical touch, which the game can interpret as firing. */
+        SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+        SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
+    }
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER) != 0) { fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError()); return 0; }
     pad_init();
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2); SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1); SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24); SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    g_win = SDL_CreateWindow("Dead Space", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h,
-                             SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    Uint32 winflags=SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+    const char* fullscreen=getenv("DS_TOUCH_FULLSCREEN");
+    if(touch_enabled() && fullscreen && strcmp(fullscreen,"0")!=0)
+        winflags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+    g_win = SDL_CreateWindow("Dead Space Mobile — Linux Touch",
+                             SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,w,h,winflags);
     if (!g_win) { fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError()); return 0; }
     g_ctx = SDL_GL_CreateContext(g_win);
     if (!g_ctx) { fprintf(stderr, "SDL_GL_CreateContext failed: %s\n", SDL_GetError()); return 0; }
@@ -22,6 +83,8 @@ static int sdl_open(int w, int h) {
     SDL_GL_GetDrawableSize(g_win, &g_w, &g_h);
     { int ww, wh; SDL_GetWindowSize(g_win, &ww, &wh); g_sx = (float)g_w / ww; g_sy = (float)g_h / wh; }
     printf("window %dx%d, GL_RENDERER=%s\n", g_w, g_h, dgl_glGetString ? (const char*)dgl_glGetString(0x1F01) : "?");
+    if(touch_enabled()) fprintf(stderr,
+        "[LINUX_TOUCH] direct SDL multi-touch enabled; drawable=%dx%d; synthetic mouse disabled\n",g_w,g_h);
     return 1;
 }
 /* PC movement uses the game's verified left-screen drag path. Separate
@@ -459,6 +522,29 @@ static void sdl_script_input(int frame) {
         }
         p+=n; if(*p==',') ++p; else break;
     }
+    /* Genuine-game CI exercises the same SDL_FINGER* events as a real Linux
+     * touch panel. Format: start:end:finger:x0:y0:x1:y1 (window pixels). */
+    p=getenv("DS_TOUCH_GESTURES");
+    while(touch_enabled() && p && *p) {
+        int start,end,finger,x0,y0,x1,y1,n=0;
+        if(sscanf(p,"%d:%d:%d:%d:%d:%d:%d%n",&start,&end,&finger,&x0,&y0,&x1,&y1,&n)!=7 || n<=0) break;
+        if(start>0 && end>start && finger>=0 && frame>=start && frame<=end) {
+            SDL_Event e; memset(&e,0,sizeof e);
+            e.type=frame==start ? SDL_FINGERDOWN : frame==end ? SDL_FINGERUP : SDL_FINGERMOTION;
+            e.tfinger.type=e.type;
+            e.tfinger.touchId=(SDL_TouchID)771;
+            e.tfinger.fingerId=(SDL_FingerID)(finger+100);
+            e.tfinger.x=(x0+(x1-x0)*(float)(frame-start)/(end-start)) / (float)g_w;
+            e.tfinger.y=(y0+(y1-y0)*(float)(frame-start)/(end-start)) / (float)g_h;
+            e.tfinger.pressure=1.0f;
+            if(SDL_PushEvent(&e)<0)
+                fprintf(stderr,"[LINUX_TOUCH_ERROR] failed script event: %s\n",SDL_GetError());
+            if(frame==start || frame==end) fprintf(stderr,
+                "[LINUX_TOUCH_SCRIPT] frame=%d finger=%d kind=%d from=%d,%d to=%d,%d\n",
+                frame,finger,e.type==SDL_FINGERDOWN?0:2,x0,y0,x1,y1);
+        }
+        p+=n; if(*p==',') ++p; else break;
+    }
     p=getenv("DS_MOUSE_DRAGS");
     while(p && *p) {
         int start,end,x0,y0,x1,y1,n=0;
@@ -487,7 +573,18 @@ static int sdl_pump(int* resized) {
     static int frame; sdl_script_input(++frame); pad_script(frame);
     SDL_Event e; float look_dx=0,look_dy=0; *resized = 0;
     while (SDL_PollEvent(&e)) {
-        if (e.type == SDL_QUIT) { pad_release(); return 0; }
+        if (e.type == SDL_QUIT) { if(touch_enabled()) ds_touch_release_all(); pad_release(); return 0; }
+        if(touch_enabled() && (e.type==SDL_FINGERDOWN ||
+                               e.type==SDL_FINGERMOTION || e.type==SDL_FINGERUP)) {
+            ds_touch_input(&e.tfinger);
+            continue;
+        }
+        /* Some compositors still send SDL_TOUCH_MOUSEID despite SDL hints. */
+        if(touch_enabled() && ((e.type==SDL_MOUSEBUTTONDOWN ||
+                               e.type==SDL_MOUSEBUTTONUP) &&
+                              e.button.which==SDL_TOUCH_MOUSEID)) continue;
+        if(touch_enabled() && e.type==SDL_MOUSEMOTION &&
+           e.motion.which==SDL_TOUCH_MOUSEID) continue;
         // Escape is Android Back/Pause (handled by map_scancode), not a forced shutdown.
         if ((e.type == SDL_KEYDOWN && !e.key.repeat) || e.type == SDL_KEYUP) {
             int down=e.type==SDL_KEYDOWN; SDL_Scancode sc=e.key.keysym.scancode;
@@ -501,7 +598,9 @@ static int sdl_pump(int* resized) {
             int alt,k=map_scancode(sc,&alt); if(k) host_key(down,k,alt);
         }
         if(e.type==SDL_WINDOWEVENT && e.window.event==SDL_WINDOWEVENT_FOCUS_LOST) {
-            pad_focused=0; pad_release(); pc_set_capture(0); host_pointer(2,0,0);
+            pad_focused=0; pad_release(); pc_set_capture(0);
+            if(touch_enabled()) ds_touch_release_all();
+            else host_pointer(2,0,0);
         }
         if(pc_capture && (e.type==SDL_MOUSEBUTTONDOWN || e.type==SDL_MOUSEBUTTONUP)) {
             int down=e.type==SDL_MOUSEBUTTONDOWN;
@@ -523,9 +622,12 @@ static int sdl_pump(int* resized) {
             fprintf(stderr,"[CONTROLLER] disconnected\n");
             for(int i=0;i<SDL_NumJoysticks();i++) pad_open(i);
         }
-        if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) host_pointer(0, (float)e.button.x * g_sx, (float)e.button.y * g_sy);
-        if (e.type == SDL_MOUSEMOTION && (e.motion.state & SDL_BUTTON_LMASK)) host_pointer(1, (float)e.motion.x * g_sx, (float)e.motion.y * g_sy);
-        if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) host_pointer(2, (float)e.button.x * g_sx, (float)e.button.y * g_sy);
+        /* A physical mouse remains a fallback, but cannot steal finger 0
+         * from a running touchscreen movement gesture. */
+        int mouse_id=touch_enabled()?12:0;
+        if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) host_pointer_id(0,mouse_id, (float)e.button.x * g_sx, (float)e.button.y * g_sy);
+        if (e.type == SDL_MOUSEMOTION && (e.motion.state & SDL_BUTTON_LMASK)) host_pointer_id(1,mouse_id, (float)e.motion.x * g_sx, (float)e.motion.y * g_sy);
+        if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) host_pointer_id(2,mouse_id, (float)e.button.x * g_sx, (float)e.button.y * g_sy);
         if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
             int w, h; SDL_GL_GetDrawableSize(g_win, &w, &h);
             if (w != g_w || h != g_h) { g_w = w; g_h = h; *resized = 1; int ww, wh; SDL_GetWindowSize(g_win, &ww, &wh); g_sx = (float)w / ww; g_sy = (float)h / wh; }
