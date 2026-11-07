@@ -25,6 +25,26 @@ PROBES = {
      "GameObjectProjectile::updateAction",
      'if(getenv("DS_AIM_DIAG")) { static unsigned n; if(++n<=8 || n%500==0) fprintf(stderr,"[AIM_PROJECTILE_SIM] this=%08x world=%08x n=%u\\n",r0,r1,n); }'
  ),
+ "001f6344": (
+     "WeaponPlasmaCutter::onFire",
+     'if(getenv("DS_AIM_DIAG")) fprintf(stderr,"[AIM_FIRE] plasma-cutter onFire weapon=%08x\\n",r0);'
+ ),
+ "001eec34": (
+     "Weapon::performRaycast",
+     'if(getenv("DS_AIM_DIAG")) fprintf(stderr,"[AIM_RAYCAST] weapon=%08x from=%08x to=%08x\\n",r0,r1,r2);'
+ ),
+ "001ee630": (
+     "Weapon::WeaponRayResult::addSingleResult",
+     'if(getenv("DS_AIM_DIAG")) { static unsigned n; if(++n<=200) fprintf(stderr,"[AIM_RAY_HIT] callback=%08x local-result=%08x n=%u\\n",r0,r1,n); }'
+ ),
+ "001ef110": (
+     "Weapon::resolveImpact",
+     'if(getenv("DS_AIM_DIAG")) fprintf(stderr,"[AIM_IMPACT] weapon=%08x target=%08x hit-vector=%08x\\n",r0,r1,r2);'
+ ),
+ "001f6ea4": (
+     "WeaponPlasmaCutter::onPostHitEvent",
+     'if(getenv("DS_AIM_DIAG")) fprintf(stderr,"[AIM_POST_HIT] plasma cutter=%08x hit=%08x\\n",r0,r1);'
+ ),
 }
 
 def patch(out: Path) -> list[str]:
