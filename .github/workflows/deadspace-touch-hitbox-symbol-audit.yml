@@ -1,0 +1,91 @@
+name: Audit original engine touch interaction routines
+on:
+  push:
+    branches: [work/deadspace-linux-touchscreen-2026-11-07]
+    paths: [.github/workflows/deadspace-touch-hitbox-symbol-audit.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  locate-original-touch-functions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download genuine 2011 game and setup ELF analysis
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/original-apk" "$RUNNER_TEMP/native-lib"
+          gh release download apk-files-for-testing -R "$GITHUB_REPOSITORY" \
+            -p 'Deas.Space.Mobile.Fixes.apk' -D "$RUNNER_TEMP/original-apk"
+          unzip -p "$RUNNER_TEMP/original-apk/Deas.Space.Mobile.Fixes.apk" \
+            lib/armeabi/libDeadSpace.so > "$RUNNER_TEMP/native-lib/libDeadSpace.so"
+          echo "DS_SO=$RUNNER_TEMP/native-lib/libDeadSpace.so" >> "$GITHUB_ENV"
+          python3 -m venv "$RUNNER_TEMP/py"
+          "$RUNNER_TEMP/py/bin/pip" install --quiet pyelftools
+          echo "$RUNNER_TEMP/py/bin" >> "$GITHUB_PATH"
+          sha1sum "$RUNNER_TEMP/native-lib/libDeadSpace.so"
+      - name: Find original touch, HUD, input forwarder and UI hit-test symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, subprocess
+          from elftools.elf.elffile import ELFFile
+          fpath=os.environ['DS_SO']
+          with open(fpath,'rb') as f:
+              elf=ELFFile(f)
+              chosen=[]
+              for secname in ('.dynsym','.symtab'):
+                  sec=elf.get_section_by_name(secname)
+                  if not sec: continue
+                  for sym in sec.iter_symbols():
+                      s=sym.name
+                      if not s or sym['st_value']==0: continue
+                      d=subprocess.run(['c++filt',s],capture_output=True,text=True).stdout.strip()
+                      if any(x in d.lower() for x in ('inputforwardertaps','inputforwarder','interact','touch','hitbox','guisprite','hud','tap','pickup','circle')):
+                          chosen.append((int(sym['st_value']),int(sym['st_size']),d,s))
+              print("MATCHING_ORIGINAL_ELF_SYMBOLS",len(chosen))
+              for addr,size,name,mangled in sorted(set(chosen))[:220]:
+                  print("ORIGINAL_SYMBOL",hex(addr),"size",size,name,"mangled",mangled)
+          PY
+      - name: Generate lifted original game and inspect original touch function bodies
+        run: |
+          set -euo pipefail
+          cd experimental/lifted_milestone6/tools
+          DS_TEXTUREPACK_DIAG=0 python3 gen_all.py > "$RUNNER_TEMP/gen.log" 2>&1
+          tail -n 8 "$RUNNER_TEMP/gen.log"
+          python3 - <<'PY'
+          import pathlib,re,subprocess,os
+          from elftools.elf.elffile import ELFFile
+          so=os.environ['DS_SO']
+          candidates=[]
+          with open(so,'rb') as f:
+              e=ELFFile(f)
+              for s in ['.dynsym','.symtab']:
+                  sec=e.get_section_by_name(s)
+                  if not sec: continue
+                  for x in sec.iter_symbols():
+                      name=x.name
+                      d=subprocess.run(['c++filt',name],capture_output=True,text=True).stdout.strip()
+                      if any(y in d for y in ('InputForwarderTaps','Interaction','GuiButton')):
+                          addr=int(x['st_value'])
+                          if addr: candidates.append((addr,d))
+          print("CANDIDATE_LIFTED_FUNCTIONS",candidates[:50])
+          for addr,descr in candidates[:18]:
+              regex=re.compile(r'\bu64 f_%08x\s*\('%addr)
+              found=[]
+              for p in pathlib.Path("out").glob("fn_*.c"):
+                  content=p.read_text()
+                  match=regex.search(content)
+                  if match:
+                      first=match.start()
+                      nextfn=content.find("\nu64 f_",match.end())
+                      code=content[first:nextfn if nextfn>=0 else None]
+                      found.append((p,code))
+              for file,code in found:
+                  print("FUNCTION",hex(addr),descr,file,"BODY_CHARS",len(code))
+                  print("BODY_START",code[:17000])
+          PY
