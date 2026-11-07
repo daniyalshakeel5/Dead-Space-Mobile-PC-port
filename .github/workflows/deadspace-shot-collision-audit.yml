@@ -1,0 +1,65 @@
+name: Audit genuine fuse shot hit detection and viewport
+on:
+  push:
+    branches: [work/deadspace-linux-touchscreen-2026-11-07]
+    paths: [.github/workflows/deadspace-shot-collision-audit.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shot-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect original APK symbols for weapon raycast and fuse hit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/apk"
+          gh release download apk-files-for-testing -R "$GITHUB_REPOSITORY" \
+            -p 'Deas.Space.Mobile.Fixes.apk' -D "$RUNNER_TEMP/apk"
+          unzip -p "$RUNNER_TEMP/apk/Deas.Space.Mobile.Fixes.apk" lib/armeabi/libDeadSpace.so > "$RUNNER_TEMP/game.so"
+          [[ "$(sha1sum "$RUNNER_TEMP/game.so" | cut -d' ' -f1)" == 64a3323cd3cc0c483a645b62af8508624163ba9b ]]
+          python3 -m venv "$RUNNER_TEMP/py"
+          "$RUNNER_TEMP/py/bin/pip" -q install pyelftools
+          "$RUNNER_TEMP/py/bin/python" - "$RUNNER_TEMP/game.so" <<'PY'
+          import sys,subprocess,re
+          from elftools.elf.elffile import ELFFile
+          with open(sys.argv[1],'rb') as f:
+              elf=ELFFile(f); raw={}
+              for part in ('.symtab','.dynsym'):
+                  sec=elf.get_section_by_name(part)
+                  if not sec: continue
+                  for sym in sec.iter_symbols():
+                      name=sym.name
+                      addr=int(sym['st_value'])&~1
+                      size=int(sym['st_size'])
+                      if name and addr and sym['st_info']['type']=='STT_FUNC':
+                          raw[name]=(addr,size)
+          names=list(raw)
+          demangled=subprocess.run(['c++filt'],input='\n'.join(names),capture_output=True,text=True,check=True).stdout.splitlines()
+          groups={
+           'weapons':r'weapon|gun|projectile|fire|shoot|bullet|plasma|aim|crosshair|muzzle|laser|beam',
+           'physics':r'ray.?cast|collision|hit.?test|contact|btCollisionWorld|btDynamicsWorld|btRigidBody|btCollisionObject|sweep|line.?test|intersect|damage|destruct|target|fuse',
+           'screenspace':r'viewport|unproject|screen.?to|screen.?point|view.?ray|project\(|camera|frustum'
+          }
+          for group,expr in groups.items():
+              regex=re.compile(expr,re.I)
+              hits=[]
+              for name,readable in zip(names,demangled):
+                  addr,size=raw[name]
+                  if regex.search(readable) and not any(omit in readable for omit in ('std::','boost::','eastl::','basic_string','tVector','allocator','shared_ptr')):
+                      hits.append((addr,size,readable))
+              print('GROUP',group,'CANDIDATES',len(hits))
+              for addr,size,readable in sorted(hits)[:225]:
+                  print('SYMBOL',group,hex(addr),'size',size,readable[:210])
+          PY
+      - name: Confirm resolution, screenshot and projection variables for native port
+        shell: bash
+        run: |
+          grep -nE 'DS_WIDTH|DS_HEIGHT|NativeOnSurfaceChanged|SDL_GL_GetDrawableSize|glViewport|DS_RENDER_MIN_FAR|ds_reanimated_touch_scale' \
+            experimental/lifted_milestone6/tools/{host.c,front_sdl.c,gl_shim.c,rt.h} \
+            packaging/linux-touchscreen/Play-Dead-Space-Touch.sh | head -90
