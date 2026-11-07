@@ -1,0 +1,69 @@
+name: Compare Reanimated v1.3 assets and runtime compatibility
+on:
+  push:
+    branches: [work/deadspace-linux-touchscreen-2026-11-07]
+    paths: [.github/workflows/deadspace-reanimated-compatibility.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare-original-and-reanimated:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download both real game packages to GitHub runner
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/donors/original" "$RUNNER_TEMP/donors/reanimated"
+          gh release download apk-files-for-testing -R "$GITHUB_REPOSITORY" \
+            -p 'Deas.Space.Mobile.Fixes.apk' -D "$RUNNER_TEMP/donors/original"
+          gh release download v1.3 -R GINESTR0/DeadSpaceReanimated \
+            -p 'DeadSpaceReanimated-1.3.apk' -D "$RUNNER_TEMP/donors/reanimated"
+          sha256sum "$RUNNER_TEMP/donors/original/"*.apk "$RUNNER_TEMP/donors/reanimated/"*.apk
+      - name: Compare file-level game data SHA1 without exporting copyright data
+        shell: bash
+        run: |
+          python3 - "$RUNNER_TEMP/donors/original/Deas.Space.Mobile.Fixes.apk" "$RUNNER_TEMP/donors/reanimated/DeadSpaceReanimated-1.3.apk" <<'PY'
+          import sys,zipfile,hashlib,collections,json
+          with zipfile.ZipFile(sys.argv[1]) as old,zipfile.ZipFile(sys.argv[2]) as new:
+              old_names={i.filename for i in old.infolist() if i.filename.startswith('assets/published/') and not i.is_dir()}
+              new_names={i.filename.removeprefix('assets/game/') for i in new.infolist() if i.filename.startswith('assets/game/assets/published/') and not i.is_dir()}
+              intersect=old_names&new_names
+              print("ORIGINAL_PUBLISHED_COUNT",len(old_names))
+              print("REANIMATED_PUBLISHED_COUNT",len(new_names))
+              print("MATCHING_FILE_NAMES",len(intersect))
+              print("ONLY_ORIGINAL_NAMES",json.dumps(sorted(old_names-new_names)[:70]))
+              print("ONLY_REANIMATED_NAMES",json.dumps(sorted(new_names-old_names)[:70]))
+              identical=[]; changed=[]
+              for p in sorted(intersect):
+                  a=old.getinfo(p); b=new.getinfo('assets/game/'+p)
+                  if a.file_size==b.file_size and a.CRC==b.CRC: identical.append(p)
+                  else: changed.append((p,a.file_size,b.file_size))
+              print("IDENTICAL_CONTENT_CRC_COUNT",len(identical))
+              print("MODIFIED_FILE_COUNT",len(changed))
+              print("MODIFIED_EXAMPLES",json.dumps(changed[:90]))
+              arm=new.read('assets/game/libDeadSpace32.so')
+              oldarm=old.read('lib/armeabi/libDeadSpace.so')
+              print("SAME_GAME_ELF",arm==oldarm)
+              print("BOTH_GAME_SHA1",hashlib.sha1(arm).hexdigest(),hashlib.sha1(oldarm).hexdigest())
+              print("HD_KTX_FILE_COUNT",sum(1 for x in new.namelist() if x.startswith('assets/texture_hd/') and x.endswith('.ktx')))
+              print("NO_COPYRIGHT_ASSETS_EXPORTED")
+          PY
+      - name: Inspect Reanimated ARM64 runtime touch/interaction symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -p "$RUNNER_TEMP/donors/reanimated/DeadSpaceReanimated-1.3.apk" \
+            lib/arm64-v8a/libdsr.so > "$RUNNER_TEMP/libdsr.so"
+          echo "RUNTIME_IDENTITY"
+          file "$RUNNER_TEMP/libdsr.so"
+          echo "RUNTIME_SYMBOLS_MATCHING_TOUCH"
+          (readelf --dyn-syms --wide "$RUNNER_TEMP/libdsr.so" | c++filt |
+            grep -iE 'touch|interaction|tap|hit.test|radius|pickup|scale|screen|viewport|aim|button' | head -100) || true
+          echo "RUNTIME_STRINGS_MATCHING_TOUCH"
+          (strings -a -n 7 "$RUNNER_TEMP/libdsr.so" |
+            grep -iE 'touch|interaction|tap|hitbox|radius|pickup|scale|screen|viewport|button|hud' | head -120) || true
+          echo "Metadata only; no game or runtime binary leaves runner."
