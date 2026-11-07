@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Opt-in diagnostics at native-verified original game call sites.
 
-No gameplay values or hitboxes are modified. DS_AIM_DIAG=1 records when the
+No gameplay values or hitboxes are modified. DS_AIM_DIAG=1 records world-space ray endpoints, collision-result pointers, and when the
 original camera is assigned an aspect ratio, when projectile simulation runs,
 and when an original shoot-switch hit callback is *actually* reached.
 These RVAs were looked up in the authentic 2011 ELF (not guessed).
@@ -15,11 +15,11 @@ PROBES = {
  ),
  "0013264c": (
      "GameObjectShootSwitch::onHit",
-     'if(getenv("DS_AIM_DIAG")) fprintf(stderr,"[AIM_FUSE_HIT] ShootSwitch this=%08x hit=%08x\\n",r0,r1);'
+     'if(getenv("DS_AIM_DIAG")) fprintf(stderr,"[AIM_FUSE_HIT] ShootSwitch this=%08x hit=%08x event_type=%u\\n",r0,r1,r1?LD32(r1+84u):0);'
  ),
  "00133278": (
      "GameObjectShootSwitchCovered::onHit",
-     'if(getenv("DS_AIM_DIAG")) fprintf(stderr,"[AIM_FUSE_HIT] CoveredShootSwitch this=%08x hit=%08x\\n",r0,r1);'
+     'if(getenv("DS_AIM_DIAG")) fprintf(stderr,"[AIM_FUSE_HIT] CoveredShootSwitch this=%08x hit=%08x event_type=%u\\n",r0,r1,r1?LD32(r1+84u):0);'
  ),
  "00174834": (
      "GameObjectProjectile::updateAction",
@@ -31,11 +31,11 @@ PROBES = {
  ),
  "001eec34": (
      "Weapon::performRaycast",
-     'if(getenv("DS_AIM_DIAG")) fprintf(stderr,"[AIM_RAYCAST] weapon=%08x from=%08x to=%08x\\n",r0,r1,r2);'
+     'if(getenv("DS_AIM_DIAG")) { fprintf(stderr,"[AIM_RAYCAST] result=%08x from=%08x to=%08x\\n",r0,r1,r2); if(r1 && r2) fprintf(stderr,"[AIM_RAY_SEGMENT] origin=(%.4f,%.4f,%.4f) endpoint=(%.4f,%.4f,%.4f)\\n",u2f(LD32(r1+0u)),u2f(LD32(r1+4u)),u2f(LD32(r1+8u)),u2f(LD32(r2+0u)),u2f(LD32(r2+4u)),u2f(LD32(r2+8u))); }'
  ),
  "001ee630": (
      "Weapon::WeaponRayResult::addSingleResult",
-     'if(getenv("DS_AIM_DIAG")) { static unsigned n; if(++n<=200) fprintf(stderr,"[AIM_RAY_HIT] callback=%08x local-result=%08x n=%u\\n",r0,r1,n); }'
+     'if(getenv("DS_AIM_DIAG")) { static unsigned n; if(++n<=200) fprintf(stderr,"[AIM_RAY_HIT] callback=%08x local-result=%08x collision-word0=%08x n=%u\\n",r0,r1,r1?LD32(r1):0,n); }'
  ),
  "001ef110": (
      "Weapon::resolveImpact",
