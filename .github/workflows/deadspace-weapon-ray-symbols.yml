@@ -1,0 +1,49 @@
+name: Identify original plasma cutter hit ray and fuse dispatch methods
+on:
+  push:
+    branches: [work/deadspace-linux-touchscreen-2026-11-07]
+    paths: [.github/workflows/deadspace-weapon-ray-symbols.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-symbols:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect genuine original game ELF, no asset redistribution
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/apk"
+          gh release download apk-files-for-testing -R "$GITHUB_REPOSITORY" \
+            -p 'Deas.Space.Mobile.Fixes.apk' -D "$RUNNER_TEMP/apk"
+          unzip -p "$RUNNER_TEMP/apk/Deas.Space.Mobile.Fixes.apk" lib/armeabi/libDeadSpace.so > "$RUNNER_TEMP/game.so"
+          [[ "$(sha1sum "$RUNNER_TEMP/game.so" | cut -d' ' -f1)" == 64a3323cd3cc0c483a645b62af8508624163ba9b ]]
+          python3 -m venv "$RUNNER_TEMP/py"
+          "$RUNNER_TEMP/py/bin/pip" -q install pyelftools
+          "$RUNNER_TEMP/py/bin/python" - "$RUNNER_TEMP/game.so" <<'PY'
+          import sys,subprocess,re
+          from elftools.elf.elffile import ELFFile
+          with open(sys.argv[1],'rb') as f:
+            elf=ELFFile(f)
+            names={}
+            for secname in ('.symtab','.dynsym'):
+              sec=elf.get_section_by_name(secname)
+              if sec is None: continue
+              for sym in sec.iter_symbols():
+                addr=int(sym['st_value'])&~1
+                if addr and sym.name and sym['st_info']['type']=='STT_FUNC':
+                  names[sym.name]=(addr,int(sym['st_size']))
+          mangled=list(names)
+          demangled=subprocess.run(['c++filt'],input='\n'.join(mangled),capture_output=True,text=True,check=True).stdout.splitlines()
+          needle=re.compile(r'^(Weapon|WeaponPlasmaCutter|GameObjectShootSwitch|GameObjectShootSwitchCovered|CameraController|CameraSourceWeapon|HitEvent|GameObjectProjectile|GameWorld|GameObjectPlayable)::',re.I)
+          substr=re.compile(r'fire|shoot|hit|ray|trace|collide|project|spawn|aim|camera|aspect|damage|fuse|switch|weapon|bullet|target|impact',re.I)
+          for name,dem in zip(mangled,demangled):
+            addr,size=names[name]
+            if needle.search(dem) and substr.search(dem):
+              print('TARGET_FN',hex(addr),'size',size,dem[:250])
+          PY
