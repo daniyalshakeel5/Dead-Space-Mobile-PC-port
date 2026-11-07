@@ -11,6 +11,38 @@ From user-supplied `20261107-183058-*.log` on Linux (Mesa Intel UHD Graphics 600
 - Four pairs of `GameObjectShootSwitchCovered::onHit` and `GameObjectShootSwitch::onHit`, all `event_type=0`, **preceded** the first logged `onFire`. Therefore they do NOT establish that any fired shot collided with the fuse.
 - No `[AIM_RAYCAST]`, `[AIM_RAY_HIT]`, `[AIM_IMPACT]`, or `[AIM_POST_HIT]` during the shots. This by itself does **not** prove no physics hit: the original plasma-cutter onFire implementation invokes another lower-level ray function directly.
 
+## Tutorial sequence correction (user-confirmed)
+
+The user clarified that the **first four tutorial fuses are cut with the
+plasma saw**, while **subsequent fuses require the plasma cutter**.
+Earlier troubleshooting incorrectly treated all fuses as plasma-cutter
+targets and thus missed the distinction between melee and firearm hits.
+
+The log shows exactly four pairs of `CoveredShootSwitch::onHit` /
+`ShootSwitch::onHit`, for **four distinct** original game-object addresses:
+
+- `a20d9e20`
+- `a20e7aa8`
+- `a20e53a0`
+- `a20d5c28`
+
+All appear **before** the first `WeaponPlasmaCutter::onFire` entry.
+They are consistent with the plasma-saw fuse stage, though the logs
+alone do not identify the attacker class for each callback.
+
+Ten plasma-cutter `onFire` entries follow. **No further fuse onHit
+callbacks follow them in the uploaded trace.** This narrows the softlock
+to the **plasma-cutter-required fuse stage**, not broken collision
+registration for all switches. It still does not establish whether those
+ten shots actually struck ordinary wall geometry.
+
+Do not change the original fuse eligibility rules, enlarge projectile
+hitboxes, simulate fuse destruction, or conflate tap tolerance with
+physics collision. Compare the actual plasma-cutter physics-ray return
+values and valid post-hit dispatch with those earlier successful
+switch interactions. Attribute earlier callbacks to the plasma saw
+only as contextually consistent, pending direct attacker/source logging.
+
 ## Original game code — reliable diagnosis
 
 Original `WeaponPlasmaCutter::onFire` decompiled from the genuine ELF:
