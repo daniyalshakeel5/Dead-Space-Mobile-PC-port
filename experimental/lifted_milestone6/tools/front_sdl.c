@@ -81,10 +81,17 @@ static int sdl_open(int w, int h) {
     SDL_GL_SetSwapInterval(getenv("DS_NOVSYNC") ? 0 : 1);
     gl_load_all(SDL_GL_GetProcAddress);
     SDL_GL_GetDrawableSize(g_win, &g_w, &g_h);
+    ds_touch_output_h = g_h > 0 ? (u32)g_h : 480u;
     { int ww, wh; SDL_GetWindowSize(g_win, &ww, &wh); g_sx = (float)g_w / ww; g_sy = (float)g_h / wh; }
     printf("window %dx%d, GL_RENDERER=%s\n", g_w, g_h, dgl_glGetString ? (const char*)dgl_glGetString(0x1F01) : "?");
-    if(touch_enabled()) fprintf(stderr,
-        "[LINUX_TOUCH] direct SDL multi-touch enabled; drawable=%dx%d; synthetic mouse disabled\n",g_w,g_h);
+    if(touch_enabled()) {
+        fprintf(stderr,
+            "[LINUX_TOUCH] direct SDL multi-touch enabled; drawable=%dx%d; synthetic mouse disabled\n",g_w,g_h);
+        fprintf(stderr,
+            "[REANIMATED_TOUCH] enabled=%d base720p=%g oldtap=10 expanded=%u olddouble=30 expanded=%u drawable-height=%u\n",
+            ds_reanimated_touch_scale()>1.0f,ds_reanimated_touch_scale(),
+            ds_reanimated_tap_px(10,10),ds_reanimated_tap_px(30,30),ds_touch_output_h);
+    }
     return 1;
 }
 /* PC movement uses the game's verified left-screen drag path. Separate
@@ -630,7 +637,7 @@ static int sdl_pump(int* resized) {
         if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) host_pointer_id(2,mouse_id, (float)e.button.x * g_sx, (float)e.button.y * g_sy);
         if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
             int w, h; SDL_GL_GetDrawableSize(g_win, &w, &h);
-            if (w != g_w || h != g_h) { g_w = w; g_h = h; *resized = 1; int ww, wh; SDL_GetWindowSize(g_win, &ww, &wh); g_sx = (float)w / ww; g_sy = (float)h / wh; }
+            if (w != g_w || h != g_h) { g_w = w; g_h = h; ds_touch_output_h = h>0?(u32)h:480u; *resized = 1; int ww, wh; SDL_GetWindowSize(g_win, &ww, &wh); g_sx = (float)w / ww; g_sy = (float)h / wh; }
         }
     }
     pc_update(look_dx,look_dy);

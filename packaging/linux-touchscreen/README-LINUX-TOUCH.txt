@@ -2,7 +2,8 @@ DEAD SPACE MOBILE - NATIVE LINUX TOUCHSCREEN TEST
 =================================================
 
 This is the actual ARM->native x86 translation of Dead Space Mobile, built as
-a 32-bit Linux ELF using your own original APK's game library and assets.
+a 32-bit Linux ELF using the original 2011 game binary and assets extracted from either the supported
+Fixes APK or GINESTR0's DeadSpaceReanimated-1.3.apk.
 There is NO Android emulator, ARM runtime, or synthetic game-file substitute.
 The package deliberately DOES NOT contain any copyrighted game files.
 
@@ -23,6 +24,10 @@ HOW TO LAUNCH
 2. Run ./Play-Dead-Space-Touch.sh or open a terminal there and run:
      chmod +x Play-Dead-Space-Touch.sh
      ./Play-Dead-Space-Touch.sh "/path/to/Deas.Space.Mobile.Fixes.apk"
+   You may instead supply "/path/to/DeadSpaceReanimated-1.3.apk".
+   The Reanimated donor has the IDENTICAL original 2011 game library and
+   1,729 identical published assets as the Fixes APK. Its additional 222
+   HD KTX textures and Android-only ARM64 runtime are not loaded on Linux.
    If no APK path is supplied, the launcher uses a file picker (if Zenity
    exists) or asks for its path in the terminal.
 3. First launch extracts your *own* original game's libDeadSpace.so and
@@ -57,3 +62,15 @@ projection adjustment remains for the opening cutscene.
 
 For any crash, send the newest logs/*.log and logs/*-exit-code.txt.
 Do not redistribute the original APK, extracted files, or game assets.
+
+REANIMATED-STYLE INTERACTION TARGET FIX (EXPERIMENTAL)
+The original game hardcodes 10 px tap tolerance and 30 px double-tap distance.
+Reanimated v1.3 adapts those limits to new displays in its Android runtime.
+Our independent native Linux implementation modifies those original game
+call sites and the verified HUD radial-interaction routine (original RVAs
+0x7b810, 0x7aefc, 0x6a908), scaling by drawable height / 480 (bounded 1–3).
+No game assets or closed Reanimated ARM64 binary are included in this port.
+Actual interaction-circle coverage must be verified on your touchscreen.
+To revert to the previous touch behaviour:
+  DS_REANIMATED_TOUCH=0 ./Play-Dead-Space-Touch.sh --windowed
+Reanimated author: GINESTR0, https://github.com/GINESTR0/DeadSpaceReanimated

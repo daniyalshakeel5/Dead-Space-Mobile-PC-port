@@ -81,6 +81,9 @@ mkdir -p "$ASSETS/var"
 
 # Native touchscreen mode. No Xperia/PS4 controller spoofing and no emulator.
 export DS_WINDOW=1 DS_TOUCHSCREEN=1
+# Recreate Reanimated's resolution-scaled tap and interaction thresholds.
+# Set DS_REANIMATED_TOUCH=0 for an exact original-game touch baseline.
+export DS_REANIMATED_TOUCH="${DS_REANIMATED_TOUCH:-1}"
 export DS_TOUCH_FULLSCREEN="${DS_TOUCH_FULLSCREEN:-1}"
 if [[ "$WINDOWED" == "1" ]]; then export DS_TOUCH_FULLSCREEN=0; fi
 export DS_MANUFACTURER="${DS_MANUFACTURER:-Generic}"

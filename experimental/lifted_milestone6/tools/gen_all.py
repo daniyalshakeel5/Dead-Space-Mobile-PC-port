@@ -88,6 +88,13 @@ def main():
         original = p.read_text(encoding="utf-8")
         p.write_text(patch_texturepack(original), encoding="utf-8")
         print(f"TexturePack null-vector diagnostics injected into {p}")
+    # Reanimated v1.3 uses this exact original libDeadSpace.so and fixes
+    # touch tolerance in its ARM64 runtime. Recreate the verified 2011 tap
+    # thresholds and interaction radius in native x86; no Android runtime.
+    from touch_reanimated_patch import patch as patch_reanimated_touch
+    for desc in patch_reanimated_touch(__import__("pathlib").Path(OUT),
+                                      __import__("pathlib").Path(SO)):
+        print("REANIMATED_TOUCH_PATCH", desc)
     tot = sum(os.path.getsize(f"{OUT}/{x}") for x in os.listdir(OUT))
     print(f"{len(ok)} lifted, {len(unlifted)} unlifted stubs, {len(imps)} imports, {idx} chunks, {tot/1e6:.1f} MB of C")
 
