@@ -231,7 +231,7 @@ sha256sum -c SHA256SUMS.txt
 ```
 
 See `TECHNICAL_BUILD_GUIDE.md` for architecture and rebuilding. Port source:
-[Dead-Space-Mobile-PC-port](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/tree/work/deadspace-linux-touchscreen-2026-11-07/source).
+[Dead-Space-Mobile-PC-port](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/tree/main/source).
 ATC decoder attribution is in `THIRD_PARTY_ASSETSTUDIO_LICENSE.txt`. SDL2 and
 other runtime libraries are installed through your distribution, not bundled.
 Reanimated's HD pack is by GINESTR0. Dead Space and original game content belong
