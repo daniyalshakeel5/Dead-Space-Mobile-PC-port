@@ -7,6 +7,7 @@ the Android/JNI, graphics, file and threading interfaces the game expects.
 
 - [All port source, launchers and tests](source/README.md)
 - [Full technical breakdown and build instructions](docs/TECHNICAL_BUILD_GUIDE.md)
+- [Installation instructions and dependencies](docs/INSTALLATION_AND_DEPENDENCIES.md)
 - [Linux touchscreen launcher and setup](source/packaging/linux-touchscreen/README-LINUX-TOUCH.txt)
 - [Collision and accelerometer investigation](docs/LINUX_COLLISION_AND_ACCEL_FIX_2026-11-08.md)
 - [768p and audio validation](docs/LINUX_AUDIO_AND_768P_2026-11-08.md)
