@@ -361,3 +361,7 @@ modes in a ZIP, checks its integrity, and creates internal/external SHA256 files
 plus release notes and publishing instructions. It does not create a GitHub
 release or bundle the donor APK, game library, HD textures, saves, or logs.
 The user confirmed saves survived reopening and HD textures look sharp.
+
+## Extended gameplay verification — user report, 2026-11-09
+
+The user reports **approximately two hours of hands-on gameplay on the finalized Linux build**. This establishes a **user-verified playable** status for that build, beyond automated frame progression and startup checks. It is a user-reported session, not an independently instrumented two-hour CI run. The report does not establish campaign completion, exhaustive interaction coverage, universal hardware compatibility, or native Windows validation. Earlier notes about specific scenes not yet reproduced remain scoped to those scenes; they do not negate the extended gameplay report.
