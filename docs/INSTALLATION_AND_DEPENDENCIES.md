@@ -59,6 +59,8 @@ Build flags include `-m32 -O1 -msse2 -mfpmath=sse -ffp-contract=off`; linker use
 
 ## Verification and limitations
 
+**Gameplay verification (user report, 2026-11-09):** the finalized Linux build was played for approximately **two hours**. Classify this build as **user-verified playable**, not merely boot-verified. This is not a claim of full campaign completion, all mechanics tested, or cross-device compatibility.
+
 The finalized Linux work reports user-confirmed 1366×768 touch/hit detection, opening skybox, audio and persistent saves on its tested device; these are device-specific reports, not universal guarantees. A later motion-gated level, previously affected combat flashing, native Windows gameplay, and physical controller operation remain incompletely verified. Passing CI compilation or a scripted 24,000-frame run is not proof of a completed playthrough.
 
 For diagnostics, provide the exact release version, donor variant, `ldd` output, stdout/stderr, exit code, display resolution and input hardware. Do not upload copyrighted game files or personal saves publicly.
