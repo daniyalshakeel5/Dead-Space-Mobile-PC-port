@@ -9,7 +9,7 @@ Start with the [technical build guide](../docs/TECHNICAL_BUILD_GUIDE.md).
 | `experimental/lifted_milestone6/src/` | Earlier C++/Unicorn host, retained for historical investigation; not the current native Linux executable |
 | `experimental/windows_native_host/` | Windows substrate and build/install/repair tools |
 | `packaging/` | Linux touchscreen and Windows controller distribution launchers |
-| `launcher/` | WSL bootstrap launcher |
+| `launcher/` | Packaged Linux entry point and Windows/WSLg launcher for the bundled executable |
 | `scripts/` | Build/run and gameplay evidence helpers |
 | `tests/` | Asset-free translator/runtime/sensor/audio regression tests |
 | `tools/` | Archive analysis, historical source import and trace comparison tools |

@@ -17,7 +17,7 @@ if [[ "$(uname -m)" != i?86 && "$(uname -m)" != "x86_64" ]]; then
 fi
 [[ -f "$ROOT/dspc_sdl" ]] || die "Missing dspc_sdl executable beside launcher."
 chmod u+x "$ROOT/dspc_sdl" || true
-if ldd "$ROOT/dspc_sdl" 2>&1 | grep -q 'not found'; then
+if ldd "$ROOT/dspc_sdl" 2>&1 | grep 'not found' >/dev/null; then
     ldd "$ROOT/dspc_sdl" >&2 || true
     die "Missing 32-bit Linux runtime libraries. Read README-LINUX-TOUCH.txt for Debian instructions."
 fi

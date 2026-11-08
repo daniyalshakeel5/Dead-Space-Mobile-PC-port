@@ -337,3 +337,27 @@ it expected an obsolete trapping/report API, while the current tool deliberately
 logs and retains the original fault behavior. Its tests now exercise the actual
 read-only/instrument/backup interface and preservation of the native call.
 All nine generator-probe regressions pass under the relocated source layout.
+
+## Packaging the tested executable
+
+The release launchers now run the binary beside them. The Windows `.cmd` /
+PowerShell pair uses WSLg and no longer fetches the old baseline source branch.
+Native Linux is the tested target; Windows/WSLg is an optional unverified path.
+The tested prebuilt binary imports GLIBC_2.38 symbols, so the release requires
+32-bit glibc 2.38+ even though rebuilding on an older toolchain may differ.
+
+From the repository root:
+
+```bash
+python3 source/scripts/package-linux-release.py \
+  --binary /path/to/tested/dspc_sdl \
+  --runtime-commit fd72452253a86e74f0c5c929026090658f3f5586 \
+  --version 2026.11.08 --output /path/to/release-staging
+```
+
+The script accepts only an ELF32 x86 binary, copies an explicit source/document
+allowlist, records runtime and package source revisions, preserves executable
+modes in a ZIP, checks its integrity, and creates internal/external SHA256 files
+plus release notes and publishing instructions. It does not create a GitHub
+release or bundle the donor APK, game library, HD textures, saves, or logs.
+The user confirmed saves survived reopening and HD textures look sharp.

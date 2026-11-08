@@ -1,3 +1,6 @@
+START HERE: Read START-HERE.md for complete release setup, APK choices,
+dependencies, saves, upgrades and the optional packaged WSL launcher.
+
 DEAD SPACE MOBILE - NATIVE LINUX TOUCHSCREEN TEST
 =================================================
 
@@ -13,7 +16,7 @@ An Intel/AMD x86-64 Linux laptop, tablet, or convertible, including Debian
 by this particular build. The executable is 32-bit (i686), so a 64-bit OS
 requires the corresponding 32-bit runtime libraries.
 
-DEBIAN 13 / UBUNTU PREPARATION (once, in a terminal):
+DEBIAN 13 / UBUNTU 24.04+ PREPARATION (once, in a terminal):
   sudo dpkg --add-architecture i386
   sudo apt update
   sudo apt install libsdl2-2.0-0:i386 libgl1:i386 libgl1-mesa-dri:i386 \

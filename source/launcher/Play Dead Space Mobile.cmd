@@ -1,6 +1,6 @@
 @echo off
 setlocal
-title Dead Space Mobile PC - WSL Launcher
+title Dead Space Mobile - Packaged Linux Build (WSLg)
 powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File "%~dp0DeadSpaceMobile-WSL.ps1" %*
 set "result=%ERRORLEVEL%"
 if not "%result%"=="0" (

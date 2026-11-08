@@ -1,0 +1,33 @@
+name: Release launcher and packaging checks
+on:
+  push:
+    branches: [work/deadspace-linux-touchscreen-2026-11-07]
+    paths: ['source/launcher/**', 'source/packaging/linux-touchscreen/**', 'source/scripts/package-linux-release.py', 'source/tests/test_linux_release_package.py', '.github/workflows/release-launcher-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 source/tests/test_linux_release_package.py
+      - run: bash -n 'source/launcher/Play Dead Space Mobile.sh' && bash -n source/packaging/linux-touchscreen/Play-Dead-Space-Touch.sh
+  powershell-syntax:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          $null = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'source/launcher/DeadSpaceMobile-WSL.ps1'), [ref]$tokens, [ref]$errors)
+          if ($errors.Count) { $errors | Format-List; exit 1 }
+      - name: Parse with PowerShell 7
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          $null = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'source/launcher/DeadSpaceMobile-WSL.ps1'), [ref]$tokens, [ref]$errors)
+          if ($errors.Count) { $errors | Format-List; exit 1 }

@@ -22,3 +22,10 @@ an Android emulator or a runtime ARM emulator. Historical Unicorn experiments
 and Windows work remain in `source/experimental/` with their own limitations.
 
 Original Android package background: [XDA post](https://xdaforums.com/t/dead-space-android-13-100-brightness-fix-almost-21-9-full-screen-decompiled-apktool.4664045/).
+
+## Packaged release
+
+See [full installation instructions](source/packaging/linux-touchscreen/START-HERE.md).
+The Linux and optional Windows/WSLg launchers run the executable beside them.
+Build a clean, asset-free release with `source/scripts/package-linux-release.py`;
+its explicit file list excludes installed game assets and personal saves.
