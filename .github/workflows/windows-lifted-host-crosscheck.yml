@@ -3,9 +3,9 @@ on:
   push:
     branches: [work/deadspace-windows-lifted-host-2026-11-04]
     paths:
-      - experimental/lifted_milestone6/tools/**
-      - experimental/windows_native_host/**
-      - tests/check_windows_lifted_host.py
+      - source/experimental/lifted_milestone6/tools/**
+      - source/experimental/windows_native_host/**
+      - source/tests/check_windows_lifted_host.py
       - .github/workflows/windows-lifted-host-crosscheck.yml
   workflow_dispatch:
 permissions:
@@ -28,4 +28,4 @@ jobs:
           test -f /tmp/SDL2-2.32.10/i686-w64-mingw32/include/SDL2/SDL.h
           test -f /tmp/SDL2-2.32.10/i686-w64-mingw32/bin/SDL2.dll
       - name: Cross-compile and link real SDL2/OpenGL lifted host as PE32
-        run: python3 tests/check_windows_lifted_host.py --sdl-root /tmp/SDL2-2.32.10
+        run: python3 source/tests/check_windows_lifted_host.py --sdl-root /tmp/SDL2-2.32.10

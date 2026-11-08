@@ -12,7 +12,7 @@ jobs:
       - name: Parse and validate original Linux crash symbolizer without needing WSL
         shell: pwsh
         run: |
-          $p='experimental/lifted_milestone6/Diagnose-WSL-Crash.ps1'
+          $p='source/experimental/lifted_milestone6/Diagnose-WSL-Crash.ps1'
           $tokens=$null
           $errs=$null
           [System.Management.Automation.Language.Parser]::ParseFile(
@@ -41,7 +41,7 @@ jobs:
       - name: Validate source-preserving TexturePack Linux crash diagnostic
         shell: pwsh
         run: |
-          $file = 'experimental/lifted_milestone6/Diagnose-TexturePack-Linux.ps1'
+          $file = 'source/experimental/lifted_milestone6/Diagnose-TexturePack-Linux.ps1'
           $tokens = $null; $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile(
             (Resolve-Path $file).Path,[ref]$tokens,[ref]$errors) | Out-Null
@@ -51,17 +51,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash -n experimental/lifted_milestone6/Apply-TexturePack-Linux.sh
-          grep -q "loader_vector_probe.py" experimental/lifted_milestone6/Apply-TexturePack-Linux.sh
-          grep -q 'found_loader' experimental/lifted_milestone6/Apply-TexturePack-Linux.sh
-          grep -q 'M3G_LOADER' experimental/lifted_milestone6/tools/loader_vector_probe.py
-          python3 -m py_compile experimental/lifted_milestone6/tools/texturepack_fault_guard.py
-          python3 -m py_compile experimental/lifted_milestone6/tools/loader_vector_probe.py
-          python3 -m unittest discover -s tests -p 'test_loader_vector_probe.py' -v
+          bash -n source/experimental/lifted_milestone6/Apply-TexturePack-Linux.sh
+          grep -q "loader_vector_probe.py" source/experimental/lifted_milestone6/Apply-TexturePack-Linux.sh
+          grep -q 'found_loader' source/experimental/lifted_milestone6/Apply-TexturePack-Linux.sh
+          grep -q 'M3G_LOADER' source/experimental/lifted_milestone6/tools/loader_vector_probe.py
+          python3 -m py_compile source/experimental/lifted_milestone6/tools/texturepack_fault_guard.py
+          python3 -m py_compile source/experimental/lifted_milestone6/tools/loader_vector_probe.py
+          python3 -m unittest discover -s source/tests -p 'test_loader_vector_probe.py' -v
           python3 - <<'PY'
           import importlib.util
           from pathlib import Path
-          p = Path('experimental/lifted_milestone6/tools/texturepack_fault_guard.py')
+          p = Path('source/experimental/lifted_milestone6/tools/texturepack_fault_guard.py')
           spec = importlib.util.spec_from_file_location('guard', p)
           mod = importlib.util.module_from_spec(spec)
           spec.loader.exec_module(mod)
@@ -98,7 +98,7 @@ jobs:
       - name: Test complete TexturePack decoder source extraction with synthetic files
         shell: pwsh
         run: |
-          $script='experimental/lifted_milestone6/Inspect-TexturePipeline.ps1'
+          $script='source/experimental/lifted_milestone6/Inspect-TexturePipeline.ps1'
           $tokens=$null; $errors=$null
           [System.Management.Automation.Language.Parser]::ParseFile(
             (Resolve-Path $script).Path,[ref]$tokens,[ref]$errors) | Out-Null
@@ -150,7 +150,7 @@ jobs:
           Set-Content (Join-Path $p "tools\host.c") "old host source"
           Set-Content (Join-Path $p "tools\out\protos.h") "old generated C"
           Set-Content (Join-Path $p "apk\lib\armeabi\libDeadSpace.so") "user owned asset sentinel"
-          $installer = Join-Path $PWD "experimental\lifted_milestone6\Install-Milestone6.ps1"
+          $installer = Join-Path $PWD "source\experimental\lifted_milestone6\Install-Milestone6.ps1"
           & pwsh -NoProfile -File $installer -ProjectDir $p -Quiet
           if ($LASTEXITCODE -ne 0) { throw "Installer exited $LASTEXITCODE" }
           $new = Get-Content -Raw (Join-Path $p "tools\host.c")
@@ -171,17 +171,17 @@ jobs:
       - name: Stage asset-free one-click update
         run: |
           mkdir -p update/tools
-          cp experimental/lifted_milestone6/tools/* update/tools/
-          cp experimental/lifted_milestone6/Install-Milestone6.ps1 update/
-          cp experimental/lifted_milestone6/Install-Milestone6.cmd update/
-          cp experimental/lifted_milestone6/README-ONECLICK.txt update/
-          cp experimental/lifted_milestone6/Diagnose-TexturePack-Linux.ps1 update/
-          cp 'experimental/lifted_milestone6/Diagnose TexturePack Linux.cmd' update/
-          cp experimental/lifted_milestone6/Apply-TexturePack-Linux.sh update/
-          cp experimental/lifted_milestone6/Inspect-TexturePipeline.ps1 update/
-          cp 'experimental/lifted_milestone6/Inspect Texture Pipeline.cmd' update/
-          cp experimental/lifted_milestone6/Diagnose-WSL-Crash.ps1 update/
-          cp 'experimental/lifted_milestone6/Diagnose WSL Crash.cmd' update/
+          cp source/experimental/lifted_milestone6/tools/* update/tools/
+          cp source/experimental/lifted_milestone6/Install-Milestone6.ps1 update/
+          cp source/experimental/lifted_milestone6/Install-Milestone6.cmd update/
+          cp source/experimental/lifted_milestone6/README-ONECLICK.txt update/
+          cp source/experimental/lifted_milestone6/Diagnose-TexturePack-Linux.ps1 update/
+          cp 'source/experimental/lifted_milestone6/Diagnose TexturePack Linux.cmd' update/
+          cp source/experimental/lifted_milestone6/Apply-TexturePack-Linux.sh update/
+          cp source/experimental/lifted_milestone6/Inspect-TexturePipeline.ps1 update/
+          cp 'source/experimental/lifted_milestone6/Inspect Texture Pipeline.cmd' update/
+          cp source/experimental/lifted_milestone6/Diagnose-WSL-Crash.ps1 update/
+          cp 'source/experimental/lifted_milestone6/Diagnose WSL Crash.cmd' update/
           echo "No original game ELF, APK, save data or extracted assets are included."
           find update -type f -printf '%P\n' | sort
       - name: Upload tested Windows one-click WSL source update

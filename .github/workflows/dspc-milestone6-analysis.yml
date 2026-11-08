@@ -16,10 +16,10 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq unar p7zip-full
       - name: Verify comparison tool on synthetic fixtures
-        run: python3 tools/analyze_milestones.py --self-test
+        run: python3 source/tools/analyze_milestones.py --self-test
       - name: Compare milestone 5 ZIP and milestone 6 RAR
         run: |
-          python3 tools/analyze_milestones.py \
+          python3 source/tools/analyze_milestones.py \
             --old dspc_milestone5.zip \
             --new dspc_milestone6.rar \
             --report milestone6-analysis.md \

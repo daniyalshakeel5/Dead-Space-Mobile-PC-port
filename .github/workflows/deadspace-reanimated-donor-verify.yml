@@ -20,7 +20,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/reanimated" "$RUNNER_TEMP/game"
           gh release download v1.3 -R GINESTR0/DeadSpaceReanimated \
             -p 'DeadSpaceReanimated-1.3.apk' -D "$RUNNER_TEMP/reanimated"
-          bash -n packaging/linux-touchscreen/Play-Dead-Space-Touch.sh
+          bash -n source/packaging/linux-touchscreen/Play-Dead-Space-Touch.sh
       - name: Exercise real nested game extraction path without copying copyrighted files to artifacts
         run: |
           set -euo pipefail

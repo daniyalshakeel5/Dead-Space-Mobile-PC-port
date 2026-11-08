@@ -2,7 +2,7 @@ name: Real APK milestone 6 baseline comparison
 on:
   push:
     branches: [work/deadspace-real-baseline-2026-11-05]
-    paths: [.github/workflows/deadspace-real-baseline.yml, experimental/lifted_milestone6/tools/**]
+    paths: [.github/workflows/deadspace-real-baseline.yml, source/experimental/lifted_milestone6/tools/**]
   workflow_dispatch:
 permissions:
   contents: read
@@ -50,7 +50,7 @@ jobs:
             [[ "${#entries[@]}" == 1 ]]
             cp -a "$(dirname "${entries[0]}")" "$root/tools"
           else
-            cp -a experimental/lifted_milestone6/tools "$root/tools"
+            cp -a source/experimental/lifted_milestone6/tools "$root/tools"
           fi
           # Both variants use the exact asset/data arrangement reported by
           # the other agent. Each matrix job has its own writable directory.

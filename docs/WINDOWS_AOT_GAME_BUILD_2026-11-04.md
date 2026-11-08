@@ -14,22 +14,22 @@ excluded from the public GitHub repository and Actions artifacts.
 
 ## Implemented (GitHub source)
 
-- `experimental/windows_native_host/win32_substrate.h/.c`: real Win32
+- `source/experimental/windows_native_host/win32_substrate.h/.c`: real Win32
   VirtualAlloc/VirtualFree/VirtualProtect, recursive CRITICAL_SECTION, CONDITION_VARIABLE,
   semaphore, TLS and native worker threads.
-- `experimental/lifted_milestone6/tools/windows_lifted_compat.h`: actual lifted
+- `source/experimental/lifted_milestone6/tools/windows_lifted_compat.h`: actual lifted
   host's Win32 mappings, Win32 fatal-exception address logging, _mkdir/_fullpath,
   Win32 fsync and POSIX lrand48 compatibility.
-- `experimental/lifted_milestone6/tools/host.c`: common Linux+Windows lifted
+- `source/experimental/lifted_milestone6/tools/host.c`: common Linux+Windows lifted
   ELF data loader; Windows-specific crash handler without removing keyboard/controller
   callbacks, original bootstrap routines, JNI, SDL2 or GLES.
-- `experimental/lifted_milestone6/tools/libc_files.c`: Win32 bionic stat/dirent
+- `source/experimental/lifted_milestone6/tools/libc_files.c`: Win32 bionic stat/dirent
   layout bridging and binary-mode resource opens.
-- `experimental/lifted_milestone6/tools/build_win32_lifted.sh`: uses the
-  existing owner's generated `tools/out/fn_*.c` private source, native
+- `source/experimental/lifted_milestone6/tools/build_win32_lifted.sh`: uses the
+  existing owner's generated `source/tools/out/fn_*.c` private source, native
   `i686-w64-mingw32-gcc-posix`, pinned official SDL2 2.32.10 MinGW x86 SDK,
   SSE2 softfp flags and `-Wl,--large-address-aware`.
-- `experimental/windows_native_host/Build-DeadSpace-Windows.cmd` + `.ps1`:
+- `source/experimental/windows_native_host/Build-DeadSpace-Windows.cmd` + `.ps1`:
   graphical one-click Windows build orchestrator. WSL is used only as the
   **compiler** and to retrieve public dependencies. It DOES NOT run the Windows
   game through WSL or emulation.
@@ -64,7 +64,7 @@ Download the source-only GitHub Actions artifact named
 
 Extract outside the existing dspc project and double-click
 `Build-DeadSpace-Windows.cmd`. The script finds the existing project
-(including `tools/out/protos.h`, `apk/lib/armeabi/libDeadSpace.so`, and
+(including `source/tools/out/protos.h`, `apk/lib/armeabi/libDeadSpace.so`, and
 `apk/assets`) and, if necessary, uses WSL's root account to install the
 native Windows x86 cross compiler. It stages the Windows host in
 `windows-build/host-src` and leaves Claude's original WSL game untouched.

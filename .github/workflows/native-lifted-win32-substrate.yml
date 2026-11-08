@@ -4,11 +4,11 @@ on:
     branches:
       - work/deadspace-windows-lifted-host-2026-11-04
     paths:
-      - experimental/windows_native_host/**
-      - experimental/lifted_milestone6/tools/win32_bionic_openflags.h
+      - source/experimental/windows_native_host/**
+      - source/experimental/lifted_milestone6/tools/win32_bionic_openflags.h
       - .github/workflows/native-lifted-win32-substrate.yml
-      - tools/compare_gles_texture_trace.py
-      - tests/test_gles_texture_trace.py
+      - source/tools/compare_gles_texture_trace.py
+      - source/tests/test_gles_texture_trace.py
   workflow_dispatch:
 permissions:
   contents: read
@@ -57,4 +57,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify GPU trace format classification (no game files)
-        run: python3 -m unittest discover -s tests -p 'test_gles_texture_trace.py' -v
+        run: python3 -m unittest discover -s source/tests -p 'test_gles_texture_trace.py' -v

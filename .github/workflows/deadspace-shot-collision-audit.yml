@@ -61,5 +61,5 @@ jobs:
         shell: bash
         run: |
           grep -nE 'DS_WIDTH|DS_HEIGHT|NativeOnSurfaceChanged|SDL_GL_GetDrawableSize|glViewport|DS_RENDER_MIN_FAR|ds_reanimated_touch_scale' \
-            experimental/lifted_milestone6/tools/{host.c,front_sdl.c,gl_shim.c,rt.h} \
-            packaging/linux-touchscreen/Play-Dead-Space-Touch.sh | head -90
+            source/experimental/lifted_milestone6/tools/{host.c,front_sdl.c,gl_shim.c,rt.h} \
+            source/packaging/linux-touchscreen/Play-Dead-Space-Touch.sh | head -90

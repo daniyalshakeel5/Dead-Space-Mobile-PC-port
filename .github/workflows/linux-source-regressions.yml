@@ -1,0 +1,35 @@
+name: Native Linux source regressions (asset-free)
+on:
+  push:
+    branches: [work/deadspace-linux-touchscreen-2026-11-07]
+    paths: ['source/**', '.github/workflows/linux-source-regressions.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regressions:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build and test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y gcc-multilib libc6-dev-i386 python3-pyelftools libsdl2-dev pkg-config
+      - name: Verify translated VFP state, sensors and solver initialization
+        run: |
+          python3 source/tests/test_vfp_call_state.py
+          python3 source/tests/test_linux_accel.py
+          python3 source/tests/test_solver_init_fix.py
+      - name: Exercise real JNI and SDL audio
+        run: |
+          python3 source/tests/check_m6_host_c_syntax.py
+          python3 source/tests/test_audio_sdl.py
+      - name: Check texture parser and decoder memory bounds
+        run: |
+          gcc -O1 -fsanitize=address,undefined -Isource/experimental/lifted_milestone6/tools source/tests/test_texture_ktx.c -o /tmp/ds-texture-test
+          /tmp/ds-texture-test
+      - name: Check existing generator probes and launcher syntax
+        run: |
+          python3 -m unittest discover -s source/tests -p 'test_*probe.py'
+          bash -n source/packaging/linux-touchscreen/Play-Dead-Space-Touch.sh
+          sh -n source/experimental/lifted_milestone6/tools/build.sh

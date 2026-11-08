@@ -3,18 +3,18 @@ on:
   push:
     branches: [work/deadspace-windows-lifted-host-2026-11-04]
     paths:
-      - experimental/windows_native_host/Install-DeadSpace-Fresh.ps1
-      - experimental/windows_native_host/Build-DeadSpace-Windows.ps1
-      - experimental/windows_native_host/Build-DeadSpace-Windows.cmd
-      - experimental/windows_native_host/Install Dead Space Mobile.cmd
-      - experimental/windows_native_host/README-TEST-WINDOWS.txt
-      - experimental/windows_native_host/Repair-DeadSpace-Windows.ps1
-      - experimental/windows_native_host/Repair Dead Space Windows.cmd
-      - experimental/windows_native_host/Diagnose-DeadSpace-Crash.ps1
-      - experimental/windows_native_host/Diagnose Dead Space Crash.cmd
-      - experimental/windows_native_host/Inspect-DeadSpace-ModelCache.ps1
-      - experimental/windows_native_host/Inspect Dead Space Model Cache.cmd
-      - experimental/lifted_milestone6/tools/**
+      - source/experimental/windows_native_host/Install-DeadSpace-Fresh.ps1
+      - source/experimental/windows_native_host/Build-DeadSpace-Windows.ps1
+      - source/experimental/windows_native_host/Build-DeadSpace-Windows.cmd
+      - source/experimental/windows_native_host/Install Dead Space Mobile.cmd
+      - source/experimental/windows_native_host/README-TEST-WINDOWS.txt
+      - source/experimental/windows_native_host/Repair-DeadSpace-Windows.ps1
+      - source/experimental/windows_native_host/Repair Dead Space Windows.cmd
+      - source/experimental/windows_native_host/Diagnose-DeadSpace-Crash.ps1
+      - source/experimental/windows_native_host/Diagnose Dead Space Crash.cmd
+      - source/experimental/windows_native_host/Inspect-DeadSpace-ModelCache.ps1
+      - source/experimental/windows_native_host/Inspect Dead Space Model Cache.cmd
+      - source/experimental/lifted_milestone6/tools/**
       - .github/workflows/windows-private-game-build-kit.yml
   workflow_dispatch:
 permissions:
@@ -28,11 +28,11 @@ jobs:
         shell: pwsh
         run: |
           $files = @(
-             'experimental/windows_native_host/Install-DeadSpace-Fresh.ps1',
-             'experimental/windows_native_host/Build-DeadSpace-Windows.ps1',
-             'experimental/windows_native_host/Repair-DeadSpace-Windows.ps1',
-             'experimental/windows_native_host/Diagnose-DeadSpace-Crash.ps1',
-             'experimental/windows_native_host/Inspect-DeadSpace-ModelCache.ps1'
+             'source/experimental/windows_native_host/Install-DeadSpace-Fresh.ps1',
+             'source/experimental/windows_native_host/Build-DeadSpace-Windows.ps1',
+             'source/experimental/windows_native_host/Repair-DeadSpace-Windows.ps1',
+             'source/experimental/windows_native_host/Diagnose-DeadSpace-Crash.ps1',
+             'source/experimental/windows_native_host/Inspect-DeadSpace-ModelCache.ps1'
           )
           foreach($p in $files) {
              $tokens = $null
@@ -67,7 +67,7 @@ jobs:
             '}'
           ) -Encoding UTF8
           $env:DS_DIAG_QUIET = '1'
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'experimental/windows_native_host/Inspect-DeadSpace-ModelCache.ps1' -InstallDir $root
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'source/experimental/windows_native_host/Inspect-DeadSpace-ModelCache.ps1' -InstallDir $root
           if ($LASTEXITCODE -ne 0) { throw "ModelCache source extraction failed" }
           $report = Join-Path $root 'windows-build\logs\modelcache-source-context.txt'
           if (!(Test-Path $report)) { throw 'Source report missing' }
@@ -101,9 +101,9 @@ jobs:
           $root = Join-Path $env:RUNNER_TEMP 'DeadSpaceFreshProject'
           $kit = Join-Path $env:RUNNER_TEMP 'fresh-test-kit'
           New-Item -ItemType Directory -Force (Join-Path $kit 'tools') | Out-Null
-          Copy-Item 'experimental/lifted_milestone6/tools/*' (Join-Path $kit 'tools') -Force
-          Copy-Item 'experimental/windows_native_host/win32_substrate.*' (Join-Path $kit 'tools') -Force
-          Copy-Item 'experimental/windows_native_host/Install-DeadSpace-Fresh.ps1' $kit -Force
+          Copy-Item 'source/experimental/lifted_milestone6/tools/*' (Join-Path $kit 'tools') -Force
+          Copy-Item 'source/experimental/windows_native_host/win32_substrate.*' (Join-Path $kit 'tools') -Force
+          Copy-Item 'source/experimental/windows_native_host/Install-DeadSpace-Fresh.ps1' $kit -Force
           $installer = Join-Path $kit 'Install-DeadSpace-Fresh.ps1'
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -ApkPath $fixture -InstallDir $root -PrepareOnly
           if ($LASTEXITCODE -ne 0) { throw "Fresh extraction installer failed ($LASTEXITCODE)" }
@@ -146,12 +146,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate translators and native Windows compiler script
         run: |
-          bash -n experimental/lifted_milestone6/tools/build_win32_lifted.sh
-          python3 -m py_compile experimental/lifted_milestone6/tools/gen_all.py experimental/lifted_milestone6/tools/lift.py experimental/lifted_milestone6/tools/overrides.py experimental/lifted_milestone6/tools/texturepack_fault_guard.py
-          python3 -m py_compile experimental/lifted_milestone6/tools/modelcache_empty_vector.py
-          python3 -m py_compile experimental/lifted_milestone6/tools/object3d_duplicate_probe.py
-          python3 -m unittest discover -s tests -p 'test_object3d_duplicate_probe.py' -v
-          python3 -m unittest discover -s tests -p 'test_modelcache_empty_vector.py' -v
+          bash -n source/experimental/lifted_milestone6/tools/build_win32_lifted.sh
+          python3 -m py_compile source/experimental/lifted_milestone6/tools/gen_all.py source/experimental/lifted_milestone6/tools/lift.py source/experimental/lifted_milestone6/tools/overrides.py source/experimental/lifted_milestone6/tools/texturepack_fault_guard.py
+          python3 -m py_compile source/experimental/lifted_milestone6/tools/modelcache_empty_vector.py
+          python3 -m py_compile source/experimental/lifted_milestone6/tools/object3d_duplicate_probe.py
+          python3 -m unittest discover -s source/tests -p 'test_object3d_duplicate_probe.py' -v
+          python3 -m unittest discover -s source/tests -p 'test_modelcache_empty_vector.py' -v
   package-kit:
     needs: [windows-fresh-install-test, bash-check]
     runs-on: ubuntu-24.04
@@ -160,24 +160,24 @@ jobs:
       - name: Stage complete source-only fresh Windows installer
         run: |
           mkdir -p package/tools
-          src=experimental/lifted_milestone6/tools
+          src=source/experimental/lifted_milestone6/tools
           for f in rt.h host.c jni_vm.c threads.c libc_files.c gl_shim.c front_sdl.c build.sh build_win32_lifted.sh gen_all.py gen_gl.py lift.py overrides.py jninames.py texturepack_fault_guard.py modelcache_empty_vector.py object3d_duplicate_probe.py native_buffered_input.py m3g_loader_serialization.py modelcache_null_duplicate_recovery.py windows_lifted_compat.h win32_bionic_openflags.h win32_import_bridge.h win32_missing_imports.c win32_missing_gles.c; do
             test -s "$src/$f"
             cp "$src/$f" package/tools/
           done
-          cp experimental/windows_native_host/win32_substrate.c package/tools/
-          cp experimental/windows_native_host/win32_substrate.h package/tools/
-          cp experimental/windows_native_host/Install-DeadSpace-Fresh.ps1 package/
-          cp experimental/windows_native_host/Build-DeadSpace-Windows.ps1 package/
-          cp experimental/windows_native_host/Build-DeadSpace-Windows.cmd package/
-          cp 'experimental/windows_native_host/Install Dead Space Mobile.cmd' package/
-          cp experimental/windows_native_host/README-TEST-WINDOWS.txt package/
-          cp experimental/windows_native_host/Repair-DeadSpace-Windows.ps1 package/
-          cp 'experimental/windows_native_host/Repair Dead Space Windows.cmd' package/
-          cp experimental/windows_native_host/Diagnose-DeadSpace-Crash.ps1 package/
-          cp 'experimental/windows_native_host/Diagnose Dead Space Crash.cmd' package/
-          cp experimental/windows_native_host/Inspect-DeadSpace-ModelCache.ps1 package/
-          cp 'experimental/windows_native_host/Inspect Dead Space Model Cache.cmd' package/
+          cp source/experimental/windows_native_host/win32_substrate.c package/tools/
+          cp source/experimental/windows_native_host/win32_substrate.h package/tools/
+          cp source/experimental/windows_native_host/Install-DeadSpace-Fresh.ps1 package/
+          cp source/experimental/windows_native_host/Build-DeadSpace-Windows.ps1 package/
+          cp source/experimental/windows_native_host/Build-DeadSpace-Windows.cmd package/
+          cp 'source/experimental/windows_native_host/Install Dead Space Mobile.cmd' package/
+          cp source/experimental/windows_native_host/README-TEST-WINDOWS.txt package/
+          cp source/experimental/windows_native_host/Repair-DeadSpace-Windows.ps1 package/
+          cp 'source/experimental/windows_native_host/Repair Dead Space Windows.cmd' package/
+          cp source/experimental/windows_native_host/Diagnose-DeadSpace-Crash.ps1 package/
+          cp 'source/experimental/windows_native_host/Diagnose Dead Space Crash.cmd' package/
+          cp source/experimental/windows_native_host/Inspect-DeadSpace-ModelCache.ps1 package/
+          cp 'source/experimental/windows_native_host/Inspect Dead Space Model Cache.cmd' package/
           if find package -type f | grep -E '\.(apk|so|m3g|ogg|dex|bin)$'; then
              echo "Refusing to publish original EA binaries/assets"; exit 1
           fi

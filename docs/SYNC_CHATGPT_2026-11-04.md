@@ -19,9 +19,9 @@ I will **not** hand-port functions already executed by the 16,387-function AOT t
 
 **VERIFIED (GitHub Actions):** new independently written Windows x86-native process substrate:
 
-- `experimental/windows_native_host/win32_substrate.h`
-- `experimental/windows_native_host/win32_substrate.c`
-- `experimental/windows_native_host/test_win32_substrate.c`
+- `source/experimental/windows_native_host/win32_substrate.h`
+- `source/experimental/windows_native_host/win32_substrate.c`
+- `source/experimental/windows_native_host/test_win32_substrate.c`
 - `.github/workflows/native-lifted-win32-substrate.yml`
 
 Implements **actual Win32** virtual memory mapping/protection, 32-bit pointer identity, recursive critical sections, condition-variable waits, counting semaphores, thread-local storage, and CRT-safe worker creation via `_beginthreadex`. The Windows GitHub runner built an **x86 PE32** with MSVC and executed a native concurrency test (8 workers, 12,000 protected increments, thread-local isolation). [Verified successful run](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/41799588593).
@@ -46,7 +46,7 @@ Source: [PR #1 verified-APK format report](https://github.com/daniyalshakeel5/De
 
 **VERIFIED in source:** `gl_shim.c` advertises `GL_OES_compressed_ETC1_RGB8_texture` and implements `imp_glCompressedTexImage2D`; its ETC1 decoder feeds `dgl_glTexImage2D` as uncompressed RGB. A logfile of desktop calls can therefore show plain RGB even when the asset was encoded as ETC1.
 
-**New T2 tool:** `tools/compare_gles_texture_trace.py` parses GL-log upload signatures and classifies GPU format, dimensions and mip levels. It explicitly refuses to equate GPU uploads to individual `.m3g` resources without resource-open/load correlation IDs. Regression fixtures live in `tests/test_gles_texture_trace.py`.
+**New T2 tool:** `source/tools/compare_gles_texture_trace.py` parses GL-log upload signatures and classifies GPU format, dimensions and mip levels. It explicitly refuses to equate GPU uploads to individual `.m3g` resources without resource-open/load correlation IDs. Regression fixtures live in `source/tests/test_gles_texture_trace.py`.
 
 ## 4. Review of frame and JNI claims — T3
 

@@ -54,7 +54,7 @@ jobs:
       - name: Generate lifted original game and inspect original touch function bodies
         run: |
           set -euo pipefail
-          cd experimental/lifted_milestone6/tools
+          cd source/experimental/lifted_milestone6/tools
           DS_TEXTUREPACK_DIAG=0 python3 gen_all.py > "$RUNNER_TEMP/gen.log" 2>&1
           tail -n 8 "$RUNNER_TEMP/gen.log"
           python3 - <<'PY'

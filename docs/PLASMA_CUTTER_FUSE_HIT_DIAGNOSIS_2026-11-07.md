@@ -52,7 +52,7 @@ Original `GameObjectShootSwitch::onHit` RVA `0x0013264c` distinguishes hit-event
 
 ## New read-only diagnostic
 
-`experimental/lifted_milestone6/tools/shot_hit_trace.py` now instruments the actual `f_0023e12c` ray-entry routine and, specifically within `WeaponPlasmaCutter::onFire`, all **five** original calls to it, before and after invocation.
+`source/experimental/lifted_milestone6/tools/shot_hit_trace.py` now instruments the actual `f_0023e12c` ray-entry routine and, specifically within `WeaponPlasmaCutter::onFire`, all **five** original calls to it, before and after invocation.
 
 With `DS_AIM_DIAG=1`, check:
 

@@ -1,5 +1,8 @@
 # Reanimated v1.3 — Native Linux touch-target compatibility
 
+> Historical investigation. HD loading, audio, save storage and the solver
+> correction are now described in [the current technical guide](TECHNICAL_BUILD_GUIDE.md).
+
 ## Provenance and evidence
 
 The user verified the original Linux touchscreen port launches and responds to touch, but on a large display the original 2011 UI/object interaction hit areas are too small. They requested the improvements from [Dead Space Reanimated](https://github.com/GINESTR0/DeadSpaceReanimated) by **GINESTR0**, specifically version **v1.3**.

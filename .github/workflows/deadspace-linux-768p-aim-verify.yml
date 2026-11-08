@@ -46,7 +46,7 @@ jobs:
           unzip -q "$root/download/Deas.Space.Mobile.Fixes.apk" -d "$root/apk"
           sha1sum "$root/apk/lib/armeabi/libDeadSpace.so" | tee "$root/logs/identity.txt"
           [[ "$(sha1sum "$root/apk/lib/armeabi/libDeadSpace.so" | cut -d' ' -f1)" == 64a3323cd3cc0c483a645b62af8508624163ba9b ]]
-          cp -a experimental/lifted_milestone6/tools "$root/tools"
+          cp -a source/experimental/lifted_milestone6/tools "$root/tools"
           # Both variants use the exact asset/data arrangement reported by
           # the other agent. Each matrix job has its own writable directory.
           mkdir -p "$root/apk/assets/var"
@@ -116,7 +116,7 @@ jobs:
           dest="$RUNNER_TEMP/DeadSpaceMobile-Linux-Touchscreen"
           mkdir -p "$dest"
           cp "$DS_ROOT/tools/out/dspc_sdl" "$dest/"
-          cp packaging/linux-touchscreen/* "$dest/"
+          cp source/packaging/linux-touchscreen/* "$dest/"
           chmod +x "$dest/dspc_sdl" "$dest/Play-Dead-Space-Touch.sh"
           bash -n "$dest/Play-Dead-Space-Touch.sh"
           file "$dest/dspc_sdl" | grep -q 'ELF 32-bit'

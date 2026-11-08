@@ -4,8 +4,8 @@ on:
     branches: [work/deadspace-portable-runtime-2026-11-05]
     paths:
       - .github/workflows/deadspace-real-apk-win32-crossbuild.yml
-      - experimental/lifted_milestone6/tools/**
-      - experimental/windows_native_host/**
+      - source/experimental/lifted_milestone6/tools/**
+      - source/experimental/windows_native_host/**
   workflow_dispatch:
 permissions:
   contents: read
@@ -46,8 +46,8 @@ jobs:
           [[ -s "$dir/apk/lib/armeabi/libDeadSpace.so" ]] || exit 21
           [[ -d "$dir/apk/assets/published" ]] || exit 22
           echo "ACTUAL_WINDOWS_APK_SHA256=$(sha256sum "$original" | cut -d ' ' -f 1)"
-          cp -a experimental/lifted_milestone6/tools/. "$dir/tools/"
-          cp experimental/windows_native_host/win32_substrate.{c,h} "$dir/tools/"
+          cp -a source/experimental/lifted_milestone6/tools/. "$dir/tools/"
+          cp source/experimental/windows_native_host/win32_substrate.{c,h} "$dir/tools/"
       - name: Compile the REAL original Dead Space game to Win32 PE32
         shell: bash
         run: |

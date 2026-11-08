@@ -14,15 +14,15 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq gcc-multilib libc6-dev-i386
       - name: Compile all milestone6 host C paths without original game assets
-        run: python3 tests/check_m6_host_c_syntax.py
+        run: python3 source/tests/check_m6_host_c_syntax.py
       - name: Execute native 32-bit Bionic file errno and thread-isolation regressions
         run: |
-          gcc -m32 -O1 -w -pthread tests/test_m6_bionic_errno.c -o /tmp/test_m6_bionic_errno
+          gcc -m32 -O1 -w -pthread source/tests/test_m6_bionic_errno.c -o /tmp/test_m6_bionic_errno
           /tmp/test_m6_bionic_errno
       - name: Check imported milestone6 translator and diagnostic syntax
         run: |
-          python3 -m py_compile experimental/lifted_milestone6/tools/gen_all.py
-          python3 -m py_compile experimental/lifted_milestone6/tools/texturepack_fault_guard.py
-          sh -n experimental/lifted_milestone6/tools/build.sh
+          python3 -m py_compile source/experimental/lifted_milestone6/tools/gen_all.py
+          python3 -m py_compile source/experimental/lifted_milestone6/tools/texturepack_fault_guard.py
+          sh -n source/experimental/lifted_milestone6/tools/build.sh
       - name: Verify translation guard and idempotence against synthetic data
-        run: python3 -m unittest discover -s tests -p 'test_m6_texturepack_probe.py' -v
+        run: python3 -m unittest discover -s source/tests -p 'test_m6_texturepack_probe.py' -v
