@@ -12,6 +12,8 @@ the Android/JNI, graphics, file and threading interfaces the game expects.
 - [Collision and accelerometer investigation](docs/LINUX_COLLISION_AND_ACCEL_FIX_2026-11-08.md)
 - [768p and audio validation](docs/LINUX_AUDIO_AND_768P_2026-11-08.md)
 
+**Gameplay status: USER-VERIFIED PLAYABLE.** The user reports approximately **two hours of actual gameplay** on the finalized Linux build. This is an extended hands-on gameplay report, not just a startup or synthetic test. It does not imply a completed campaign or verification on other platforms.
+
 On the tested Google Phaser360 Linux device, the build uses a 1366×768 drawable
 and matching touch coordinates. The user confirmed working hit detection,
 opening-cutscene skybox and audio. Real IIO accelerometer readings reach the
