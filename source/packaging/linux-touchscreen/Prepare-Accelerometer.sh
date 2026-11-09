@@ -42,9 +42,10 @@ ds_accel_select() {
                 chosen="$DS_ACCEL_DEVICE"
                 source="user-selected"
             else
-                printf '[ACCEL] Specified sensor is unavailable: %s; falling back\n' "$DS_ACCEL_DEVICE" >&2
+                printf '[ACCEL] Specified sensor is unavailable: %s; searching for another device\n' "$DS_ACCEL_DEVICE" >&2
             fi
-        else
+        fi
+        if [[ -z "$chosen" ]]; then
             root="${DS_ACCEL_SCAN_ROOT:-/sys/bus/iio/devices}"
             for candidate in "$root"/iio:device*; do
                 if ds_accel_usable "$candidate"; then
