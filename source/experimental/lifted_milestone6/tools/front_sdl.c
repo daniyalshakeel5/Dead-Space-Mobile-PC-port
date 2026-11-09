@@ -152,11 +152,7 @@ static unsigned pc_input_trace_frames;
 /* Context-sensitive bindings use the genuine game's JNI keyboard/touch.
  * State is independent so triggers never accidentally release each other. */
 static int pad_aim, pad_fire, pad_cross;
-/* Owner's DS2-style bindings. Android keycode 100 is the game's EXISTING
- * Triangle action: 180 turn outside aim, alternate weapon fire while aiming.
- * We send it from L3 outside aim and R1 during aim, without an invented bridge. */
 static int pad_r1_held, pad_stomp_held;
-static int pad_context_100, pad_locator, pad_sprint;
 static float pad_cross_x, pad_cross_y;
 /* Only explicitly recognized melee/stomp gestures enter the touchscreen.
  * Right-stick look goes to the separate game's TouchPad module. */
@@ -234,9 +230,7 @@ static void pad_special_release(void) {
         host_pointer_id(2,3,pad_cross_x,pad_cross_y);
     }
     if(pad_swipe_phase) host_pointer_id(2,4,pad_swipe_x,pad_swipe_y);
-    if(pad_context_100) host_key(0,100,0);
-    if(pad_locator) host_key(0,20,0);
-    pad_aim=pad_fire=pad_cross=pad_context_100=pad_locator=pad_sprint=0;
+    pad_aim=pad_fire=pad_cross=0;
     pad_r1_held=pad_stomp_held=pad_swipe_phase=pad_swipe_direction=pad_swipe_next=0;
     pad_physical_touch_down=0;
 }
@@ -281,9 +275,7 @@ static void pc_update(float dx,float dy) {
              * on real DualShock hardware this stays near the neutral zone.
              * Send a stable proportional offset while held. The first frame
              * is intentionally down-only so the engine sees the anchor. */
-            /* L1 extends the virtual joystick toward its sprint region. */
-            float radius_x=g_w*(pad_sprint ? .20f : .14f);
-            float radius_y=g_h*(pad_sprint ? .26f : .18f);
+            float radius_x=g_w*.14f, radius_y=g_h*.18f;
             pc_move_x=bx+x*radius_x;
             pc_move_y=by+y*radius_y;
             host_pointer_id(1,pc_move_finger(),pc_move_x,pc_move_y);
@@ -349,21 +341,16 @@ static int map_scancode(int sc, int* alt) {
 static int map_button(int b, int* alt) {
     *alt = 0;
     switch (b) {
-        /* In-game actions are handled by pad_read. Never send Circle as
-         * Android BACK: physical testing showed that would pause the game. */
+        /* Cross, R1, L2 and R2 are contextual in pad_read. Android BACK
+         * pauses in this APK, so Circle must not emit Android BACK. */
         case SDL_CONTROLLER_BUTTON_A: case SDL_CONTROLLER_BUTTON_B: return 0;
-        case SDL_CONTROLLER_BUTTON_X: return 99; /* Square: reload */
-        case SDL_CONTROLLER_BUTTON_Y: return 0;  /* Triangle: unassigned; R1 owns existing alternate fire */
-        case SDL_CONTROLLER_BUTTON_LEFTSTICK:
-        case SDL_CONTROLLER_BUTTON_RIGHTSTICK:
+        case SDL_CONTROLLER_BUTTON_X: return 99; case SDL_CONTROLLER_BUTTON_Y: return 100;
         case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
         case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER: return 0;
-        case SDL_CONTROLLER_BUTTON_START: *alt=1; return 4; /* Options: pause */
-        case SDL_CONTROLLER_BUTTON_BACK: return 109; /* Share: original Select */
-        case SDL_CONTROLLER_BUTTON_DPAD_UP: return 19;
-        case SDL_CONTROLLER_BUTTON_DPAD_DOWN: return 0; /* D-pad Down: handled with R3 */
-        case SDL_CONTROLLER_BUTTON_DPAD_LEFT: return 21;
-        case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: return 22;
+        case SDL_CONTROLLER_BUTTON_START: *alt=1; return 4;  /* Options -> pause */
+        case SDL_CONTROLLER_BUTTON_BACK: return 109;
+        case SDL_CONTROLLER_BUTTON_DPAD_UP: return 19; case SDL_CONTROLLER_BUTTON_DPAD_DOWN: return 20;
+        case SDL_CONTROLLER_BUTTON_DPAD_LEFT: return 21; case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: return 22;
     }
     return 0;
 }
@@ -411,53 +398,22 @@ static void pad_read(float* lx,float* ly,float* rx,float* ry) {
               SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_LEFTY),lx,ly);
     pad_stick(SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_RIGHTX),
               SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_RIGHTY),rx,ry);
-    /* Owner's control scheme (Dead Space 2-inspired, with L3 180 turn).
-     * No host-level pre-Plasma-Cutter combat lock: movement, melee, stomp,
-     * interaction and quick turn are always forwarded. The genuine game
-     * continues to decide when aiming is available after weapon pickup.
-     * Existing alternate fire is the native Triangle action (keycode 100),
-     * reached through R1 while aiming; do not simulate new gestures. */
+    /* Xperia JNI physical keyboard actions: L1=aim, R1=fire.
+     * The PC binding makes L2 aim and R2 context-dependent. */
     int aiming=SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_TRIGGERLEFT)>8192;
     int r2=SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_TRIGGERRIGHT)>8192;
-    int r1=SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)!=0;
-    int cross=SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_A)!=0;
-    int sprint=SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_LEFTSHOULDER)!=0;
     int firing=aiming && r2;
-    int saw=r1 && !aiming;     /* R1: Plasma Saw melee without aiming */
-    int stomp=r2 && !aiming;   /* R2: stomp without aiming */
-    int quickturn=SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_LEFTSTICK) && !aiming;
-    int altfire=r1 && aiming;  /* R1: original Triangle alternate fire in aim */
-    int action100=quickturn || altfire;
-    int locator=SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_RIGHTSTICK) ||
-                SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+    int saw=SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) && !aiming;
+    int cross=SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_A)!=0;
     if(aiming!=pad_aim) { pad_aim=aiming; host_key(aiming,102,0); pad_input_log("aim-L2",aiming); }
     if(firing!=pad_fire) { pad_fire=firing; host_key(firing,103,0); pad_input_log("fire-R2",firing); }
-    if(sprint!=pad_sprint) { pad_sprint=sprint; pad_input_log("sprint-L1",sprint); }
-    /* Send the same existing game input code 100, but from the owner's
-     * physical buttons: L3 for 180 turn, R1 during aim for alternate fire.
-     * Triangle must NOT double-trigger alternate fire. */
-    if(action100!=pad_context_100) {
-        pad_context_100=action100;
-        host_key(action100,100,0);
-        pad_input_log(action100?(quickturn?"quickturn-L3":"alternate-fire-L2-R1"):"quickturn-or-altfire-release",action100);
-    }
-    /* Route R3 locator through the existing down control only once even if
-     * D-pad Down is also held. Menu support for D-pad Down is retained. */
-    if(locator!=pad_locator) {
-        pad_locator=locator;
-        host_key(locator,20,0);
-        pad_input_log("locator-R3-or-DpadDown",locator);
-    }
-    /* A Plasma Saw is already available in the tutorial: don't require L2,
-     * a Plasma Cutter, or a weapon pickup before forwarding melee/stomp. */
-    if(saw && !pad_r1_held) pad_begin_swipe(-1,"R1-melee");
+    /* Touch edition: plasma saw is a swipe UP in the top-left quadrant.
+     * DPAD_UP was a menu key and did not trigger the real melee action. */
+    if(saw && !pad_r1_held) pad_begin_swipe(-1,"R1");
     if(saw!=pad_r1_held) pad_input_log("plasma-saw-R1",saw);
     pad_r1_held=saw;
-    if(stomp && !pad_stomp_held) pad_begin_swipe(1,"R2-stomp");
-    if(stomp!=pad_stomp_held) pad_input_log("stomp-R2",stomp);
-    pad_stomp_held=stomp;
     /* Native touchscreen game requires tapping doors and objects.
-     * Retain DPAD_CENTER for menus, plus an independent centre-screen tap. */
+     * Retain DPAD_CENTER for menus, but supply a centre-screen tap too. */
     if(cross!=pad_cross) {
         if(cross) {
             pad_cross_x=g_w*.50f; pad_cross_y=g_h*.50f;
@@ -469,14 +425,15 @@ static void pad_read(float* lx,float* ly,float* rx,float* ry) {
         }
         pad_cross=cross; pad_input_log("interact-X",cross);
     }
+    /* Stomp uses the same upper-left swipe area, but downward. */
+    int stomp=r2 && !aiming;
+    if(stomp && !pad_stomp_held) pad_begin_swipe(1,"R2-without-L2");
+    if(stomp!=pad_stomp_held) pad_input_log("stomp-R2",stomp);
+    pad_stomp_held=stomp;
     pad_swipe_tick();
     for(int b=0;b<SDL_CONTROLLER_BUTTON_MAX;b++) {
         int down=SDL_GameControllerGetButton(pad,(SDL_GameControllerButton)b)!=0;
         if(b==SDL_CONTROLLER_BUTTON_A || b==SDL_CONTROLLER_BUTTON_B ||
-           b==SDL_CONTROLLER_BUTTON_Y ||
-           b==SDL_CONTROLLER_BUTTON_LEFTSTICK ||
-           b==SDL_CONTROLLER_BUTTON_RIGHTSTICK ||
-           b==SDL_CONTROLLER_BUTTON_DPAD_DOWN ||
            b==SDL_CONTROLLER_BUTTON_LEFTSHOULDER ||
            b==SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) {
             pad_buttons[b]=down; continue;
