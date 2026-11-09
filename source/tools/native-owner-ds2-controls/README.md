@@ -36,6 +36,15 @@ melee while not aiming. L3 becomes the existing 180 turn; L1 becomes run.
 Triangle in aim is native Stasis, R3 becomes locator. R2 retains native fire
 when aimed and stomp when not aimed.
 
+**Zero-G Jump update (2026-11-09):** The original controller mapped
+Zero-G Jump (native action `0x352fb9f`) to D-pad Down, while D-pad Up
+was Locator (native action `0x352fb95`). The SDL shim now maps physical
+**D-pad Up to native Zero-G Jump**, preserves **R3 as Locator**, and leaves
+physical D-pad Down unassigned. All other control mappings, the game
+executable and the existing alternate-fire action are unchanged.
+The new remapper passed 14 isolated button-state checks; in-game Zero-G
+jump still requires physical gameplay verification.
+
 The three exact-byte patches preserve the existing unarmed **aim safety**:
 no-weapon branches still avoid dereferencing an absent equipped weapon in
 `setAiming`. Other native actions and the stomp event now continue to dispatch
