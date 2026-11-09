@@ -1,21 +1,33 @@
-# Windows Startup Fix
+# Windows Native Controller Build
 
-[Download the corrected Windows ZIP](DeadSpaceMobile-Windows-Startup-Fix.zip?raw=true)
+[Download the native-controller Windows ZIP](DeadSpaceMobile-Windows-Native-Controller.zip?raw=true)
 
-Fixes the reported `EA::core::GetAccelerometer()` crash by carrying the later Linux stationary-sensor fallback into native Windows. Also restores Fixes/Reanimated APK setup and optional HD-pack installation. Copy the files into the existing installation and keep `game` and `userdata`.
+Replaces the old touchscreen/keyboard pad frontend with original game movement,
+look, combat events and live menu-button callbacks. Controller input does not
+generate screen taps, swipes or Android keyboard codes. The implementation is
+reconstructed from the latest Linux release executable and its documented DS2
+layout, including the equipped-weapon guard and unarmed melee/stomp behavior.
 
-[Native Windows verification passed](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42690400367):
+Copy the package files into your existing installation. Keep `game` and
+`userdata`. New installations can select the upstream Fixes or Reanimated APK.
+The earlier accelerometer startup fix, original EA audio mixer, VFP/physics
+fixes and optional HD texture support remain included.
 
-- Fresh start: 1,200 genuine-game frames, exit code 0.
-- Existing-install relaunch: 1,200 frames, exit code 0.
-- Reanimated HD pack enabled: 1,200 frames, exit code 0, with logged HD texture replacements.
+Local asset-free native-controller, generator and Win32 host-link tests pass.
+The Windows workflow tests the genuine game with a virtual SDL pad, captures
+framebuffers, and rejects legacy pointer/key generation. Its latest run is
+listed in [Actions](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/workflows/windows-startup-check.yml).
+Runtime verification is pending for this new native-controller ZIP.
 
-All three captured 1366x768 nonblank framebuffers and produced nonzero original-game mixer samples. Tests used software OpenGL and SDL dummy audio; hardware audio playback, long sessions and campaign completion remain unverified. Test-only Mesa and original game assets are not in the ZIP.
+The [previous startup-fix build](DeadSpaceMobile-Windows-Startup-Fix.zip?raw=true)
+passed [three Windows startup runs](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42690400367),
+but retained the old controller frontend. Do not use it for native pad testing.
 
-Local VFP, solver, KTX and sensor regressions also passed. Both genuine APK layouts were prepared successfully; all 1,729 original published resources matched, and adding the 222-file HD pack preserved userdata.
+The ZIP includes the maintained source patch, build information, controls and
+coverage audit. No APK, assets, generated game C or saves are bundled.
+Physical controller hardware, motion hardware, campaign completion and long
+sessions are not yet verified.
 
-The ZIP includes `RELEASE_AUDIT.txt` and the maintained source changes. The newer Linux native-controller implementation is still missing from the source tag, later release branch and RAR. This remains the older touchscreen/keyboard controller frontend, not a full DS2-controller port.
+ZIP SHA256: `7b662c0f81eb79298062506c8e44bc161326a6991da0730a97fbadea60f7f555`
 
-ZIP SHA256: `undefined`
-
-EXE SHA256: `undefined`
+EXE SHA256: `3e01a9f5ad0dee8ba2536df296246cbc93abffab78dbf892fea8b4faaa325490`
