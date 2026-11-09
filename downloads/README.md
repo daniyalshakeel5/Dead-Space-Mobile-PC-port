@@ -1,13 +1,21 @@
 # Windows Startup Fix
 
-[Download the replacement Windows ZIP](DeadSpaceMobile-Windows-Startup-Fix.zip?raw=true)
+[Download the corrected Windows ZIP](DeadSpaceMobile-Windows-Startup-Fix.zip?raw=true)
 
-Fixes the reported `EA::core::GetAccelerometer()` crash by carrying the Linux stationary-sensor fallback into native Windows. Also restores Fixes/Reanimated APK and optional HD-pack setup. Keep your `game` and `userdata` folders when updating.
+Fixes the reported `EA::core::GetAccelerometer()` crash by carrying the later Linux stationary-sensor fallback into native Windows. Also restores Fixes/Reanimated APK setup and optional HD-pack installation. Copy the files into the existing installation and keep `game` and `userdata`.
 
-The ZIP includes the source changes and release-fix audit. The newer Linux native controller source remains unavailable, so the older controller frontend is still used.
+[Native Windows verification passed](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42690400367):
 
-Local VFP, solver, KTX, sensor and genuine-APK setup checks passed. The Windows startup workflow checks first launch, relaunch and Reanimated-HD startup; consult its run result before treating those runtime checks as passed.
+- Fresh start: 1,200 genuine-game frames, exit code 0.
+- Existing-install relaunch: 1,200 frames, exit code 0.
+- Reanimated HD pack enabled: 1,200 frames, exit code 0, with logged HD texture replacements.
 
-ZIP SHA256: `835cfb62cdf8b05861e773ef6165db4b5b90de8a9699792f481a24db5cbc561c`
+All three captured 1366x768 nonblank framebuffers and produced nonzero original-game mixer samples. Tests used software OpenGL and SDL dummy audio; hardware audio playback, long sessions and campaign completion remain unverified. Test-only Mesa and original game assets are not in the ZIP.
 
-EXE SHA256: `3f5f465093948abb00360ff709955888fc55d138db6e8d25333fab29cb4767ef`
+Local VFP, solver, KTX and sensor regressions also passed. Both genuine APK layouts were prepared successfully; all 1,729 original published resources matched, and adding the 222-file HD pack preserved userdata.
+
+The ZIP includes `RELEASE_AUDIT.txt` and the maintained source changes. The newer Linux native-controller implementation is still missing from the source tag, later release branch and RAR. This remains the older touchscreen/keyboard controller frontend, not a full DS2-controller port.
+
+ZIP SHA256: `undefined`
+
+EXE SHA256: `undefined`
