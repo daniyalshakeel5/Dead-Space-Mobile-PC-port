@@ -98,6 +98,13 @@ mv -- "$probe" "$probe.renamed" || die "Cannot rename files in save directory."
 rm -- "$probe.renamed"
 warn "Save files: $DATA/var"
 
+# The original Android game expects accelerometer support even on hosts with
+# no IIO device (notably WSL). Initialize a stationary dummy IIO device only
+# when no readable real accelerometer exists; preserve real hardware readings.
+[[ -r "$ROOT/Prepare-Accelerometer.sh" ]] ||
+    die "Missing accelerometer initialization helper: Prepare-Accelerometer.sh"
+source "$ROOT/Prepare-Accelerometer.sh" || die "Accelerometer initialization failed"
+
 # A Reanimated APK may be supplied to add HD textures to an existing install.
 if [[ -n "$APK" ]]; then
     APK="${APK/#\~/$HOME}"
