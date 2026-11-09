@@ -1,11 +1,13 @@
-# Windows Test Build
+# Windows Startup Fix
 
-[Download DeadSpaceMobile-Windows.zip](DeadSpaceMobile-Windows.zip?raw=true)
+[Download the replacement Windows ZIP](DeadSpaceMobile-Windows-Startup-Fix.zip?raw=true)
 
-Native Windows x86 test build compiled from release tag `Linux-with-controller-support`, source commit `b1fa1ca87922cd905da1be2521e412e0758b4d7e`, with the source changes included in the ZIP's `windows-build-changes.patch`.
+Fixes the reported `EA::core::GetAccelerometer()` crash by carrying the Linux stationary-sensor fallback into native Windows. Also restores Fixes/Reanimated APK and optional HD-pack setup. Keep your `game` and `userdata` folders when updating.
 
-Compilation, launcher syntax, and original-APK extraction checks passed. Gameplay remains unverified. The latest Linux RAR omits its native controller implementation's source, so this build uses the older committed touchscreen/keyboard controller frontend. It is not a full reproduction of the latest Linux controller release.
+The ZIP includes the source changes and release-fix audit. The newer Linux native controller source remains unavailable, so the older controller frontend is still used.
 
-Extract the ZIP, run `Play Dead Space.cmd`, and select the matching upstream Fixes APK. No original APK, assets, saves, or generated game C are included.
+Local VFP, solver, KTX, sensor and genuine-APK setup checks passed. The Windows startup workflow checks first launch, relaunch and Reanimated-HD startup; consult its run result before treating those runtime checks as passed.
 
-ZIP SHA256: `f3a388aeb485ab0fbca6b55c662da552c3d5ac23f556561d8338334963c70ad5`
+ZIP SHA256: `cc5097f4af80409d3aee1f1c92c11bcc293894c5b251e550928027793599efa7`
+
+EXE SHA256: `3f5f465093948abb00360ff709955888fc55d138db6e8d25333fab29cb4767ef`
