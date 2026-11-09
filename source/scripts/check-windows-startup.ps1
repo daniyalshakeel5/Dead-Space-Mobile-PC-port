@@ -50,16 +50,29 @@ foreach ($label in $labels) {
     $stderr = Join-Path $evidence ($label + '-stderr.log')
     $frame = Join-Path $evidence ($label + '.ppm')
     $env:DS_SHOT = '1200:' + $frame.Replace('\','/')
-    $process = Start-Process -FilePath (Join-Path $root 'DeadSpaceMobile-Win32.exe') -WorkingDirectory $root -ArgumentList ('"' + $so + '"') -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-    if (!$process.WaitForExit(180000)) {
-        Stop-Process -Id $process.Id -Force
-        throw "$label timed out after 180 seconds."
-    }
-    $process.Refresh()
-    $process.ExitCode | Set-Content (Join-Path $evidence ($label + '-exit-code.txt'))
+    $info = New-Object System.Diagnostics.ProcessStartInfo
+    $info.FileName = Join-Path $root 'DeadSpaceMobile-Win32.exe'
+    $info.WorkingDirectory = $root
+    $info.Arguments = '"' + $so + '"'
+    $info.UseShellExecute = $false
+    $info.RedirectStandardOutput = $true
+    $info.RedirectStandardError = $true
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $info
+    if (!$process.Start()) { throw "$label could not start." }
+    $outputTask = $process.StandardOutput.ReadToEndAsync()
+    $errorTask = $process.StandardError.ReadToEndAsync()
+    $finished = $process.WaitForExit(180000)
+    if (!$finished) { $process.Kill(); $process.WaitForExit() }
+    [System.IO.File]::WriteAllText($stdout,$outputTask.Result)
+    [System.IO.File]::WriteAllText($stderr,$errorTask.Result)
+    $exitCode = $process.ExitCode
+    $process.Dispose()
+    $exitCode | Set-Content (Join-Path $evidence ($label + '-exit-code.txt'))
     Get-Content $stdout -Tail 30
     Get-Content $stderr -Tail 45
-    if ($process.ExitCode -ne 0) { throw "$label exited with $($process.ExitCode)." }
+    if (!$finished) { throw "$label timed out after 180 seconds." }
+    if ($exitCode -ne 0) { throw "$label exited with $exitCode." }
     if (!(Select-String -LiteralPath $stdout -Pattern '^ran frames')) { throw "$label did not complete the frame loop." }
     if (!(Select-String -LiteralPath $stdout -Pattern 'window 1366x768, GL_RENDERER=')) { throw "$label did not create the expected OpenGL window." }
     if (!(Select-String -LiteralPath $stderr -SimpleMatch '[WINDOWS_ACCEL] initialized stationary logical sensor')) { throw "$label did not initialize the Windows sensor bridge." }

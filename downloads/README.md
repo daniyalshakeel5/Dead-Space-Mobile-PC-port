@@ -8,6 +8,6 @@ The ZIP includes the source changes and release-fix audit. The newer Linux nativ
 
 Local VFP, solver, KTX, sensor and genuine-APK setup checks passed. The Windows startup workflow checks first launch, relaunch and Reanimated-HD startup; consult its run result before treating those runtime checks as passed.
 
-ZIP SHA256: `cc5097f4af80409d3aee1f1c92c11bcc293894c5b251e550928027793599efa7`
+ZIP SHA256: `835cfb62cdf8b05861e773ef6165db4b5b90de8a9699792f481a24db5cbc561c`
 
 EXE SHA256: `3f5f465093948abb00360ff709955888fc55d138db6e8d25333fab29cb4767ef`
