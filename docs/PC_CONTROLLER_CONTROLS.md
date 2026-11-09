@@ -109,3 +109,51 @@ drag/move-only/pulse. A successful frame loop or input event alone does not
 establish actual camera movement; compare screenshots around 20,100–20,900
 and check that aimed/non-aimed panning does not accidentally shoot. Real
 hardware behavior needs confirmation.
+
+
+## 2026-11-09 — Owner-requested controller overrides (current branch)
+
+**These owner-selected mappings supersede conflicting historical descriptions above.**
+Branch: `work/deadspace-owner-ds2-controls-2026-11-09`. This is a
+**source-only change**, not yet merged into a packaged release or verified on
+physical gamepad hardware. The ZIP of the latest Linux build was deliberately
+not unpacked in ChatGPT's local environment, at the owner's request.
+
+| Physical control | Owner-selected behavior | Status |
+| --- | --- | --- |
+| Left stick | Move, existing virtual joystick | Existing implementation |
+| Right stick | Look, existing continuous drag | Existing implementation |
+| L1 | Larger virtual-joystick deflection intended to sprint | Added, gait not yet validated |
+| L2 | Aim; native game enforces Plasma Cutter availability | Existing input, pickup gate needs hardware verification |
+| R1 without L2 | Plasma Saw melee (original upper-left swipe up) | Remapped |
+| R1 with L2 | **Existing original Triangle (Android key 100) alternate-fire path** | Remapped; no new accelerometer/gesture bridge |
+| R2 without L2 | Stomp (original upper-left swipe down) | Restored |
+| R2 with L2 | Weapon fire (Android key 103) | Existing |
+| L3 without L2 | 180-degree quick turn (existing Android key 100) | Remapped |
+| R3 | Locator (same native key as D-pad Down) | Remapped, needs game verification |
+| Cross | Interact/confirm, including center-screen touch | Existing provisional implementation |
+| Square | Reload (Android key 99) | Existing |
+| Triangle | Not mapped to key 100: that would duplicate R1 alternate fire | Needs a verified standalone Stasis input before assigning |
+| Circle | Unmapped; Android BACK would pause instead of using Kinesis | Existing limitation |
+| Options | Pause | Existing |
+| Share | Select | Existing |
+| D-pad | Existing navigation; Down also triggers Locator | Existing |
+
+**Before weapon pickup**: the host does **not** globally disable
+combat controls. Melee, stomp, movement, interaction and L3 quick turn
+are forwarded immediately; only aiming is subject to the native game's
+weapon/progression logic. No claim is made here that the original game's
+progression gating has been modified or verified. The Plasma Saw is used
+before the Plasma Cutter is collected in the tutorial.
+
+**Alternate fire**: the user's confirmed working alternate-fire action was
+Triangle *while aiming*. Its genuine JNI input action (Android keycode 100)
+is preserved, now triggered by R1 while aiming. R1 without aiming remains
+the touchscreen Plasma Saw swipe. There is no synthesized acceleration
+gesture or replacement gameplay logic.
+
+**Remaining validation**: confirm pre-cutter Plasma Saw and stomp, L3 180
+turn, R1 aimed alternate fire, L1 movement speed, R3 Locator, focus-loss
+release and whether the game's original aim gate exactly matches the
+requested Plasma Cutter pickup point. Triangle/Stasis and Circle/Kinesis
+are not claimed complete until their distinct native actions are found.
