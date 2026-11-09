@@ -138,7 +138,10 @@ separate 32-bit SDL button remapper, with source in
 | Triangle while aiming | Original native Stasis |
 | R3 | Locator |
 | Cross, Square, Circle | Native interact, reload, Kinesis |
-| D-pad Left/Right, Up, Down | Previous/next weapon, locator, Zero-G jump |
+| D-pad Left/Right | Previous/next weapon |
+| D-pad Up | Zero-G Jump (native action `0x352fb9f`; formerly D-pad Down) |
+| D-pad Down | Unassigned |
+| R3 | Locator (native action `0x352fb95`; replaces D-pad Up) |
 | Options, Share | Pause/back, Rig |
 
 The previous executable checked `getCurrentWeapon` and skipped other
