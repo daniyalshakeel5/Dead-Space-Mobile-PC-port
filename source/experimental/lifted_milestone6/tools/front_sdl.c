@@ -152,9 +152,11 @@ static unsigned pc_input_trace_frames;
 /* Context-sensitive bindings use the genuine game's JNI keyboard/touch.
  * State is independent so triggers never accidentally release each other. */
 static int pad_aim, pad_fire, pad_cross;
-/* Owner's Dead Space 2-style bindings; keep working alternate fire untouched. */
+/* Owner's DS2-style bindings. Android keycode 100 is the game's EXISTING
+ * Triangle action: 180 turn outside aim, alternate weapon fire while aiming.
+ * We send it from L3 outside aim and R1 during aim, without an invented bridge. */
 static int pad_r1_held, pad_stomp_held;
-static int pad_quickturn_stasis, pad_locator, pad_sprint;
+static int pad_context_100, pad_locator, pad_sprint;
 static float pad_cross_x, pad_cross_y;
 /* Only explicitly recognized melee/stomp gestures enter the touchscreen.
  * Right-stick look goes to the separate game's TouchPad module. */
@@ -232,9 +234,9 @@ static void pad_special_release(void) {
         host_pointer_id(2,3,pad_cross_x,pad_cross_y);
     }
     if(pad_swipe_phase) host_pointer_id(2,4,pad_swipe_x,pad_swipe_y);
-    if(pad_quickturn_stasis) host_key(0,100,0);
+    if(pad_context_100) host_key(0,100,0);
     if(pad_locator) host_key(0,20,0);
-    pad_aim=pad_fire=pad_cross=pad_quickturn_stasis=pad_locator=pad_sprint=0;
+    pad_aim=pad_fire=pad_cross=pad_context_100=pad_locator=pad_sprint=0;
     pad_r1_held=pad_stomp_held=pad_swipe_phase=pad_swipe_direction=pad_swipe_next=0;
     pad_physical_touch_down=0;
 }
@@ -351,7 +353,7 @@ static int map_button(int b, int* alt) {
          * Android BACK: physical testing showed that would pause the game. */
         case SDL_CONTROLLER_BUTTON_A: case SDL_CONTROLLER_BUTTON_B: return 0;
         case SDL_CONTROLLER_BUTTON_X: return 99; /* Square: reload */
-        case SDL_CONTROLLER_BUTTON_Y: return 0;  /* Triangle: stasis only while aiming */
+        case SDL_CONTROLLER_BUTTON_Y: return 0;  /* Triangle: unassigned; R1 owns existing alternate fire */
         case SDL_CONTROLLER_BUTTON_LEFTSTICK:
         case SDL_CONTROLLER_BUTTON_RIGHTSTICK:
         case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
@@ -413,30 +415,31 @@ static void pad_read(float* lx,float* ly,float* rx,float* ry) {
      * No host-level pre-Plasma-Cutter combat lock: movement, melee, stomp,
      * interaction and quick turn are always forwarded. The genuine game
      * continues to decide when aiming is available after weapon pickup.
-     * Do not change or synthesize the already-working alternate fire path. */
+     * Existing alternate fire is the native Triangle action (keycode 100),
+     * reached through R1 while aiming; do not simulate new gestures. */
     int aiming=SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_TRIGGERLEFT)>8192;
     int r2=SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_TRIGGERRIGHT)>8192;
     int r1=SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)!=0;
     int cross=SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_A)!=0;
     int sprint=SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_LEFTSHOULDER)!=0;
     int firing=aiming && r2;
-    int saw=r2 && !aiming;     /* R2: melee outside aim */
-    int stomp=r1 && !aiming;   /* R1: stomp outside aim */
+    int saw=r1 && !aiming;     /* R1: Plasma Saw melee without aiming */
+    int stomp=r2 && !aiming;   /* R2: stomp without aiming */
     int quickturn=SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_LEFTSTICK) && !aiming;
-    int stasis=SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_Y) && aiming;
-    int action100=quickturn || stasis;
+    int altfire=r1 && aiming;  /* R1: original Triangle alternate fire in aim */
+    int action100=quickturn || altfire;
     int locator=SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_RIGHTSTICK) ||
                 SDL_GameControllerGetButton(pad,SDL_CONTROLLER_BUTTON_DPAD_DOWN);
     if(aiming!=pad_aim) { pad_aim=aiming; host_key(aiming,102,0); pad_input_log("aim-L2",aiming); }
     if(firing!=pad_fire) { pad_fire=firing; host_key(firing,103,0); pad_input_log("fire-R2",firing); }
     if(sprint!=pad_sprint) { pad_sprint=sprint; pad_input_log("sprint-L1",sprint); }
-    /* The original Xperia Triangle code 100 is context-dependent:
-     * quick turn when exploring, Stasis when aiming. On this port L3 owns
-     * the exploration action and Triangle is only sent during aim. */
-    if(action100!=pad_quickturn_stasis) {
-        pad_quickturn_stasis=action100;
+    /* Send the same existing game input code 100, but from the owner's
+     * physical buttons: L3 for 180 turn, R1 during aim for alternate fire.
+     * Triangle must NOT double-trigger alternate fire. */
+    if(action100!=pad_context_100) {
+        pad_context_100=action100;
         host_key(action100,100,0);
-        pad_input_log(action100?(quickturn?"quickturn-L3":"stasis-Triangle"):"turn-or-stasis-release",action100);
+        pad_input_log(action100?(quickturn?"quickturn-L3":"alternate-fire-L2-R1"):"quickturn-or-altfire-release",action100);
     }
     /* Route R3 locator through the existing down control only once even if
      * D-pad Down is also held. Menu support for D-pad Down is retained. */
@@ -447,11 +450,11 @@ static void pad_read(float* lx,float* ly,float* rx,float* ry) {
     }
     /* A Plasma Saw is already available in the tutorial: don't require L2,
      * a Plasma Cutter, or a weapon pickup before forwarding melee/stomp. */
-    if(saw && !pad_r1_held) pad_begin_swipe(-1,"R2-melee");
-    if(saw!=pad_r1_held) pad_input_log("plasma-saw-R2",saw);
+    if(saw && !pad_r1_held) pad_begin_swipe(-1,"R1-melee");
+    if(saw!=pad_r1_held) pad_input_log("plasma-saw-R1",saw);
     pad_r1_held=saw;
-    if(stomp && !pad_stomp_held) pad_begin_swipe(1,"R1-stomp");
-    if(stomp!=pad_stomp_held) pad_input_log("stomp-R1",stomp);
+    if(stomp && !pad_stomp_held) pad_begin_swipe(1,"R2-stomp");
+    if(stomp!=pad_stomp_held) pad_input_log("stomp-R2",stomp);
     pad_stomp_held=stomp;
     /* Native touchscreen game requires tapping doors and objects.
      * Retain DPAD_CENTER for menus, plus an independent centre-screen tap. */
