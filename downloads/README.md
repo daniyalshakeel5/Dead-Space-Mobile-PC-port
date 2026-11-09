@@ -28,6 +28,6 @@ coverage audit. No APK, assets, generated game C or saves are bundled.
 Physical controller hardware, motion hardware, campaign completion and long
 sessions are not yet verified.
 
-ZIP SHA256: `7b662c0f81eb79298062506c8e44bc161326a6991da0730a97fbadea60f7f555`
+ZIP SHA256: `7836cdb1c57ca8190a3d23b5a0237a5394ac72daec19ceefeb7c832864e227dc`
 
-EXE SHA256: `3e01a9f5ad0dee8ba2536df296246cbc93abffab78dbf892fea8b4faaa325490`
+EXE SHA256: `fa6991b4c52ebbeb0a17c9f2758a3e705327d45a847218a7229d3e8a7af52208`

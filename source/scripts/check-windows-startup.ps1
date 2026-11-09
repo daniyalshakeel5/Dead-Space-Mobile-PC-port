@@ -60,7 +60,7 @@ foreach ($label in $labels) {
         $env:DS_INPUT_DIAG = '1'
         $env:DS_NATIVE_PAD_TEST = '1'
         $presses = @(600,1200,1800,2400,3000,3600,4200,4800,5400,6000,6600,7200,7800,8400,9000,9600,10200)
-        $env:DS_CONTROLLER_BUTTONS = (($presses | ForEach-Object { "${_}:$($_ + 20):a" }) -join ',') + ',12000:12500:leftshoulder,13200:13220:rightshoulder'
+        $env:DS_CONTROLLER_BUTTONS = (($presses | ForEach-Object { "${_}:$($_ + 20):a" }) -join ',') + ',8800:8820:start,12000:12500:leftshoulder,13200:13220:rightshoulder'
         $env:DS_CONTROLLER_AXES = '11000:11800:0:-24000:0:0,12000:12800:18000:0:10000:0'
         $env:DS_CONTROLLER_TRIGGERS = '13500:13520:-32768:32767'
         $env:DS_SHOT = '14000:' + $frame.Replace('\','/')
@@ -97,6 +97,7 @@ foreach ($label in $labels) {
     if (Select-String -LiteralPath $stderr -SimpleMatch 'Windows SEH exception') { throw "$label reported a Windows exception." }
     if (!(Test-Path -LiteralPath $frame)) { throw "$label framebuffer capture is missing." }
     if ($label -eq 'native-controller') {
+        if (!(Select-String -LiteralPath $stderr -SimpleMatch '[NATIVE_PAD_CONTINUE]')) { throw 'No native loading-screen activation was observed.' }
         if (!(Select-String -LiteralPath $stderr -SimpleMatch '[NATIVE_PAD_MENU]')) { throw 'No native menu activation was observed.' }
         if (!(Select-String -LiteralPath $stderr -Pattern '\[NATIVE_PAD\].*active=1 move=(?!0\.000,0\.000)')) { throw 'Native controller did not reach gameplay movement.' }
         if (!(Select-String -LiteralPath $stderr -SimpleMatch '[NATIVE_PAD_STOMP]')) { throw 'Native stomp was not dispatched.' }
