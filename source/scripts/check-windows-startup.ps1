@@ -27,6 +27,7 @@ $env:DS_STEPS = 'create,surface,frame'
 $env:DS_FRAMES = '1200'
 $env:DS_WIDTH = '1366'
 $env:DS_HEIGHT = '768'
+$env:DS_FULLSCREEN = '0'
 $env:DS_RENDER_MIN_FAR = '1200'
 $env:DS_REANIMATED_TOUCH = '1'
 $env:DS_HD_TEXTURES = '0'
@@ -44,6 +45,9 @@ if ($ReanimatedApk) { $labels += 'reanimated-hd' }
 $labels += 'native-controller'
 if ($AudioProbeOnly) { $labels = @('audio-selftest','first-start') }
 foreach ($label in $labels) {
+    $env:DS_FULLSCREEN = if ($label -eq 'first-start') { '1' } else { '0' }
+    if ($label -eq 'first-start') { Remove-Item Env:DS_FULLSCREEN }
+    if ($label -eq 'existing-install') { $env:DS_KEY_HOLDS = '300:302:F11,600:602:F11' } else { Remove-Item Env:DS_KEY_HOLDS -ErrorAction SilentlyContinue }
     if ($label -eq 'audio-selftest') { $env:DS_AUDIO_SELFTEST = '1' }
     if ($label -eq 'reanimated-hd') {
         & powershell.exe -NoLogo -NoProfile -STA -ExecutionPolicy Bypass -File (Join-Path $root 'Launch.ps1') -Apk $ReanimatedApk -PrepareOnly
@@ -100,13 +104,25 @@ foreach ($label in $labels) {
         continue
     }
     if (!(Select-String -LiteralPath $stdout -Pattern '^ran frames')) { throw "$label did not complete the frame loop." }
-    if (!(Select-String -LiteralPath $stdout -Pattern 'window 1366x768, GL_RENDERER=')) { throw "$label did not create the expected OpenGL window." }
+    $displayLine = Select-String -LiteralPath $stderr -Pattern '\[DISPLAY\].*desktop=(\d+)x(\d+).*fullscreen=(\d) drawable=(\d+)x(\d+)' | Select-Object -First 1
+    if (!$displayLine) { throw "$label did not report display detection." }
+    $display = $displayLine.Matches[0].Groups
+    if ($label -eq 'first-start') {
+        if ($display[3].Value -ne '1' -or $display[1].Value -ne $display[4].Value -or $display[2].Value -ne $display[5].Value) { throw 'Default fullscreen does not match the detected desktop resolution.' }
+    } elseif ($display[3].Value -ne '0' -or $display[4].Value -ne '1366' -or $display[5].Value -ne '768') { throw "$label did not create the expected windowed regression surface." }
+    ($display[4].Value + ' ' + $display[5].Value) | Set-Content (Join-Path $evidence ($label + '-frame-size.txt'))
+    if ($label -eq 'existing-install') {
+        $toggles = @(Select-String -LiteralPath $stderr -Pattern '\[DISPLAY_TOGGLE\] fullscreen=(\d)')
+        if ($toggles.Count -ne 2 -or $toggles[0].Matches[0].Groups[1].Value -ne '1' -or $toggles[1].Matches[0].Groups[1].Value -ne '0') { throw 'F11 fullscreen/windowed round trip failed.' }
+    }
     if (!(Select-String -LiteralPath $stderr -SimpleMatch '[WINDOWS_ACCEL] initialized stationary logical sensor')) { throw "$label did not initialize the Windows sensor bridge." }
     if (Select-String -LiteralPath $stderr -SimpleMatch 'Windows SEH exception') { throw "$label reported a Windows exception." }
     if (!(Test-Path -LiteralPath $frame)) { throw "$label framebuffer capture is missing." }
     $audioClock = Select-String -LiteralPath $stderr -Pattern '\[AUDIO_CLOCK\].*empty_writes=(\d+)' | Select-Object -Last 1
     if (!$audioClock) { throw "$label audio clock evidence is missing." }
     if ([int]$audioClock.Matches[0].Groups[1].Value -gt 8) { throw "$label audio repeatedly ran out of queued PCM." }
+    $audioRate = Select-String -LiteralPath $stderr -Pattern '\[AUDIO_CLOCK\].*nominal_rate=(\d+) measured_rate=([\d.]+)' | Select-Object -Last 1
+    if (!$audioRate -or [double]::Parse($audioRate.Matches[0].Groups[2].Value,[System.Globalization.CultureInfo]::InvariantCulture) -lt [int]$audioRate.Matches[0].Groups[1].Value * 0.9) { throw "$label audio delivery remains below 90 percent of its nominal rate." }
     if ($label -eq 'native-controller') {
         if (!(Select-String -LiteralPath $stderr -SimpleMatch '[NATIVE_PAD_CONTINUE]')) { throw 'No native loading-screen activation was observed.' }
         if (!(Select-String -LiteralPath $stderr -SimpleMatch '[NATIVE_PAD_MENU]')) { throw 'No native menu activation was observed.' }
