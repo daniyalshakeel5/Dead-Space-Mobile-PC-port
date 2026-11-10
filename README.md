@@ -5,6 +5,7 @@ compiles it into a native **32-bit x86 (i686)** executable. SDL supplies the
 window, touchscreen events and audio output; a compatibility runtime supplies
 the Android/JNI, graphics, file and threading interfaces the game expects.
 
+- [Community handoff, pull-request triage, and contributor priorities](docs/COMMUNITY_HANDOFF_AND_PR_TRIAGE_2026-11-11.md)
 - [All port source, launchers and tests](source/README.md)
 - [Full technical breakdown and build instructions](docs/TECHNICAL_BUILD_GUIDE.md)
 - [Installation instructions and dependencies](docs/INSTALLATION_AND_DEPENDENCIES.md)
@@ -12,7 +13,7 @@ the Android/JNI, graphics, file and threading interfaces the game expects.
 - [Collision and accelerometer investigation](docs/LINUX_COLLISION_AND_ACCEL_FIX_2026-11-08.md)
 - [768p and audio validation](docs/LINUX_AUDIO_AND_768P_2026-11-08.md)
 
-**Gameplay status: USER-VERIFIED PLAYABLE.** The user reports approximately **two hours of actual gameplay** on the finalized Linux build. This is an extended hands-on gameplay report, not just a startup or synthetic test. It does not imply a completed campaign or verification on other platforms.
+**Gameplay status: USER-VERIFIED PLAYABLE ON LINUX AND WINDOWS.** The owner reports approximately **two hours of actual gameplay on Linux** and **one hour on Windows**, with excellent visuals and performance observed on Windows. These are hands-on gameplay reports, not merely successful startup or synthetic tests; they do not imply full-campaign completion or verification of every peripheral. The Windows build and its dependencies are tracked separately from the Linux release.
 
 On the tested Google Phaser360 Linux device, the build uses a 1366×768 drawable
 and matching touch coordinates. The user confirmed working hit detection,
