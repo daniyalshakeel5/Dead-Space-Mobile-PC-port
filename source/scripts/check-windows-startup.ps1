@@ -39,7 +39,7 @@ $env:SDL_AUDIODRIVER = 'dummy'
 $env:GALLIUM_DRIVER = 'llvmpipe'
 $env:LIBGL_ALWAYS_SOFTWARE = '1'
 $so = (Join-Path $root 'game/lib/armeabi/libDeadSpace.so').Replace('\','/')
-$labels = @('first-start','existing-install')
+$labels = @('audio-selftest','first-start','existing-install')
 if ($ReanimatedApk) { $labels += 'reanimated-hd' }
 $labels += 'native-controller'
 if ($AudioProbeOnly) { $labels = @('audio-selftest','first-start') }
@@ -104,6 +104,9 @@ foreach ($label in $labels) {
     if (!(Select-String -LiteralPath $stderr -SimpleMatch '[WINDOWS_ACCEL] initialized stationary logical sensor')) { throw "$label did not initialize the Windows sensor bridge." }
     if (Select-String -LiteralPath $stderr -SimpleMatch 'Windows SEH exception') { throw "$label reported a Windows exception." }
     if (!(Test-Path -LiteralPath $frame)) { throw "$label framebuffer capture is missing." }
+    $audioClock = Select-String -LiteralPath $stderr -Pattern '\[AUDIO_CLOCK\].*empty_writes=(\d+)' | Select-Object -Last 1
+    if (!$audioClock) { throw "$label audio clock evidence is missing." }
+    if ([int]$audioClock.Matches[0].Groups[1].Value -gt 8) { throw "$label audio repeatedly ran out of queued PCM." }
     if ($label -eq 'native-controller') {
         if (!(Select-String -LiteralPath $stderr -SimpleMatch '[NATIVE_PAD_CONTINUE]')) { throw 'No native loading-screen activation was observed.' }
         if (!(Select-String -LiteralPath $stderr -SimpleMatch '[NATIVE_PAD_MENU]')) { throw 'No native menu activation was observed.' }
