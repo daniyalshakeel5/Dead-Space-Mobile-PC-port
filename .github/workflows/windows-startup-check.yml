@@ -9,6 +9,7 @@ on:
       - downloads/DeadSpaceMobile-Windows-Startup-Fix.zip
       - downloads/DeadSpaceMobile-Windows-Native-Controller.zip
       - downloads/DeadSpaceMobile-Windows-Audio-Fix.zip
+      - downloads/DeadSpaceMobile-Windows-Gesture-Fix.zip
       - downloads/diagnostics/windows-accel-check.exe
   workflow_dispatch:
 
@@ -39,12 +40,12 @@ jobs:
           Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/GINESTR0/DeadSpaceReanimated/releases/download/v1.3/DeadSpaceReanimated-1.3.apk' -OutFile (Join-Path $inputs 'reanimated.apk')
           gh release download 26.2.6 --repo mmozeiko/build-mesa --pattern 'mesa-llvmpipe-x86-26.2.6.7z' --dir $inputs
           if ($LASTEXITCODE -ne 0) { throw 'Test-only Mesa download failed.' }
-      - name: Verify Windows audio, native fullscreen, startup and controller
+      - name: Verify Windows gesture build, audio, fullscreen and native controller
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $inputs = Join-Path $env:RUNNER_TEMP 'windows-startup-inputs'
-          & ./source/scripts/check-windows-startup.ps1 -PackageZip (Join-Path $env:GITHUB_WORKSPACE 'downloads/DeadSpaceMobile-Windows-Audio-Fix.zip') -Apk (Join-Path $inputs 'original.apk') -ReanimatedApk (Join-Path $inputs 'reanimated.apk') -MesaArchive (Join-Path $inputs 'mesa-llvmpipe-x86-26.2.6.7z') -WorkRoot (Join-Path $env:RUNNER_TEMP 'windows-startup')
+          & ./source/scripts/check-windows-startup.ps1 -PackageZip (Join-Path $env:GITHUB_WORKSPACE 'downloads/DeadSpaceMobile-Windows-Gesture-Fix.zip') -Apk (Join-Path $inputs 'original.apk') -ReanimatedApk (Join-Path $inputs 'reanimated.apk') -MesaArchive (Join-Path $inputs 'mesa-llvmpipe-x86-26.2.6.7z') -WorkRoot (Join-Path $env:RUNNER_TEMP 'windows-startup')
       - name: Check and convert genuine framebuffer captures
         shell: powershell
         run: |
