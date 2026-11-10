@@ -3,7 +3,8 @@ param(
     [Parameter(Mandatory=$true)][string]$Apk,
     [Parameter(Mandatory=$true)][string]$MesaArchive,
     [Parameter(Mandatory=$true)][string]$WorkRoot,
-    [string]$ReanimatedApk
+    [string]$ReanimatedApk,
+    [switch]$AudioProbeOnly
 )
 $ErrorActionPreference = 'Stop'
 $evidence = Join-Path $WorkRoot 'evidence'
@@ -41,7 +42,9 @@ $so = (Join-Path $root 'game/lib/armeabi/libDeadSpace.so').Replace('\','/')
 $labels = @('first-start','existing-install')
 if ($ReanimatedApk) { $labels += 'reanimated-hd' }
 $labels += 'native-controller'
+if ($AudioProbeOnly) { $labels = @('audio-selftest','first-start') }
 foreach ($label in $labels) {
+    if ($label -eq 'audio-selftest') { $env:DS_AUDIO_SELFTEST = '1' }
     if ($label -eq 'reanimated-hd') {
         & powershell.exe -NoLogo -NoProfile -STA -ExecutionPolicy Bypass -File (Join-Path $root 'Launch.ps1') -Apk $ReanimatedApk -PrepareOnly
         if ($LASTEXITCODE -ne 0) { throw 'Reanimated HD preparation failed.' }
@@ -91,6 +94,11 @@ foreach ($label in $labels) {
     Get-Content $stderr -Tail 45
     if (!$finished) { throw "$label timed out after $($timeout / 1000) seconds." }
     if ($exitCode -ne 0) { throw "$label exited with $exitCode." }
+    if ($label -eq 'audio-selftest') {
+        if (!(Select-String -LiteralPath $stderr -SimpleMatch '[AUDIO_SELFTEST]')) { throw 'Audio timing self-test did not run.' }
+        Remove-Item Env:DS_AUDIO_SELFTEST
+        continue
+    }
     if (!(Select-String -LiteralPath $stdout -Pattern '^ran frames')) { throw "$label did not complete the frame loop." }
     if (!(Select-String -LiteralPath $stdout -Pattern 'window 1366x768, GL_RENDERER=')) { throw "$label did not create the expected OpenGL window." }
     if (!(Select-String -LiteralPath $stderr -SimpleMatch '[WINDOWS_ACCEL] initialized stationary logical sensor')) { throw "$label did not initialize the Windows sensor bridge." }
@@ -104,4 +112,5 @@ foreach ($label in $labels) {
         if (Select-String -LiteralPath $stderr -Pattern '\[LEGACY_INPUT\] (key|pointer kind=[01])') { throw 'Controller test generated legacy touch/key input.' }
     }
 }
-('PASS: Windows startup plus 14000-frame native-controller run, without legacy touch/key input: ' + ($labels -join ', ')) | Set-Content (Join-Path $evidence 'result.txt')
+$summary = if ($AudioProbeOnly) { 'PASS: Windows audio timing probe and original-game startup: ' } else { 'PASS: Windows startup plus 14000-frame native-controller run, without legacy touch/key input: ' }
+($summary + ($labels -join ', ')) | Set-Content (Join-Path $evidence 'result.txt')
