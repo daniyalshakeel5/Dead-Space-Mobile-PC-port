@@ -1,49 +1,63 @@
-# Windows Native Controller Build
+# Windows Audio And Fullscreen Build
 
-[Download the native-controller Windows ZIP](DeadSpaceMobile-Windows-Native-Controller.zip?raw=true)
+[Download the updated Windows ZIP](DeadSpaceMobile-Windows-Audio-Fix.zip?raw=true)
 
-Replaces the old touchscreen/keyboard pad frontend with original game movement,
-look, combat events and live menu-button callbacks. Controller input does not
-generate screen taps, swipes or Android keyboard codes. The implementation is
-reconstructed from the latest Linux release executable and its documented DS2
-layout, including the equipped-weapon guard and unarmed melee/stomp behavior.
+Windows now detects the display under the pointer and starts in borderless
+fullscreen at its desktop resolution. Per-monitor DPI awareness keeps rendering
+and mouse coordinates aligned. F11 toggles fullscreen/windowed; `Launch.ps1
+-Windowed` starts in a window.
 
-Copy the package files into your existing installation. Keep `game` and
+The audio submission loop uses high-resolution Windows deadlines that account
+for processing time, with higher-priority mixer/submission threads, prebuffering
+and prompt low-water refilling. The queue starts at 4096 frames; underruns add
+bounded headroom up to 12288 frames (256 ms at 48 kHz), which decays after stable
+playback. Resizing never discards PCM. The original 48 kHz stereo mixer and
+decoders are unchanged.
+
+Native controller movement, look, combat events and live menu callbacks remain.
+The controller path does not generate screen taps, swipes or Android key codes.
+The original game's touchscreen tutorial artwork remains unchanged.
+
+Copy the package files into the existing installation. Keep `game` and
 `userdata`. New installations can select the upstream Fixes or Reanimated APK.
-The earlier accelerometer startup fix, original EA audio mixer, VFP/physics
-fixes and optional HD texture support remain included.
+The sensor startup, VFP/physics and optional HD-texture fixes remain included.
+No APK, assets, generated game C, saves or test-only Mesa libraries are bundled.
+The maintained source patch and coverage audit are included in the ZIP.
 
-**[Windows verification passed](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42756082739)**
+## Verification
 
-- Fresh start, existing-install relaunch and Reanimated HD startup: 1,200 frames
-  each, exit code 0.
-- Native controller: 14,000 genuine-game frames, exit code 0, driven only by an
-  SDL virtual pad. Native loading-screen continue, difficulty OK and pause/resume
-  callbacks were recorded.
-- Gameplay analog movement/look, unarmed melee and stomp were recorded. Captures
-  show the character moving through the opening level and advancing its tutorials.
-- No legacy touch or Android-key input was generated in the controller run.
-  All eleven captures were nonblank 1366x768 framebuffers.
+**[Windows verification passed](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42766234928)**
 
-The Windows-tested EXE hash matches the ZIP below. Test-only Mesa and SDL dummy
-audio were used; physical GPU/audio behavior is not established by this run.
-All 27 local regressions also pass, including native event layouts, unarmed
-aim/fire safety, hold release, stale/disconnected input, VFP preservation, live
-menu identity checks and native loading-screen continuation. Win32 host linking
-also passed. Armed combat and later campaign workflows still need gameplay tests.
+- Default startup detected the runner's 1024x768 desktop and opened native-size
+  borderless fullscreen. The existing-install case passed an F11 round trip.
+- Fresh start, existing-install relaunch and Reanimated HD startup each completed
+  1200 genuine-game frames with exit code 0 and no empty audio queues.
+- The native-controller run completed 14000 frames with exit code 0, no legacy
+  touch/key input, native menu/loading continuation and gameplay movement/stomp.
+  PCM delivery measured 46647 frames/sec with no empty writes over 330 seconds.
+- The one-second deadline test, including 200 ms of simulated processing work,
+  measured 1002 ms. Two injected 45 ms stalls caused no empty audio queues.
+- All eleven captures passed nonblank framebuffer checks at their expected sizes.
 
-The original game's touch tutorial artwork/text remains; this does not mean the
-controller is emulating touches. The recorded controller run generated none.
+All 29 local regressions pass, including native controller semantics, donor-hook
+guards, deadline pacing, bounded audio-buffer growth/decay, queued-PCM
+preservation, sensor behavior and VFP state. The SDL and non-SDL Win32 hosts link.
+The public download was fetched back and its SHA256 matches the local package.
 
-The [previous startup-fix build](DeadSpaceMobile-Windows-Startup-Fix.zip?raw=true)
-passed [three Windows startup runs](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42690400367),
-but retained the old controller frontend. Do not use it for native pad testing.
+Windows Actions uses test-only software OpenGL and SDL dummy audio. It can check
+PCM delivery timing and queue health, not audible WASAPI hardware quality.
+Physical audio, multi-monitor/high-DPI hardware, armed combat, campaign completion
+and long-session behavior still need hardware gameplay testing.
 
-The ZIP includes the maintained source patch, build information, controls and
-coverage audit. No APK, assets, generated game C or saves are bundled.
-Physical controller hardware, motion hardware, campaign completion and long
-sessions are not yet verified.
+ZIP SHA256: `21da356dc206ea97f85dd96414cdf4c91c75f7690ccde70d4a9601c8d762f500`
 
-ZIP SHA256: `42b9cd5e44b41c9d1c0f5ed233db20998c254cc193d199f9a29b6c3660372a98`
+EXE SHA256: `f51152e3108b0293907cdaf551e16a216359d51981bc1d9f65c159834dcbc27b`
 
-EXE SHA256: `3ca956224167f5df7771d0d5592c822c6282091c328d2c6bcf0f4e14bb406ca0`
+## Previous Builds
+
+[Previous native-controller build](DeadSpaceMobile-Windows-Native-Controller.zip?raw=true):
+[Windows startup/controller verification](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42756082739)
+passed, but this build predates the audio pacing and automatic fullscreen changes.
+
+[Original startup-fix build](DeadSpaceMobile-Windows-Startup-Fix.zip?raw=true)
+retains the old controller frontend. Do not use it for native-controller testing.
