@@ -13,11 +13,27 @@ Copy the package files into your existing installation. Keep `game` and
 The earlier accelerometer startup fix, original EA audio mixer, VFP/physics
 fixes and optional HD texture support remain included.
 
-Local asset-free native-controller, generator and Win32 host-link tests pass.
-The Windows workflow tests the genuine game with a virtual SDL pad, captures
-framebuffers, and rejects legacy pointer/key generation. Its latest run is
-listed in [Actions](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/workflows/windows-startup-check.yml).
-Runtime verification is pending for this new native-controller ZIP.
+**[Windows verification passed](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42756082739)**
+
+- Fresh start, existing-install relaunch and Reanimated HD startup: 1,200 frames
+  each, exit code 0.
+- Native controller: 14,000 genuine-game frames, exit code 0, driven only by an
+  SDL virtual pad. Native loading-screen continue, difficulty OK and pause/resume
+  callbacks were recorded.
+- Gameplay analog movement/look, unarmed melee and stomp were recorded. Captures
+  show the character moving through the opening level and advancing its tutorials.
+- No legacy touch or Android-key input was generated in the controller run.
+  All eleven captures were nonblank 1366x768 framebuffers.
+
+The Windows-tested EXE hash matches the ZIP below. Test-only Mesa and SDL dummy
+audio were used; physical GPU/audio behavior is not established by this run.
+All 27 local regressions also pass, including native event layouts, unarmed
+aim/fire safety, hold release, stale/disconnected input, VFP preservation, live
+menu identity checks and native loading-screen continuation. Win32 host linking
+also passed. Armed combat and later campaign workflows still need gameplay tests.
+
+The original game's touch tutorial artwork/text remains; this does not mean the
+controller is emulating touches. The recorded controller run generated none.
 
 The [previous startup-fix build](DeadSpaceMobile-Windows-Startup-Fix.zip?raw=true)
 passed [three Windows startup runs](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/42690400367),
