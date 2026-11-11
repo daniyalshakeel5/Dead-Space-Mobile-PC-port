@@ -68,6 +68,12 @@ public static class DesktopProbe {
     [DllImport("user32.dll")] static extern bool PostMessage(IntPtr window,uint message,IntPtr key,IntPtr data);
     [DllImport("user32.dll")] static extern uint MapVirtualKey(uint key,uint type);
     [DllImport("user32.dll")] static extern bool GetCursorInfo(ref CursorInfo info);
+    [DllImport("user32.dll")] static extern IntPtr LoadCursor(IntPtr instance,IntPtr name);
+    [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr window,uint message,IntPtr wparam,IntPtr lparam);
+    [DllImport("user32.dll")] static extern bool DrawIconEx(IntPtr dc,int x,int y,IntPtr icon,int width,int height,uint step,IntPtr brush,uint flags);
+    [DllImport("user32.dll")] static extern bool GetIconInfo(IntPtr icon,out IconInfo info);
+    [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr obj);
+    [StructLayout(LayoutKind.Sequential)] struct IconInfo { public bool Icon; public int HotX,HotY; public IntPtr Mask,Color; }
     [DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
     public static Rectangle Client(IntPtr window) {
         Rect r; Point p=new Point();
@@ -84,6 +90,18 @@ public static class DesktopProbe {
         CursorInfo info=new CursorInfo(); info.Size=Marshal.SizeOf(typeof(CursorInfo));
         return GetCursorInfo(ref info)&&(info.Flags&1)!=0;
     }
+    public static bool NativeArrow(IntPtr window) {
+        if(SendMessage(window,0x20,window,new IntPtr(1)).ToInt64()!=1) return false;
+        CursorInfo info=new CursorInfo(); info.Size=Marshal.SizeOf(typeof(CursorInfo));
+        return GetCursorInfo(ref info)&&info.Cursor==LoadCursor(IntPtr.Zero,new IntPtr(32512));
+    }
+    public static void CheckResizeBorder(IntPtr window) {
+        if((GetWindowLong(window,-16)&0x40000)==0) throw new Exception("Window lost its thick resize frame");
+        Rect r; GetWindowRect(window,out r);
+        long point=((r.Bottom-3)&0xffff)<<16|((r.Right-3)&0xffff);
+        if(SendMessage(window,0x84,IntPtr.Zero,new IntPtr(point)).ToInt64()!=17)
+            throw new Exception("Bottom-right border does not support native resizing");
+    }
     public static void ResizeClient(IntPtr window,int width,int height) {
         Rect old; GetWindowRect(window,out old);
         Rect r=new Rect(); r.Right=width; r.Bottom=height;
@@ -93,7 +111,21 @@ public static class DesktopProbe {
     public static void Capture(IntPtr window,string path) {
         Rectangle r=Client(window);
         using(Bitmap bitmap=new Bitmap(r.Width,r.Height,PixelFormat.Format24bppRgb)) {
-            using(Graphics graphics=Graphics.FromImage(bitmap)) graphics.CopyFromScreen(r.Location,System.Drawing.Point.Empty,r.Size);
+            using(Graphics graphics=Graphics.FromImage(bitmap)) {
+                graphics.CopyFromScreen(r.Location,System.Drawing.Point.Empty,r.Size);
+                bitmap.Save(path+".without-cursor.png",ImageFormat.Png);
+                CursorInfo cursor=new CursorInfo(); cursor.Size=Marshal.SizeOf(typeof(CursorInfo));
+                IconInfo icon;
+                if(!GetCursorInfo(ref cursor)||cursor.Cursor==IntPtr.Zero||!GetIconInfo(cursor.Cursor,out icon))
+                    throw new Exception("Native capture cursor unavailable");
+                try {
+                    IntPtr dc=graphics.GetHdc();
+                    try {
+                        if(!DrawIconEx(dc,cursor.Position.X-r.Left-icon.HotX,cursor.Position.Y-r.Top-icon.HotY,
+                                       cursor.Cursor,0,0,0,IntPtr.Zero,3)) throw new Exception("Native cursor capture failed");
+                    } finally { graphics.ReleaseHdc(dc); }
+                } finally { if(icon.Mask!=IntPtr.Zero) DeleteObject(icon.Mask); if(icon.Color!=IntPtr.Zero) DeleteObject(icon.Color); }
+            }
             bitmap.Save(path,ImageFormat.Png);
         }
     }
@@ -121,6 +153,7 @@ public static class DesktopProbe {
         $rect = [DesktopProbe]::Client($gameWindow)
         [DesktopProbe]::SetCursorPos($rect.Left+72,$rect.Top+60) | Out-Null
         Start-Sleep -Milliseconds 300
+        if(![DesktopProbe]::NativeArrow($gameWindow)) { throw 'The game client did not select the native system arrow.' }
         [DesktopProbe]::Key($gameWindow,0x7b)
         $script:desktopProbeSerial++
         $number = $script:desktopProbeSerial
@@ -159,6 +192,7 @@ public static class DesktopProbe {
         $script:desktopProbeOsCursor=[DesktopProbe]::CursorVisible()
         ("OS cursor baseline supported: "+$script:desktopProbeOsCursor) | Set-Content (Join-Path $OutDir 'desktop-cursor-baseline.txt')
         $probe.Hide()
+        [DesktopProbe]::CheckResizeBorder($gameWindow)
         [void](Capture-Game 'desktop-windowed')
         Click-Away
         $probe.Hide(); [DesktopProbe]::SetForegroundWindow($gameWindow) | Out-Null
@@ -172,6 +206,7 @@ public static class DesktopProbe {
             Start-Sleep -Milliseconds 200
         }
         [DesktopProbe]::Key($gameWindow,0x7a); Start-Sleep -Milliseconds 300
+        [DesktopProbe]::CheckResizeBorder($gameWindow)
         Click-Away
         [DesktopProbe]::ResizeClient($gameWindow,900,540)
         Start-Sleep -Milliseconds 200
@@ -179,7 +214,7 @@ public static class DesktopProbe {
         $resized = Capture-Game 'desktop-restored'
         if ($resized.Width -ne 900 -or $resized.Height -ne 540) { throw 'Background resize did not survive focus restoration.' }
         Copy-Item (Join-Path $OutDir 'cursor-3.ppm') (Join-Path $OutDir 'desktop-integration.ppm')
-        'PASS: real click-away cycles, unminimized fullscreen, external cursor visibility, background resize and desktop capture.' | Set-Content (Join-Path $OutDir 'desktop-result.txt')
+        'PASS: real click-away cycles, unminimized fullscreen, native client cursor, restored resize-border hit testing, background resize and native-cursor desktop capture.' | Set-Content (Join-Path $OutDir 'desktop-result.txt')
     } finally {
         for ($show=0;$show -lt $cursorShows;$show++) { [System.Windows.Forms.Cursor]::Hide() }
         $probe.Dispose(); [DesktopProbe]::SetForegroundWindow($gameWindow) | Out-Null
@@ -281,17 +316,17 @@ foreach ($label in $labels) {
         '900 540' | Set-Content (Join-Path $evidence ($label+'-frame-size.txt'))
         $pauses=@(Select-String -LiteralPath $stderr -SimpleMatch '[APP_LIFECYCLE] pause')
         if ($pauses.Count -lt 5) { throw 'Real desktop focus-loss events were not observed.' }
-        $samples=@(Select-String -LiteralPath $stderr -Pattern '\[CURSOR_PROBE\] serial=(\d+) drawn=1 sample=(\d+),(\d+)')
-        if ($samples.Count -ne 3) { throw 'The in-frame cursor was not rendered in all three capture probes.' }
+        $samples=@(Select-String -LiteralPath $stderr -Pattern '\[CURSOR_PROBE\] serial=(\d+) native=1 relative=0 shown=1')
+        if ($samples.Count -ne 3) { throw 'The native cursor was not enabled in all three capture probes.' }
         $names=@('desktop-windowed','desktop-fullscreen','desktop-restored')
         for ($n=0;$n -lt 3;$n++) {
-            $groups=$samples[$n].Matches[0].Groups
-            python -c "import sys; from PIL import Image; a=Image.open(sys.argv[1]).convert('RGB'); b=Image.open(sys.argv[2]).convert('RGB'); assert a.size==b.size,(a.size,b.size); p=tuple(map(int,sys.argv[3:5])); assert min(a.getpixel(p))>240,('Game cursor missing',p,a.getpixel(p)); assert min(b.getpixel(p))>240,('Desktop cursor missing',p,b.getpixel(p)); assert any(lo!=hi for lo,hi in b.getextrema()),'Blank external capture'; print('PASS: game/desktop capture cursor',a.size,p)" (Join-Path $evidence ("cursor-$($n+1).ppm")) (Join-Path $evidence ($names[$n]+'.png')) $groups[2].Value $groups[3].Value
-            if ($LASTEXITCODE -ne 0) { throw 'External desktop capture or cursor pixels did not match.' }
+            python -c "import sys; from PIL import Image,ImageChops; a=Image.open(sys.argv[1]).convert('RGB'); b=Image.open(sys.argv[2]).convert('RGB'); c=Image.open(sys.argv[2]+'.without-cursor.png').convert('RGB'); assert a.size==b.size==c.size,(a.size,b.size,c.size); box=ImageChops.difference(b,c).getbbox(); assert box and box[0]>=72 and box[1]>=60 and box[2]<=136 and box[3]<=124,('Native cursor not isolated',box); assert any(lo!=hi for lo,hi in c.getextrema()),'Blank external capture'; print('PASS: native cursor captured separately from game',a.size,box)" (Join-Path $evidence ("cursor-$($n+1).ppm")) (Join-Path $evidence ($names[$n]+'.png'))
+            if ($LASTEXITCODE -ne 0) { throw 'External desktop capture or native cursor did not match.' }
         }
     }
     if (!(Select-String -LiteralPath $stderr -SimpleMatch '[WINDOWS_HOST] console_attached=0')) { throw "$label inherited a console." }
-    if (!(Select-String -LiteralPath $stderr -SimpleMatch '[DESKTOP_WINDOW] presentation=composited-borderless sdl_fullscreen=0 auto_minimize=0')) { throw "$label is not using the capture-compatible window path." }
+    if (!(Select-String -LiteralPath $stderr -Pattern '\[DESKTOP_WINDOW\] presentation=sdl-desktop sdl_fullscreen=[01] resizable=1 auto_minimize=0')) { throw "$label is not using SDL-managed resizable windows." }
+    if (!(Select-String -LiteralPath $stderr -SimpleMatch '[DESKTOP_CURSOR] renderer=native subclass=1 framebuffer_overlay=0')) { throw "$label did not initialize the native cursor." }
     if ($label -eq 'existing-install') {
         $toggles = @(Select-String -LiteralPath $stderr -Pattern '\[DISPLAY_TOGGLE\] fullscreen=(\d)')
         if ($toggles.Count -ne 2 -or $toggles[0].Matches[0].Groups[1].Value -ne '1' -or $toggles[1].Matches[0].Groups[1].Value -ne '0') { throw 'F11 fullscreen/windowed round trip failed.' }

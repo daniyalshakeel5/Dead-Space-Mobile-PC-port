@@ -1,61 +1,50 @@
-# Windows Desktop Fix Candidate
+# Windows Desktop Repair R2 Candidate
 
-[Download the desktop-fix Windows ZIP](DeadSpaceMobile-Windows-Desktop-Fix.zip?raw=true)
+[Download the R2 Windows ZIP](DeadSpaceMobile-Windows-Desktop-Fix.zip?raw=true)
 
-This candidate addresses the reported fullscreen cursor, recording and
-click-away problems while retaining the campaign-tested native controls,
-grab gestures and audio implementation.
+**The first desktop candidate is withdrawn:** the owner reported cursor trails
+after clicking outside and inability to resize in windowed mode.
 
-- The Windows system arrow is drawn into the game framebuffer, including
-  screenshots and captures, whenever mouse-look capture is off.
-- Native-resolution fullscreen uses a normal composited borderless window,
-  without exclusive fullscreen ownership or automatic minimize on focus loss.
-- Tracked inputs are released before pause; unmatched pointer releases and
-  input into a paused guest are suppressed. Background resize is applied on
-  resume, and paused loops no longer consume the requested frame budget.
-- The game is a GUI executable, not a console application. The launcher runs
-  hidden and reports errors graphically while retaining session logs.
+R2 removes the framebuffer cursor overlay and custom borderless-window code.
+It selects the native Windows arrow only inside the game client and restores
+SDL-managed desktop fullscreen and native window resizing. F11 restores the
+saved window placement. Resize-border cursors remain Windows-managed.
 
-Copy the files into the existing installation, keeping `game` and `userdata`.
-Back up `userdata` before testing. F11 switches fullscreen/windowed; F1 remains
-the mouse-look capture toggle. The native-controller/gesture mappings are
-unchanged. No APK, game assets, generated game C or saves are bundled.
+The GUI executable, hidden launcher, matched input release before pause,
+unfocused input suppression and pending resize on resume are retained.
+Native controls, grab gestures, audio, sensor and threading changes match the
+campaign-tested gesture package; no gameplay changes were made for R2.
+
+Copy the update files into the existing installation, keeping `game` and
+`userdata`. Back up `userdata` before testing. No APK, game assets, generated
+game C or saves are bundled.
 
 ## Verification
 
-**[Full Windows regression is queued](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/actions/runs/43096098131). It has not passed yet.**
+**R2 is a candidate, not yet Windows-runtime certified.** The approved Windows
+workflow is triggered by this upload; see the branch's Actions run for status.
 
-All 31 local regressions pass, including input release before pause, duplicate
-focus handling, controller/gesture semantics, capture intent, sensors, audio
-pacing and VFP preservation. The native GUI game and synthetic GUI/non-GUI
-Win32 hosts compile/link; GUI subsystem 2 is verified. The public ZIP checksum
-matches the local package.
+All 32 local regressions pass. The new native-cursor fixture checks client-only
+handling, delegation of native resize cursors, capture/focus refresh and no
+per-frame cursor resets. The complete native Windows GUI game and synthetic
+Windows hosts link successfully. GUI subsystem 2 and package checksums pass.
 
-A preceding candidate passed Windows fresh/existing/HD startups and produced
-an external desktop screenshot containing the game image and in-frame cursor.
-Its integration probe stopped at the outside-window OS-cursor assertion.
-The revised probe establishes a headless OS-cursor baseline, independently
-requires visible in-frame cursor pixels, and exercises actual click-away/
-resume cycles, background resize and desktop captures. Its full result is
-still pending; none of these notes claim complete Windows runtime validation.
+The Windows integration checks now require the native arrow, thick resize-frame
+style and bottom-right resize hit testing before and after F11, real click-away
+cycles, background resize and desktop capture with separate native-cursor
+composition. No framebuffer cursor pixels are expected or drawn by the game.
 
-The owner reports completing the campaign on the prior gesture build. That
-does not certify a full playthrough of this new desktop-only rebuild.
+Actual OBS hooks/encoders, ShareX configurations and multi-monitor hardware
+still need verification. Use the game process/window, not PowerShell, and
+enable the recorder's Capture Cursor option. OpenGL generally needs Game
+Capture or modern Windows Graphics Capture; legacy BitBlt-only capture may fail.
 
-## Capture Scope
+ZIP SHA256: `980f24224fc3343f5e86f8949802dec360b97013f63042d621fe143e74b334eb`
 
-Use the actual Dead Space Mobile process/window, not a launcher console.
-For OpenGL, use OBS Game Capture or modern Windows Graphics Capture. Legacy
-BitBlt-only window capture can still be incompatible with OpenGL. ShareX
-desktop/region capture uses the composited desktop path. Actual OBS hooks,
-encoder configurations, multi-monitor/DPI hardware and the reported click-away
-problem still require verification on the owner's PC.
+EXE SHA256: `6714effe68b455702538bf70898e86ecdfd64b82a557d86056cf23358155f94c`
 
-ZIP SHA256: `b65ac9ec0211fb7202ce33661569af8924fc9311d6d390dd259e1746e9a7dec6`
+## Known-Good Fallback
 
-EXE SHA256: `91987664942a335364e40a1497ef7bd904737096ddd229b95aed40fc27c9a0b0`
-
-## Previous Build
-
-[Campaign-tested gesture build](DeadSpaceMobile-Windows-Gesture-Fix.zip?raw=true)
-is retained as a fallback. It predates the desktop fixes in this candidate.
+[Campaign-tested gesture build](https://github.com/daniyalshakeel5/Dead-Space-Mobile-PC-port/raw/0e44209bf87ff0f5f4bfc479730ce3f47ee14c6e/downloads/DeadSpaceMobile-Windows-Gesture-Fix.zip)
+is retained unchanged. It predates the desktop repairs; the owner completed the
+campaign on that build, not on R2.
