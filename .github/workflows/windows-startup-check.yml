@@ -10,6 +10,7 @@ on:
       - downloads/DeadSpaceMobile-Windows-Native-Controller.zip
       - downloads/DeadSpaceMobile-Windows-Audio-Fix.zip
       - downloads/DeadSpaceMobile-Windows-Gesture-Fix.zip
+      - downloads/DeadSpaceMobile-Windows-Desktop-Fix.zip
       - downloads/diagnostics/windows-accel-check.exe
   workflow_dispatch:
 
@@ -40,17 +41,20 @@ jobs:
           Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/GINESTR0/DeadSpaceReanimated/releases/download/v1.3/DeadSpaceReanimated-1.3.apk' -OutFile (Join-Path $inputs 'reanimated.apk')
           gh release download 26.2.6 --repo mmozeiko/build-mesa --pattern 'mesa-llvmpipe-x86-26.2.6.7z' --dir $inputs
           if ($LASTEXITCODE -ne 0) { throw 'Test-only Mesa download failed.' }
-      - name: Verify Windows gesture build, audio, fullscreen and native controller
-        shell: powershell
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $inputs = Join-Path $env:RUNNER_TEMP 'windows-startup-inputs'
-          & ./source/scripts/check-windows-startup.ps1 -PackageZip (Join-Path $env:GITHUB_WORKSPACE 'downloads/DeadSpaceMobile-Windows-Gesture-Fix.zip') -Apk (Join-Path $inputs 'original.apk') -ReanimatedApk (Join-Path $inputs 'reanimated.apk') -MesaArchive (Join-Path $inputs 'mesa-llvmpipe-x86-26.2.6.7z') -WorkRoot (Join-Path $env:RUNNER_TEMP 'windows-startup')
-      - name: Check and convert genuine framebuffer captures
+      - name: Prepare framebuffer and desktop capture checks
         shell: powershell
         run: |
           python -m pip install --quiet Pillow
           if ($LASTEXITCODE -ne 0) { throw 'Pillow installation failed.' }
+      - name: Verify Windows desktop capture, focus, audio and native controller
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $inputs = Join-Path $env:RUNNER_TEMP 'windows-startup-inputs'
+          & ./source/scripts/check-windows-startup.ps1 -PackageZip (Join-Path $env:GITHUB_WORKSPACE 'downloads/DeadSpaceMobile-Windows-Desktop-Fix.zip') -Apk (Join-Path $inputs 'original.apk') -ReanimatedApk (Join-Path $inputs 'reanimated.apk') -MesaArchive (Join-Path $inputs 'mesa-llvmpipe-x86-26.2.6.7z') -WorkRoot (Join-Path $env:RUNNER_TEMP 'windows-startup')
+      - name: Check and convert genuine framebuffer captures
+        shell: powershell
+        run: |
           $evidence = Join-Path $env:RUNNER_TEMP 'windows-startup/evidence'
           Get-ChildItem $evidence -Filter '*.ppm' | ForEach-Object {
             python -c "import sys; from pathlib import Path; from PIL import Image; p=Path(sys.argv[1]); s=p.with_name(p.stem+'-frame-size.txt'); expected=tuple(map(int,s.read_text(encoding='utf-8-sig').split())) if s.exists() else (1366,768); im=Image.open(p).convert('RGB'); assert im.size==expected, (im.size,expected); assert any(lo!=hi for lo,hi in im.getextrema()), 'Blank framebuffer'; im.save(p.with_suffix('.png')); print(im.size, im.getextrema())" $_.FullName
