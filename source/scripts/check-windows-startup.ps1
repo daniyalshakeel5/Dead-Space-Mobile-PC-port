@@ -135,7 +135,10 @@ public static class DesktopProbe {
     function Click-Away {
         $probe.Show(); $probe.Activate(); [System.Windows.Forms.Application]::DoEvents()
         [DesktopProbe]::Click(35,40)
-        Start-Sleep -Milliseconds 400
+        for ($pump=0;$pump -lt 4;$pump++) {
+            [System.Windows.Forms.Application]::DoEvents()
+            Start-Sleep -Milliseconds 100
+        }
         if ($Game.HasExited) { throw 'Game exited when clicking another window.' }
         if ([DesktopProbe]::IsIconic($gameWindow)) { throw 'Focus loss minimized the game.' }
         if (![DesktopProbe]::CursorVisible()) { throw 'The system cursor stayed hidden outside the game.' }
@@ -161,6 +164,7 @@ public static class DesktopProbe {
         $probe.Hide()
         $resized = Capture-Game 'desktop-restored'
         if ($resized.Width -ne 900 -or $resized.Height -ne 540) { throw 'Background resize did not survive focus restoration.' }
+        Copy-Item (Join-Path $OutDir 'cursor-3.ppm') (Join-Path $OutDir 'desktop-integration.ppm')
         'PASS: real click-away cycles, unminimized fullscreen, external cursor visibility, background resize and desktop capture.' | Set-Content (Join-Path $OutDir 'desktop-result.txt')
     } finally {
         $probe.Dispose(); [DesktopProbe]::SetForegroundWindow($gameWindow) | Out-Null
@@ -180,7 +184,7 @@ foreach ($label in $labels) {
     if ($label -eq 'audio-selftest') { $env:DS_AUDIO_SELFTEST = '1' }
     if ($label -eq 'desktop-integration') {
         Get-ChildItem Env: | Where-Object { $_.Name -like 'DS_CONTROLLER*' -or $_.Name -in @('DS_NATIVE_PAD_TEST','DS_INPUT_DIAG','DS_SHOT_EVERY','DS_SHOT_DIR') } | ForEach-Object { Remove-Item ('Env:'+$_.Name) }
-        $env:DS_WIDTH='960'; $env:DS_HEIGHT='600'; $env:DS_FRAMES='3600'
+        $env:DS_WIDTH='960'; $env:DS_HEIGHT='600'; $env:DS_FRAMES='0'
         $env:DS_HD_TEXTURES='0'
         $env:DS_DESKTOP_PROBE_DIR=$evidence.Replace('\','/')
     }
@@ -195,7 +199,7 @@ foreach ($label in $labels) {
     $stderr = Join-Path $evidence ($label + '-stderr.log')
     $frame = Join-Path $evidence ($label + '.ppm')
     $env:DS_SHOT = '1200:' + $frame.Replace('\','/')
-    if ($label -eq 'desktop-integration') { $env:DS_SHOT='3600:'+$frame.Replace('\','/') }
+    if ($label -eq 'desktop-integration') { $env:DS_SHOT='-1:'+$frame.Replace('\','/') }
     $timeout = 180000
     if ($label -eq 'native-controller') {
         $env:DS_FRAMES = '14000'
@@ -226,6 +230,7 @@ foreach ($label in $labels) {
     $probeError=$null
     if ($label -eq 'desktop-integration') {
         try { Invoke-DesktopProbe $process $evidence } catch { $probeError=$_ }
+        if (!$process.HasExited) { $process.CloseMainWindow() | Out-Null }
     }
     $finished = $process.WaitForExit($timeout)
     if (!$finished) { $process.Kill(); $process.WaitForExit() }
