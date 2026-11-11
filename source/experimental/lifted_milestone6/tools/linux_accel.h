@@ -130,13 +130,28 @@ static int ds_accel_init(void) {
                 ds_accel_matrix[0],ds_accel_matrix[1],ds_accel_matrix[2],
                 ds_accel_matrix[3],ds_accel_matrix[4],ds_accel_matrix[5],
                 ds_accel_matrix[6],ds_accel_matrix[7],ds_accel_matrix[8]);
-    } else fprintf(stderr,"[LINUX_ACCEL] no readable IIO accelerometer; motion input unavailable\n");
+    } else {
+        /* The game can require an accelerometer during startup even when
+         * Linux/WSL exposes no IIO device. Keep one logical device alive
+         * with stationary gravity; never fake shake or Zero-G gestures. */
+        ds_accel_found=2;  /* 1 = real IIO, 2 = neutral dummy */
+        fprintf(stderr,"[LINUX_ACCEL] no readable IIO sensor; initialized stationary dummy\n");
+    }
     return ds_accel_found;
 }
 static int ds_accel_poll(uint64_t now,float xyz[3]) {
     if(!atomic_load(&ds_accel_enabled) || !ds_accel_init())return 0;
     if(ds_accel_samples && now-ds_accel_last_ms<(unsigned)atomic_load(&ds_accel_delay_ms))return 0;
     ds_accel_last_ms=now;
+    if(ds_accel_found==2) {
+        /* Neutral +1 g on Z in m/s^2; the native JNI reports one sensor.
+         * Preserve the original update-rate gate and Enabled/Disable flag. */
+        xyz[0]=0.0f; xyz[1]=0.0f; xyz[2]=9.807f;
+        ds_accel_samples++;
+        if(getenv("DS_ACCEL_DIAG") && (ds_accel_samples==1 || ds_accel_samples%100==0))
+            fprintf(stderr,"[ACCEL_DUMMY] n=%u xyz=(0,0,9.807) m/s2\n",ds_accel_samples);
+        return 1;
+    }
     float v[3];
     for(int i=0;i<3;i++) {
         char name[64];float raw;snprintf(name,sizeof name,"in_accel_%c_raw",'x'+i);
