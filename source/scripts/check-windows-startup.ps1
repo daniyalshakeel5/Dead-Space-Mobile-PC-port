@@ -115,6 +115,7 @@ public static class DesktopProbe {
     $probe.StartPosition = 'Manual'; $probe.Location = New-Object System.Drawing.Point(10,10)
     $probe.Size = New-Object System.Drawing.Size(160,64)
     $probe.ShowInTaskbar = $false; $probe.TopMost = $true
+    $probe.Cursor = [System.Windows.Forms.Cursors]::Arrow
     function Capture-Game([string]$Name) {
         [DesktopProbe]::SetForegroundWindow($gameWindow) | Out-Null
         $rect = [DesktopProbe]::Client($gameWindow)
@@ -141,10 +142,23 @@ public static class DesktopProbe {
         }
         if ($Game.HasExited) { throw 'Game exited when clicking another window.' }
         if ([DesktopProbe]::IsIconic($gameWindow)) { throw 'Focus loss minimized the game.' }
-        if (![DesktopProbe]::CursorVisible()) { throw 'The system cursor stayed hidden outside the game.' }
+        if ($script:desktopProbeOsCursor -and ![DesktopProbe]::CursorVisible()) { throw 'The system cursor stayed hidden outside the game.' }
     }
     $script:desktopProbeSerial=0
+    $script:desktopProbeOsCursor=$false
+    $cursorShows=0
     try {
+        # A headless runner can start with the OS cursor display count below zero.
+        $probe.Show(); $probe.Activate(); [System.Windows.Forms.Application]::DoEvents()
+        [DesktopProbe]::Click(35,40)
+        for ($pump=0;$pump -lt 4;$pump++) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 50 }
+        while (![DesktopProbe]::CursorVisible() -and $cursorShows -lt 8) {
+            [System.Windows.Forms.Cursor]::Show(); $cursorShows++
+            [System.Windows.Forms.Application]::DoEvents()
+        }
+        $script:desktopProbeOsCursor=[DesktopProbe]::CursorVisible()
+        ("OS cursor baseline supported: "+$script:desktopProbeOsCursor) | Set-Content (Join-Path $OutDir 'desktop-cursor-baseline.txt')
+        $probe.Hide()
         [void](Capture-Game 'desktop-windowed')
         Click-Away
         $probe.Hide(); [DesktopProbe]::SetForegroundWindow($gameWindow) | Out-Null
@@ -167,6 +181,7 @@ public static class DesktopProbe {
         Copy-Item (Join-Path $OutDir 'cursor-3.ppm') (Join-Path $OutDir 'desktop-integration.ppm')
         'PASS: real click-away cycles, unminimized fullscreen, external cursor visibility, background resize and desktop capture.' | Set-Content (Join-Path $OutDir 'desktop-result.txt')
     } finally {
+        for ($show=0;$show -lt $cursorShows;$show++) { [System.Windows.Forms.Cursor]::Hide() }
         $probe.Dispose(); [DesktopProbe]::SetForegroundWindow($gameWindow) | Out-Null
     }
 }
@@ -229,7 +244,10 @@ foreach ($label in $labels) {
     $errorTask = $process.StandardError.ReadToEndAsync()
     $probeError=$null
     if ($label -eq 'desktop-integration') {
-        try { Invoke-DesktopProbe $process $evidence } catch { $probeError=$_ }
+        try { Invoke-DesktopProbe $process $evidence } catch {
+            $probeError=$_
+            $_ | Out-String | Set-Content (Join-Path $evidence 'desktop-probe-error.txt')
+        }
         if (!$process.HasExited) { $process.CloseMainWindow() | Out-Null }
     }
     $finished = $process.WaitForExit($timeout)
